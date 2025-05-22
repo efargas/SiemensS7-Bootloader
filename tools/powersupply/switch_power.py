@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 from sys import argv, exit
 import argparse
@@ -34,7 +34,7 @@ if args.method == 'web':
         regex = re.compile('<meta name="X-Request-Token" content="([a-f0-9]+)">')
         match = regex.search(r.text) # Use search instead of findall
         if not match:
-            print "Error: Could not find X-Request-Token on the page."
+            print("Error: Could not find X-Request-Token on the page.")
             exit(1)
         request_token = match.group(1)
 
@@ -44,10 +44,10 @@ if args.method == 'web':
 
         r_post = s.post(host+"/ajax/rw_actor.php", data={"rw":1, "actor_nr": 1, "on_off":toggle,"ts":1536062812}, headers=headers, timeout=5) # Added timeout
         r_post.raise_for_status() # Check for HTTP errors
-        print "Successfully sent {} command via web.".format(args.mode)
+        print("Successfully sent {} command via web.".format(args.mode))
         exit(0)
     except Exception as e:
-        print "Error during web request: {}".format(e)
+        print("Error during web request: {}".format(e))
         exit(1)
 
 elif args.method == 'arduino':
@@ -57,31 +57,31 @@ elif args.method == 'arduino':
     try:
         import serial # Import serial here
     except ImportError:
-        print "Error: pyserial library is not installed. Please install it (e.g., pip install pyserial)"
+        print("Error: pyserial library is not installed. Please install it (e.g., pip install pyserial)")
         exit(1)
 
     command_to_send = "ON\n" if args.mode == "on" else "OFF\n" # Add newline
 
     try:
-        print "Attempting to connect to Arduino on port {} at {} baud...".format(args.arduino_port, args.baud_rate)
+        print("Attempting to connect to Arduino on port {} at {} baud...".format(args.arduino_port, args.baud_rate))
         # Ensure port is not None before attempting to open
         if args.arduino_port is None:
-            print "Error: Arduino port not specified."
+            print("Error: Arduino port not specified.")
             exit(1)
 
         ser = serial.Serial(args.arduino_port, args.baud_rate, timeout=2) # Added timeout
-        print "Connected to Arduino."
+        print("Connected to Arduino.")
         ser.write(command_to_send.encode()) # Encode string to bytes
-        print "Sent '{}' command to Arduino.".format(args.mode.upper())
+        print("Sent '{}' command to Arduino.".format(args.mode.upper()))
         ser.close()
         exit(0)
     except serial.SerialException as e:
-        print "Serial Error: {}. Check port and permissions.".format(e)
+        print("Serial Error: {}. Check port and permissions.".format(e))
         exit(1)
     except Exception as e:
-        print "An unexpected error occurred with Arduino communication: {}".format(e)
+        print("An unexpected error occurred with Arduino communication: {}".format(e))
         exit(1)
 else:
     # Should not happen due to choices in argparse
-    print "Invalid method selected."
+    print("Invalid method selected.")
     exit(1)
