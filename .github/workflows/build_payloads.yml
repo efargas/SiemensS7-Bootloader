@@ -1,0 +1,57 @@
+name: Build Payloads CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-payloads:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y clang make gcc-arm-none-eabi gcc-arm-linux-gnueabi
+
+    - name: Build All Payloads
+      run: |
+        set -e # Exit immediately if a command exits with a non-zero status.
+        
+        echo "Building Makefile-based payloads..."
+        # Payloads known to use Makefiles
+        PAYLOAD_DIRS_MAKE="payloads/dump_mem payloads/hello_loop payloads/tic_tac_toe"
+        for dir in $PAYLOAD_DIRS_MAKE; do
+          echo "==== Building $dir ===="
+          if [ -f "$dir/Makefile" ]; then
+            (cd "$dir" && make)
+            echo "==== $dir built successfully. ===="
+          else
+            echo "Error: Makefile not found in $dir"
+            exit 1
+          fi
+        done
+
+        echo "" # Newline for better log separation
+        echo "Building script-based payloads..."
+        # Payloads known to use build.sh
+        PAYLOAD_DIRS_SH="payloads/hello_world payloads/stager"
+        for dir in $PAYLOAD_DIRS_SH; do
+          echo "==== Building $dir ===="
+          if [ -f "$dir/build.sh" ]; then
+            (cd "$dir" && ./build.sh)
+            echo "==== $dir built successfully. ===="
+          else
+            echo "Error: build.sh not found in $dir"
+            exit 1
+          fi
+        done
+        
+        echo "" # Newline
+        echo "All specified payloads compiled successfully."
+```
