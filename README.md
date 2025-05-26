@@ -301,3 +301,55 @@ We presented our research at multiple venues. Here is the list of them:
  * [Doors of Durin: The Veiled Gate to Siemens S7 Silicon](https://i.blackhat.com/eu-19/Wednesday/eu-19-Abbasi-Doors-Of-Durin-The-Veiled-Gate-To-Siemens-S7-Silicon.pdf), Ali Abbasi, Tobias Scharnowski, Thorsten Holz, Black Hat Europe, December 2019, London, United Kingdom.
 
 
+## Compiling Payloads
+
+The payloads are located in the `payloads/` directory. Some are built using Makefiles, while others use simple shell scripts. Two different ARM cross-compilation toolchains are utilized by the build system.
+
+### Prerequisites
+
+To compile the payloads, you will need a Linux environment. We recommend using a recent Ubuntu LTS release, such as:
+
+*   **Ubuntu 22.04 LTS (Jammy Jellyfish)**
+*   **Ubuntu 20.04 LTS (Focal Fossa)**
+
+You will need to install the following packages:
+
+1.  **Clang (C compiler):** Used for compiling C code in the Makefile-based payloads.
+2.  **Make:** The build automation tool used for some payloads.
+3.  **ARM None-EABI Toolchain (Binutils):** Provides linker, objcopy, etc., for bare-metal ARM targets. `clang` uses these tools.
+4.  **ARM Linux GNU EABI Toolchain (GCC/Binutils):** Provides assembler and objcopy for ARM Linux targets, used by some shell script-based builds.
+
+You can install these on Ubuntu using `apt`:
+
+```bash
+sudo apt update
+sudo apt install -y clang make gcc-arm-none-eabi gcc-arm-linux-gnueabi
+```
+
+### Building
+
+Once the prerequisites are installed, you can compile the individual payloads.
+
+*   **For payloads with Makefiles** (e.g., `dump_mem`, `hello_loop`, `tic_tac_toe`):
+    Navigate to the payload's directory and run `make`.
+    For example:
+    ```bash
+    cd payloads/dump_mem
+    make
+    cd ../../ 
+    # Repeat for other Makefile-based payloads
+    ```
+    The compiled binaries (e.g., `.bin`, `.ihex`) will typically be placed in a `build/` subdirectory within the payload's folder.
+
+*   **For payloads with `build.sh` scripts** (e.g., `hello_world`, `stager`):
+    Navigate to the payload's directory and execute the `build.sh` script.
+    For example:
+    ```bash
+    cd payloads/hello_world
+    ./build.sh
+    cd ../../
+    # Repeat for other script-based payloads
+    ```
+    The compiled binary (usually `.bin`) will be created in the payload's folder.
+
+Please refer to the specific `Makefile` or `build.sh` in each payload directory if you encounter issues or need more details on their individual build processes.
