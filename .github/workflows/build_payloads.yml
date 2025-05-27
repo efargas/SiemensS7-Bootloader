@@ -54,3 +54,4 @@ jobs:
         
         echo "" # Newline
         echo "All specified payloads compiled successfully."
+```
