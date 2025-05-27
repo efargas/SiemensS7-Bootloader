@@ -97,4 +97,3 @@ jobs:
         name: compiled-payloads
         path: staging-payloads/
         if-no-files-found: error
-```
