@@ -48,3 +48,55 @@ jobs:
           fi
         done
         echo "All specified payloads compiled successfully."
+        
+    - name: Prepare and Upload Compiled Payloads
+      run: |
+        set -e
+        ARTIFACT_DIR="staging-payloads"
+        mkdir -p "$ARTIFACT_DIR"
+
+        # Makefile-based payloads (from their build/ subdirectory)
+        declare -A MAKEFILE_PAYLOADS=(
+          ["dump_mem/dump_mem.bin"]="payloads/dump_mem/build/dump_mem.bin"
+          ["dump_mem/dump_mem.ihex"]="payloads/dump_mem/build/dump_mem.ihex"
+          ["hello_loop/hello_loop.bin"]="payloads/hello_loop/build/hello_loop.bin"
+          ["hello_loop/hello_loop.ihex"]="payloads/hello_loop/build/hello_loop.ihex"
+          ["tic_tac_toe/tic_tac_toe.bin"]="payloads/tic_tac_toe/build/tic_tac_toe.bin"
+          ["tic_tac_toe/tic_tac_toe.ihex"]="payloads/tic_tac_toe/build/tic_tac_toe.ihex"
+        )
+        for dest_path in "${!MAKEFILE_PAYLOADS[@]}"; do
+          src_path="${MAKEFILE_PAYLOADS[$dest_path]}"
+          if [ -f "$src_path" ]; then
+            mkdir -p "$ARTIFACT_DIR/$(dirname "$dest_path")"
+            cp "$src_path" "$ARTIFACT_DIR/$dest_path"
+            echo "Copied $src_path to $ARTIFACT_DIR/$dest_path"
+          else
+            echo "Warning: Compiled payload $src_path not found!"
+          fi
+        done
+
+        # Script-based payloads (from their root directory)
+        declare -A SCRIPT_PAYLOADS=(
+          ["hello_world/hello_world.bin"]="payloads/hello_world/hello_world.bin"
+          ["stager/stager.bin"]="payloads/stager/stager.bin"
+        )
+        for dest_path in "${!SCRIPT_PAYLOADS[@]}"; do
+          src_path="${SCRIPT_PAYLOADS[$dest_path]}"
+          if [ -f "$src_path" ]; then
+            mkdir -p "$ARTIFACT_DIR/$(dirname "$dest_path")"
+            cp "$src_path" "$ARTIFACT_DIR/$dest_path"
+            echo "Copied $src_path to $ARTIFACT_DIR/$dest_path"
+          else
+            echo "Warning: Compiled payload $src_path not found!"
+          fi
+        done
+        echo "All specified payloads compiled successfully."
+        echo "Contents of $ARTIFACT_DIR:"
+        ls -R "$ARTIFACT_DIR"
+
+    - name: Upload Payloads Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: compiled-payloads
+        path: staging-payloads/
+        if-no-files-found: error
