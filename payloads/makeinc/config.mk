@@ -23,7 +23,7 @@ LDFLAGS := \
     -Tlink.ld \
     -nostdlib \
     --gc-sections \
-    -nostartfiles
+    --nostartfiles
 
 ifeq ($(FW_VER),)
 FW_VER := 2
