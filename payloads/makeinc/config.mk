@@ -17,13 +17,13 @@ CFLAGS := \
     -frwpi \
     -fropi \
     -mbig-endian \
-	-target arm-none-eabi
+    -target arm-none-eabi
+
 LDFLAGS := \
     -EB \
     -Tlink.ld \
     -nostdlib \
-    --gc-sections \
-    -nostartfiles
+    --gc-sections
 
 ifeq ($(FW_VER),)
 FW_VER := 2
