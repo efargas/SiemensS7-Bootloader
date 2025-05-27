@@ -44,5 +44,4 @@ jobs:
             exit 1
           fi
         done
-        # Last line "echo "All specified payloads compiled successfully."" removed.
-```
+        echo "All specified payloads compiled successfully."
