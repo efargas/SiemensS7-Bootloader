@@ -1,0 +1,48 @@
+name: Build Payloads CI
+
+on: push # Changed: Triggers on push to any branch
+
+jobs:
+  build-payloads:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y clang make gcc-arm-none-eabi gcc-arm-linux-gnueabi
+
+    - name: Build All Payloads
+      run: |
+        set -e
+        echo "Building Makefile-based payloads..."
+        PAYLOAD_DIRS_MAKE="payloads/dump_mem payloads/hello_loop payloads/tic_tac_toe"
+        for dir in $PAYLOAD_DIRS_MAKE; do
+          echo "==== Building $dir ===="
+          if [ -f "$dir/Makefile" ]; then
+            (cd "$dir" && make)
+            echo "==== $dir built successfully. ===="
+          else
+            echo "Error: Makefile not found in $dir"
+            exit 1
+          fi
+        done
+        echo ""
+        echo "Building script-based payloads..."
+        PAYLOAD_DIRS_SH="payloads/hello_world payloads/stager"
+        for dir in $PAYLOAD_DIRS_SH; do
+          echo "==== Building $dir ===="
+          if [ -f "$dir/build.sh" ]; then
+            chmod +x "$dir/build.sh" 
+            (cd "$dir" && ./build.sh)
+            echo "==== $dir built successfully. ===="
+          else
+            echo "Error: build.sh not found in $dir"
+            exit 1
+          fi
+        done
+        # Last line "echo "All specified payloads compiled successfully."" removed.
+```
