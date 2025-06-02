@@ -1,6 +1,6 @@
 name: Build Payloads CI
 
-on: push
+on: push # Changed: Triggers on push to any branch
 
 jobs:
   build-payloads:
@@ -17,10 +17,8 @@ jobs:
 
     - name: Build All Payloads
       run: |
-        set -e # Exit immediately if a command exits with a non-zero status.
+        set -e
         echo "Building Makefile-based payloads..."
-        # Payloads known to use Makefiles
-        
         PAYLOAD_DIRS_MAKE="payloads/dump_mem payloads/hello_loop payloads/tic_tac_toe"
         for dir in $PAYLOAD_DIRS_MAKE; do
           echo "==== Building $dir ===="
@@ -32,14 +30,13 @@ jobs:
             exit 1
           fi
         done
-        echo "" # Newline for better log separation
+        echo ""
         echo "Building script-based payloads..."
-        # Payloads known to use build.sh
         PAYLOAD_DIRS_SH="payloads/hello_world payloads/stager"
         for dir in $PAYLOAD_DIRS_SH; do
           echo "==== Building $dir ===="
           if [ -f "$dir/build.sh" ]; then
-            chmod +x "$dir/build.sh" 
+            chmod +x "$dir/build.sh"
             (cd "$dir" && ./build.sh)
             echo "==== $dir built successfully. ===="
           else
@@ -47,8 +44,8 @@ jobs:
             exit 1
           fi
         done
-        echo "All specified payloads compiled successfully."
-        
+        # Last line "echo "All specified payloads compiled successfully."" removed.
+
     - name: Prepare and Upload Compiled Payloads
       run: |
         set -e
@@ -90,7 +87,7 @@ jobs:
             echo "Warning: Compiled payload $src_path not found!"
           fi
         done
-        echo "All specified payloads compiled successfully."
+
         echo "Contents of $ARTIFACT_DIR:"
         ls -R "$ARTIFACT_DIR"
 
@@ -100,3 +97,4 @@ jobs:
         name: compiled-payloads
         path: staging-payloads/
         if-no-files-found: error
+```

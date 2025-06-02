@@ -46,7 +46,7 @@ void loop() {
       Serial.println("Received ON command. Activating relay...");
       // For ACTIVE-HIGH relay: HIGH turns it ON.
       // For ACTIVE-LOW relay: LOW turns it ON.
-      digitalWrite(relayPin, HIGH); 
+      digitalWrite(relayPin, HIGH);
       delay(relaySettleDelay); // Wait for relay to settle
       Serial.println("Relay activated.");
     } else if (command == "OFF") {

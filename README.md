@@ -1,4 +1,3 @@
-[![Build Payloads CI](https://github.com/efargas/SiemensS7-Bootloader/actions/workflows/build_payloads.yml/badge.svg?branch=master)](https://github.com/efargas/SiemensS7-Bootloader/actions/workflows/build_payloads.yml)
 <p align="center">
   <img src="pics/x-ray.gif" alt="Siemens S7-1200 3D X-Ray"/>
 </p>
@@ -337,7 +336,7 @@ Once the prerequisites are installed, you can compile the individual payloads.
     ```bash
     cd payloads/dump_mem
     make
-    cd ../../ 
+    cd ../../
     # Repeat for other Makefile-based payloads
     ```
     The compiled binaries (e.g., `.bin`, `.ihex`) will typically be placed in a `build/` subdirectory within the payload's folder.
