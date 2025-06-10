@@ -7,6 +7,8 @@ import re
 # Import requests only if needed for web method
 # Import serial only if needed for arduino method
 
+# Import ModbusTcpClient only if needed for fx3u method
+
 parser = argparse.ArgumentParser(description='Switch power on the remote power supply')
 parser.add_argument('-p', '--port', dest='port', default=80, type=lambda x: int(x, 0),
                         help='the port to use (may be changed away from 80 for local port forwarding for web method)')
@@ -25,9 +27,9 @@ fx3u_group = parser.add_argument_group('Mitsubishi FX3U Options')
 fx3u_group.add_argument('--fx3u-ip', dest='fx3u_ip',
                         help='IP address of the Mitsubishi FX3U PLC. Required if method is fx3u.')
 fx3u_group.add_argument('--fx3u-port', dest='fx3u_port', default=502, type=int,
-                        help='Port for MC Protocol communication with FX3U PLC (default: 502).')
-fx3u_group.add_argument('--fx3u-output', dest='fx3u_output',
-                        help="Output address on the FX3U PLC (e.g., 'Y0', 'Y1'). Required if method is fx3u.")
+                        help='Port for Modbus TCP communication with FX3U PLC (default: 502).')
+fx3u_group.add_argument('--fx3u-output', dest='fx3u_output', type=int,
+                        help="Modbus coil address (integer) on the FX3U PLC (e.g., 0, 1). Required if method is fx3u.")
 
 args = parser.parse_args()
 
@@ -96,27 +98,40 @@ elif args.method == 'fx3u':
         parser.error("--fx3u-ip and --fx3u-output are required when --method is fx3u")
 
     try:
-        from plc_conn.plc_utils import PLC
+        from pymodbus.client import ModbusTcpClient
     except ImportError:
-        print("Error: plc_conn library is not installed. Please install it, e.g., pip install git+https://github.com/nexus1203/plc_conn.git")
+        print("Error: pymodbus library is not installed. Please install it (e.g., pip install pymodbus)")
         exit(1)
 
     state_to_write = True if args.mode == "on" else False
+    client = None  # Initialize client to None for finally block
 
     try:
-        print(f"Attempting to connect to FX3U PLC at {args.fx3u_ip}:{args.fx3u_port} to control output {args.fx3u_output}...")
-        plc = PLC(ip_address=args.fx3u_ip, port=args.fx3u_port, plc_type="MEL_FX3U", log=False)
-        result = plc.write_bool(args.fx3u_output, state_to_write)
-
-        if result == "success":
-            print("Successfully sent {} command to FX3U output {}.".format(args.mode, args.fx3u_output))
-            exit(0)
-        else:
-            print("Failed to {} FX3U output {}. PLC responded: {}".format(args.mode, args.fx3u_output, result))
+        print(f"Attempting to connect to FX3U PLC at {args.fx3u_ip}:{args.fx3u_port} to control coil {args.fx3u_output}...")
+        client = ModbusTcpClient(args.fx3u_ip, port=args.fx3u_port)
+        if not client.connect():
+            print(f"Failed to connect to Modbus TCP server at {args.fx3u_ip}:{args.fx3u_port}")
             exit(1)
+
+        # args.fx3u_output is already an int due to type=int in add_argument
+        address = args.fx3u_output
+
+        print(f"Writing state {state_to_write} to coil {address}...")
+        rr = client.write_coil(address, state_to_write)
+
+        if rr.isError():
+            print(f"Failed to {args.mode} FX3U coil {address}. Modbus Error: {rr}")
+            exit(1)
+        else:
+            print(f"Successfully sent {args.mode} command to FX3U coil {address}.")
+            exit(0)
+
     except Exception as e:
-        print("Error communicating with FX3U PLC: {}".format(e))
+        print(f"Error communicating with FX3U PLC via Modbus TCP: {e}")
         exit(1)
+    finally:
+        if client:
+            client.close()
 
 else:
     # Should not happen due to choices in argparse
