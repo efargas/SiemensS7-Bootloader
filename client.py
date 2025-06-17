@@ -759,6 +759,8 @@ def main():
                         help="local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH", required=True)
     parser.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
                         help='switch the power adapter on and off')
+    parser.add_argument('--no-power-supply', dest='no_power_supply', default=False, action='store_true',
+                        help='Disable power supply control logic even if other power supply arguments are present.')
     parser.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
                         help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding (for web method)')
     parser.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
@@ -831,7 +833,7 @@ def main():
     # proved to be reliable. We may want to refactor this.
     s = remote("localhost", args.port)
 
-    if args.switch_power:
+    if args.switch_power and not args.no_power_supply:
         print("Turning off power supply using method '{}' and sleeping for {:d} seconds".format(args.powersupply_method, args.powersupply_delay))
 
         # switch_power.py is now python3. Commands are lists of strings, this is fine.
@@ -869,21 +871,54 @@ def main():
 
 
     print("Looping now")
-    for i in range(100):
-        # while True:
-        # We have 500000 microseconds (half a second) to hit the timing
-        s.send(pad + magic) # pad and magic are bytes
+    connected = False
+    if args.no_power_supply:
+        print("Attempting connection without power cycling for 60 seconds...")
+        start_time = time.time()
+        while time.time() - start_time < 60:
+            s.send(pad + magic) # pad and magic are bytes
+            answ = s.recv(256, timeout=0.3) # answ is bytes
+            if len(answ) > 0:
+                # Check for partial reception of magic string
+                if not answ.startswith(b"\x05-CPU"):
+                    # Try to receive more data if it doesn't start with the magic string
+                    # This is a simple attempt, might need more robust handling for fragmented packets
+                    answ += s.recv(256, timeout=0.1) # Shorter timeout for subsequent recv
 
-        answ = s.recv(256, timeout=0.3) # answ is bytes
-        if len(answ) > 0:
-            # "\5-CPU" should be b"\5-CPU"
-            if not answ.startswith(b"\x05-CPU"):
-                answ += s.recv(256)
-            assert(answ.startswith(b"\x05-CPU")) # Check against bytes
-            s.unrecv(answ) # answ is bytes, unrecv should handle it
+                if answ.startswith(b"\x05-CPU"):
+                    s.unrecv(answ) # answ is bytes, unrecv should handle it
+                    handle_conn(s, args.action, args)
+                    connected = True
+                    break
+            # Optional: short sleep to prevent spamming in the loop if needed,
+            # but recv timeout already provides some delay.
+            # time.sleep(0.1) # Example: sleep 100ms
 
-            handle_conn(s, args.action, args)
-            break
+        if not connected:
+            print("Error: Could not connect to PLC within 60 seconds without power cycling.")
+            s.close() # Close the connection
+            exit(1) # Exit the script
+
+    else: # This is the original loop when --no-power-supply is not set
+        for i in range(100): # Original loop had a range of 100 attempts
+            # We have 500000 microseconds (half a second) to hit the timing
+            s.send(pad + magic) # pad and magic are bytes
+
+            answ = s.recv(256, timeout=0.3) # answ is bytes
+            if len(answ) > 0:
+                # "\5-CPU" should be b"\5-CPU"
+                if not answ.startswith(b"\x05-CPU"):
+                    answ += s.recv(256) # Original logic to try and get more
+                if answ.startswith(b"\x05-CPU"): # Re-check after potential second recv
+                    s.unrecv(answ) # answ is bytes, unrecv should handle it
+                    handle_conn(s, args.action, args)
+                    connected = True
+                    break
+        if not connected:
+            print("Error: Failed to connect after 100 attempts with power cycling.")
+            s.close()
+            exit(1)
+
 
     print("Done.")
 
