@@ -137,7 +137,9 @@ To use this utility, you'll need to set up a specific hardware and software envi
 
 *   An affected Siemens S7-1200 PLC (e.g., CPU 1212C DC/DC/DC [6ES7 212-1AE40-0XB0]).
 *   A TTL 3.3V USB to Serial adapter (e.g., FTDI FT232RL).
-*   (Optional but recommended for power cycling) A network-controlled power socket (e.g., [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html)). If used, ensure it's configured to a known IP address (e.g., `192.168.0.100`, which is the default in `client.sh`).
+*   **Power Supply for PLC:** A method to power cycle the PLC. This can be:
+    *   A network-controlled power socket (e.g., ALLNET ALL3075V3, controlled via HTTP as detailed below). If used, ensure it's configured to a known IP address (e.g., `192.168.0.100`).
+    *   A Mitsubishi FX3U PLC (or compatible) controlling the S7 PLC's power, accessible via Modbus TCP.
 
 ### Software Requirements and Setup Instructions
 
@@ -166,9 +168,9 @@ We recommend using **Ubuntu 20.04 LTS (Focal Fossa)** for the most straightforwa
     ```
 
 4.  **Install required Python 2 libraries:**
-    The client scripts require `pwntools` and `requests`.
+    The client scripts and power supply control script require `pwntools`, `requests` (for HTTP power control), and `pymodbus` (for Modbus power control).
     ```bash
-    sudo pip2 install pwntools requests
+    sudo pip2 install pwntools requests pymodbus
     ```
 
 ### UART Wiring
@@ -188,8 +190,37 @@ Once your environment is set up and hardware connected:
 1.  **Identify your TTYUSB adapter:**
     Connect your USB to TTL adapter. It will typically appear as `/dev/ttyUSB0` on a Linux machine. This path is hardcoded in `start.sh` but can be changed if needed.
 
-2.  **Configure Power Supply (if used):**
-    If you're using a network-controlled power supply like the ALLNET ALL3075V3, ensure its IP address is set (e.g., to `192.168.0.100`) and update `client.sh` if you use a different IP.
+2.  **Configure and Control Power Supply (if used for automated power cycling):**
+    The `client.py` script can automate power cycling of the target S7 PLC using the `tools/powersupply/switch_power.py` script. This script supports different types of power control mechanisms.
+
+    **Using `tools/powersupply/switch_power.py` directly:**
+    This script can be used manually or invoked by other scripts (like `client.py`).
+
+    Common arguments:
+    *   `mode`: `on` or `off` (positional argument, required)
+    *   `--ps-type`: Specifies the type of power supply. Choices: `http` (default), `mitsubishi_modbus`.
+
+    **HTTP Power Supply (e.g., ALLNET ALL3075V3):**
+    This is the default type.
+    *   `--host <ip_address>`: IP address or hostname of the HTTP power supply (default: `powersupply`).
+    *   `--port <port_number>`: Port of the HTTP power supply (default: `80`).
+    Example:
+    ```bash
+    python tools/powersupply/switch_power.py --ps-type http --host 192.168.0.100 --port 80 on
+    ```
+
+    **Mitsubishi FX3U Modbus TCP Power Supply:**
+    Uses a Mitsubishi FX3U PLC (or compatible) to control power to the S7 PLC via a Modbus TCP command to a coil.
+    *   `--modbus-host <ip_address>`: IP address of the Mitsubishi PLC. (Required if `ps-type` is `mitsubishi_modbus`)
+    *   `--modbus-port <port_number>`: Modbus TCP port of the PLC (default: `502`).
+    *   `--modbus-coil <coil_address>`: Modbus coil address (0-indexed) to write to (default: `0`). This coil on the Mitsubishi PLC should be wired to control the S7 PLC's power.
+    Example:
+    ```bash
+    python tools/powersupply/switch_power.py --ps-type mitsubishi_modbus --modbus-host 192.168.1.10 --modbus-coil 0 on
+    ```
+
+    **Integration with `client.py`:**
+    When using `client.py` with the `--switch-power` option, `client.py` itself needs to be configured to pass the correct parameters to `tools/powersupply/switch_power.py`. The original `client.sh` and `client.py` are set up for the HTTP power supply. To use the Mitsubishi Modbus method with `client.py`, you would need to modify `client.py` to accept and pass through the Modbus-specific arguments (like `--ps-type mitsubishi_modbus`, `--ps-modbus-host`, etc.) to `switch_power.py`. Refer to the `Conceptual Changes` section of the development log for how `client.py` might be adapted. The `client.sh` script would also need to be updated to pass these new arguments to `client.py`.
 
 3.  **Compile Payloads:**
     The C payloads need to be compiled for the ARM Cortex-R4 CPU. Navigate to the specific payload directory and use `make`. For example, for `hello_loop`:
