@@ -1,6 +1,2 @@
-A=--powersupply-host
-B=192.168.0.100
-C=--port
-D=1238
 echo Remaining arguments: "$@"
-python3 client.py $A $B $C $D "$@"
+python3 client.py --method fx3u --ip 192.168.1.18 --port 502 --output 0 "$@"
