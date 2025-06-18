@@ -757,31 +757,41 @@ def main():
 
     parser.add_argument('-P', '--port', dest='port', type=lambda x: int(x, 0),
                         help="local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH", required=True)
-    parser.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
-                        help='switch the power adapter on and off')
-    parser.add_argument('--no-power-supply', dest='no_power_supply', default=False, action='store_true',
+    
+    # Power Supply Options
+    ps_options_group = parser.add_argument_group('Power Supply Options')
+    ps_options_group.add_argument('--no-power-supply', dest='no_power_supply', default=False, action='store_true',
                         help='Disable power supply control logic even if other power supply arguments are present.')
-    parser.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
-                        help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding (for web method)')
-    parser.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
-                        help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding (for web method)")
-    parser.add_argument('--powersupply-delay', dest='powersupply_delay', default=60, type=lambda x: int(x, 0),
+    ps_options_group.add_argument('--powersupply-method', dest='powersupply_method', default='web', choices=['web', 'arduino', 'fx3u'],
+                        help='The method to use for switching power (web, arduino, or fx3u)')
+    ps_options_group.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
+                        help='switch the power adapter on and off')
+    ps_options_group.add_argument('--powersupply-delay', dest='powersupply_delay', default=60, type=lambda x: int(x, 0),
                         help="number of seconds to wait before turning on power supply. defaults to 60.")
-    parser.add_argument('--powersupply-method', dest='powersupply_method', default='web', choices=['web', 'arduino', 'fx3u'],
+    
+    # ALLNET ALL3075V3 Network controlled specific arguments
+    ps_allnet_group = parser.add_argument_group('Power Supply ALLNET ALL3075V3 Options')
+    ps_allnet_group.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
+                        help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding (for web method)')
+    ps_allnet_group.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
+                        help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding (for web method)")
+    
+    # Arduino specific arguments
+    ps_arduino_group = parser.add_argument_group('Arduino Options')
                         help='Method to control the power supply (web, arduino, fx3u). Default: web.')
-    parser.add_argument('--powersupply-arduino-port', dest='powersupply_arduino_port',
+    ps_arduino_group.add_argument('--powersupply-arduino-port', dest='powersupply_arduino_port',
                         help='Serial port for Arduino (e.g., /dev/ttyUSB0). Required if --powersupply-method is arduino.')
-    parser.add_argument('--powersupply-baud-rate', dest='powersupply_baud_rate', default=9600, type=int,
-                        help='Baud rate for Arduino serial communication. Default: 9600.')
+    ps_arduino_group.add_argument('--powersupply-baud-rate', dest='powersupply_baud_rate', default=9600, type=int,
+                        help='Baud rate for Arduino serial communication. Default: 9600.')    
 
     # FX3U Power Supply Options
     ps_fx3u_group = parser.add_argument_group('Power Supply Mitsubishi FX3U Options')
     ps_fx3u_group.add_argument('--powersupply-fx3u-ip', dest='powersupply_fx3u_ip',
-                               help='IP address of the Mitsubishi FX3U PLC (for --powersupply-method fx3u).')
+                        help='IP address of the Mitsubishi FX3U PLC (for --powersupply-method fx3u).')
     ps_fx3u_group.add_argument('--powersupply-fx3u-port', dest='powersupply_fx3u_port', type=lambda x: int(x, 0),
-                               help='Port for MC Protocol on FX3U PLC (for --powersupply-method fx3u). Defaults to 502 if not specified (via switch_power.py).')
+                        help='Port for MC Protocol on FX3U PLC (for --powersupply-method fx3u). Defaults to 502 if not specified (via switch_power.py).')
     ps_fx3u_group.add_argument('--powersupply-fx3u-output', dest='powersupply_fx3u_output',
-                               help="Output address on FX3U PLC (e.g., 'Y0') (for --powersupply-method fx3u).")
+                        help="Output address on FX3U PLC (e.g., 'Y0') (for --powersupply-method fx3u).")
 
     parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME, # Changed 'r' to 'rb'
                         help='the location of the stager payload')
@@ -800,8 +810,6 @@ def main():
     parser_dump.add_argument('-d', '--dump-payload', dest='payload', type=argparse.FileType('rb'), default=DUMPMEM_PL_FILENAME)
     parser_dump.add_argument('-o', '--out-file', dest='outfile', default=None, help="Name of file to store the dump at")
 
-
-
     parser_test = subparsers.add_parser(ACTION_TEST)
     # Default is a .bin file, should be 'rb'
     parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_world/hello_world.bin",
@@ -819,12 +827,10 @@ def main():
     parser_tic_tac_toe.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
                         help='The file containing the payload to be executed, defaults to payloads/tic_tac_toe/build/tic_tac_toe.bin')
 
- 
-
-    args = parser.parse_args()
+     args = parser.parse_args()
 
     # Conditional requirement for --powersupply-arduino-port
-    if args.powersupply_method == 'arduino' and not args.powersupply_arduino_port:
+    if (args.powersupply_method == 'arduino') and (args.powersupply_arduino_port is None):
         parser.error("--powersupply-arduino-port is required when --powersupply-method is arduino")
 
     # Conditional requirement for FX3U arguments handled within the `if args.switch_power:` block below.
@@ -833,7 +839,7 @@ def main():
     # proved to be reliable. We may want to refactor this.
     s = remote("localhost", args.port)
 
-    if args.switch_power and not args.no_power_supply:
+    if (args.switch_power is not None) and (args.no_power_supply is None):
         print("Turning off power supply using method '{}' and sleeping for {:d} seconds".format(args.powersupply_method, args.powersupply_delay))
 
         # switch_power.py is now python3. Commands are lists of strings, this is fine.
@@ -849,7 +855,7 @@ def main():
             base_cmd_off.extend(arduino_args)
             base_cmd_on.extend(arduino_args)
         elif args.powersupply_method == 'fx3u':
-            if not args.powersupply_fx3u_ip or not args.powersupply_fx3u_output:
+            if (args.powersupply_fx3u_ip is None) or (args.powersupply_fx3u_output is None):
                 parser.error("error: --powersupply-fx3u-ip and --powersupply-fx3u-output are required when --powersupply-method is fx3u")
             fx3u_args = ["--method", "fx3u",
                          "--fx3u-ip", args.powersupply_fx3u_ip,
