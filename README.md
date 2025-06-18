@@ -129,32 +129,121 @@ The idea behind the implementation is as follows:
 #### RCE in older PLCs
 We spotted similar functionality in 2014 models of S7-1212C Siemens PLCs (6ES7212-1BE31-0XB0). The bootloader functionality was spotted at offset 0xE664 of older PLC bootloader (S7-1200v3).
 
+## Setup Environment
 
+To use this utility, you'll need to set up a specific hardware and software environment.
 
-### Setup Environment
+### Hardware Requirements
 
-As mentioned earlier we used a 6ES7 212-1AE40-0XB0 S7-1200 PLC with a [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html) Network controlled socket and a FTDI FT232RL USB to TTL Serial Converter. 
+*   An affected Siemens S7-1200 PLC (e.g., CPU 1212C DC/DC/DC [6ES7 212-1AE40-0XB0]).
+*   A TTL 3.3V USB to Serial adapter (e.g., FTDI FT232RL).
+*   (Optional but recommended for power cycling) A network-controlled power socket (e.g., [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html)). If used, ensure it's configured to a known IP address (e.g., `192.168.0.100`, which is the default in `client.sh`).
 
+### Software Requirements and Setup Instructions
 
+We recommend using **Ubuntu 20.04 LTS (Focal Fossa)** for the most straightforward setup, as this project relies on Python 2 and specific versions of build tools.
 
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository_url>
+    cd <repository_name>
+    ```
+    *(Replace `<repository_url>` and `<repository_name>` with the actual URL and cloned directory name)*
 
+2.  **Install system dependencies:**
+    This includes Python 2, tools to get pip for Python 2, build essentials, Clang (used for compiling payloads), the ARM cross-compiler toolchain, socat (for UART communication), make, and git.
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y python2 python-is-python2 curl git build-essential clang gcc-arm-none-eabi socat make
+    ```
+    *Note: `python-is-python2` makes the `python` command point to `python2`. The scripts use `#!/usr/bin/env python2` so this is for convenience if you invoke them manually with `python`.*
 
-#### UART Wiring
+3.  **Install pip for Python 2:**
+    ```bash
+    curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+    sudo python2 get-pip.py
+    rm get-pip.py
+    ```
+
+4.  **Install required Python 2 libraries:**
+    The client scripts require `pwntools` and `requests`.
+    ```bash
+    sudo pip2 install pwntools requests
+    ```
+
+### UART Wiring
 To be able to utilize this utility you need to connect to a UART interface of the PLC. For the pins on the side of the PLC (next to the RUN/STOP LEDs), populate the top row like the following: 
 
 ![PLC RX-TX pinout](./pics/txrxgnd.png).
 
-
-One can use any TTL 3.3V device. Obviously you should connect TX pin of the TTL adapter to the RX port of the PLC and RX port of the TTL adapter to the TX port of the PLC. 
-
-
+Connect your TTL 3.3V adapter as follows:
+*   Adapter TX pin to PLC RX pin.
+*   Adapter RX pin to PLC TX pin.
+*   Adapter GND pin to PLC GND pin.
 
 ## Using our tool
 
-Once you copied our repo go to uart_rce folder. You also need to get the name of your TTYUSB adapter in /dev folder of your linux machine. Generally it will be `/dev/TTYUSB0` (This name is hardcoded in start.sh). You also need to install required python libraries and `arm-none-eabi` compiler to compile payload for the PLC. Additionally, you must set the IP address of `ALLNET ALL3075V3` to `192.168.0.100` (you can change this value inside client.sh script). 
+Once your environment is set up and hardware connected:
+
+1.  **Identify your TTYUSB adapter:**
+    Connect your USB to TTL adapter. It will typically appear as `/dev/ttyUSB0` on a Linux machine. This path is hardcoded in `start.sh` but can be changed if needed.
+
+2.  **Configure Power Supply (if used):**
+    If you're using a network-controlled power supply like the ALLNET ALL3075V3, ensure its IP address is set (e.g., to `192.168.0.100`) and update `client.sh` if you use a different IP.
+
+3.  **Compile Payloads:**
+    The C payloads need to be compiled for the ARM Cortex-R4 CPU. Navigate to the specific payload directory and use `make`. For example, for `hello_loop`:
+    ```bash
+    cd payloads/hello_loop/
+    make
+    cd ../..  # Go back to the main directory (e.g., uart_rce)
+    ```
+    Similarly for other C-based payloads like `dump_mem` or `tic_tac_toe`.
+    Some assembly payloads (like `hello_world` or `stager`) have a `build.sh` script:
+    ```bash
+    cd payloads/hello_world/
+    sh build.sh
+    cd ../..
+    ```
+
+4.  **Start UART to TCP Forwarding:**
+    The `start.sh` script (typically found in the `uart_rce` folder if you've structured the project that way, or the root of this repository) uses `socat` to forward the serial data from `/dev/ttyUSB0` to a local TCP port. This allows the Python client to communicate with the PLC. Open a terminal and run:
+    ```bash
+    # Example: sh start.sh (assuming start.sh is in the current path)
+    # This script usually needs to keep running in its own terminal.
+    ```
+    *(Ensure `start.sh` is executable and correctly configured for your TTY device and desired TCP port if you modify it from the original project structure.)*
+
+The original README mentioned going to `uart_rce` folder. If your main scripts like `client.sh`, `start.sh`, `client.py` are in the root of this repository, adjust paths accordingly or operate from the directory where these scripts are located.
+
+The `README.md` previously mentioned: "Once you copied our repo go to uart_rce folder." and "To actually compile the payload go to `uart_rce/payloads` folder."
+If the project structure implies a `uart_rce` subfolder, users should `cd uart_rce` after cloning. The instructions above assume operations from the root of *this* repository for clarity on paths like `payloads/hello_loop/`. Adjust if your scripts are in a `uart_rce` subdirectory.
 
 
-To actually compile the payload go to `uart_rce/payloads` folder. There are various payloads available. Each payload have a [build.sh](https://github.com/RUB-SysSec/SiemensS7-Bootloader/blob/master/payloads/hello_world/build.sh) file. To compile them you can go inside the folder and run the build bash file. For example, here we compile the hello_world payload which is used for our test mode :
+To actually compile the payload go to `payloads` folder (relative to where `client.sh` is run, or `uart_rce/payloads` if such a structure exists). There are various payloads available. For C-based payloads with a Makefile (like `dump_mem`, `hello_loop`, `tic_tac_toe`):
+```bash
+cd payloads/<payload_name>/
+make
+cd ../.. # Adjust path to return to where client.sh is
+```
+For example, to compile the `hello_world` assembly payload (which uses `build.sh`):
+```console
+cd payloads/hello_world/
+sh build.sh
+cd ../.. # Adjust path
+```
+
+Once we are done compiling the payloads for Cortex-R4 CPU, we can open the channel for forwarding our UART serial data to a TCP port which will be used by our client utility. This console window should show you raw UART traffic between PLC and client utility:
+
+```console
+# Assuming start.sh is in the current directory or your PATH
+sh start.sh
+```
+Make sure `start.sh` correctly points to your `/dev/ttyUSB0` (or equivalent) and uses the TCP port expected by `client.py` (default is 4444, but `client.py` takes it as an argument).
+
+### DEMO 1: Upload and executing stager and test payloads
+
+Now, we can use our client utility. Open a new console window (without closing the console which runs `start.sh`), and type the following command for uploading the stager and test payload to the UART:
 
 
 ```console
