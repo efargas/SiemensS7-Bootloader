@@ -6,20 +6,27 @@ import re
 
 # Import requests only if needed for web method
 # Import serial only if needed for arduino method
-
 # Import ModbusTcpClient only if needed for fx3u method
 
 parser = argparse.ArgumentParser(description='Switch power on the remote power supply')
-parser.add_argument('-p', '--port', dest='port', default=80, type=lambda x: int(x, 0),
-                        help='the port to use (may be changed away from 80 for local port forwarding for web method)')
-parser.add_argument('-H', '--host', dest='host', default="powersupply",
-                        help='the host to connect to (may be changed away from powersupply for local port forwarding for web method)')
+
+# Common arguments
 parser.add_argument('mode', choices=['on', 'off'], help='Whether to turn the power on or off')
 parser.add_argument('--method', dest='method', default='web', choices=['web', 'arduino', 'fx3u'],
                         help='The method to use for switching power (web, arduino, or fx3u)')
-parser.add_argument('--arduino-port', dest='arduino_port',
+
+# ALLNET ALL3075V3 Network controlled specific arguments
+allnet_group = parser.add_argument_group('ALLNET ALL3075V3 Options')
+allnet_group.add_argument('-p', '--port', dest='port', default=80, type=lambda x: int(x, 0),
+                        help='the port to use (may be changed away from 80 for local port forwarding for web method)')
+allnet_group.add_argument('-H', '--host', dest='host', default="powersupply",
+                        help='the host to connect to (may be changed away from powersupply for local port forwarding for web method)')
+
+# Arduino specific arguments
+arduino_group = parser.add_argument_group('Arduino Options')
+arduino_group.add_argument('--arduino-port', dest='arduino_port',
                         help='The serial port for the Arduino (e.g., /dev/ttyUSB0 or COM3). Required if method is arduino.')
-parser.add_argument('--baud-rate', dest='baud_rate', default=9600, type=int,
+arduino_group.add_argument('--baud-rate', dest='baud_rate', default=9600, type=int,
                         help='The baud rate for serial communication. Default is 9600. Relevant only if method is arduino.')
 
 # FX3U specific arguments
@@ -62,7 +69,7 @@ if args.method == 'web':
         exit(1)
 
 elif args.method == 'arduino':
-    if not args.arduino_port:
+    if args.arduino_port is None:
         parser.error("--arduino-port is required when --method is arduino")
 
     try:
@@ -94,7 +101,7 @@ elif args.method == 'arduino':
         exit(1)
 
 elif args.method == 'fx3u':
-    if not args.fx3u_ip or not args.fx3u_output:
+    if (args.fx3u_ip is None) or (args.fx3u_output is None):
         parser.error("--fx3u-ip and --fx3u-output are required when --method is fx3u")
 
     try:
