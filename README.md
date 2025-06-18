@@ -135,6 +135,56 @@ We spotted similar functionality in 2014 models of S7-1212C Siemens PLCs (6ES721
 
 As mentioned earlier we used a 6ES7 212-1AE40-0XB0 S7-1200 PLC with a [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html) Network controlled socket and a FTDI FT232RL USB to TTL Serial Converter. 
 
+#### Virtual Environment Setup
+It is highly recommended to use a Python virtual environment to manage project dependencies and avoid conflicts with system-wide packages. This creates an isolated environment for your Python projects.
+
+To create a virtual environment, navigate to the project's root directory and run the following command (replace `venv` with your preferred environment name):
+```bash
+python3 -m venv venv
+```
+
+To activate the virtual environment:
+
+*   **On macOS and Linux:**
+    ```bash
+    source venv/bin/activate
+    ```
+*   **On Windows:**
+    ```bash
+    .\venv\Scripts\activate
+    ```
+Once activated, your terminal prompt will usually change to indicate the active environment. You can then proceed with Python and library installations within this isolated environment.
+
+#### Python Installation
+This tool requires Python 3. To install Python 3, please visit the official Python website for instructions: [https://www.python.org/downloads/](https://www.python.org/downloads/)
+
+#### Library Installation
+This project requires several Python libraries. Some are mandatory for the core functionality, while others are conditional based on your specific usage.
+
+**Core Dependencies (for `client.py`):**
+The main client utility (`client.py`) depends on the `pwntools` library. Install it using pip (preferably within your activated virtual environment):
+```bash
+pip install pwntools
+```
+
+**Conditional Dependencies (for `switch_power.py`):**
+The `switch_power.py` script has additional dependencies based on the power switching method you intend to use. Only install the libraries for the method(s) you plan to utilize:
+*   For `allnet_http` method: `requests`
+    ```bash
+    pip install requests
+    ```
+*   For `serial_apc` method: `pyserial`
+    ```bash
+    pip install pyserial
+    ```
+*   For `fx3u_modbus` method: `pymodbus`
+    ```bash
+    pip install pymodbus
+    ```
+
+**Standard Libraries:**
+Other Python libraries used throughout the project (such as `struct`, `time`, `socket`, `select`, `sys`, `subprocess`, `os`, `argparse`, and `binascii`) are part of the standard Python library and do not require separate installation.
+
 
 
 
