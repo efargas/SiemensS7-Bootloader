@@ -562,6 +562,19 @@ def main():
                         help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding")
     parser.add_argument('--powersupply-delay', dest='powersupply_delay', default=60, type=lambda x: int(x, 0),
                         help="number of seconds to wait before turning on power supply. defaults to 60.")
+
+    # PLC Power Control Arguments
+    parser.add_argument('--use-plc-power', dest='use_plc_power', default=False, action='store_true',
+                        help='Use Mitsubishi PLC for power control instead of network power supply.')
+    parser.add_argument('--plc-host', dest='plc_host', default='192.168.1.250', # Common default for some PLCs
+                        help='IP address of the Mitsubishi PLC.')
+    parser.add_argument('--plc-port', dest='plc_port', default=502, type=lambda x: int(x, 0),
+                        help='Modbus TCP port of the Mitsubishi PLC (default: 502).')
+    parser.add_argument('--plc-power-on-reg', dest='plc_power_on_reg', default=None, type=lambda x: int(x,0),
+                        help='Modbus register address (e.g., M-coil) for turning power ON (e.g. 8192 for M0 as per pymodbus docs).')
+    parser.add_argument('--plc-power-off-reg', dest='plc_power_off_reg', default=None, type=lambda x: int(x,0),
+                        help='Modbus register address (e.g., M-coil) for turning power OFF (e.g. 8193 for M1).')
+
     parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
                         help='the location of the stager payload')
     parser.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
@@ -603,13 +616,55 @@ def main():
     s = remote("localhost", args.port)
 
     if args.switch_power:
-        print("Turning off power supply and sleeping for {:d} seconds".format(args.powersupply_delay))
-        subprocess.check_call(["../tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "off"])
-        print("[+] Turned off power supply, sleeping")
-        time.sleep(args.powersupply_delay)
-        print("[+] Turned on power supply again")
-        subprocess.check_call(["../tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "on"])
-        print("[+] Successfully turned on power supply")
+        if args.use_plc_power:
+            if args.plc_power_on_reg is None or args.plc_power_off_reg is None:
+                log.error("PLC power control selected, but --plc-power-on-reg or --plc-power-off-reg not specified.")
+                sys.exit(1)
+
+            from pymodbus.client.sync import ModbusTcpClient
+
+            plc_client = ModbusTcpClient(args.plc_host, port=args.plc_port)
+            try:
+                log.info("Connecting to PLC for power control at {}:{}".format(args.plc_host, args.plc_port))
+                plc_client.connect()
+
+                log.info("Turning OFF power via PLC (register: {})".format(args.plc_power_off_reg))
+                # For Mitsubishi FX3U M-coils (e.g. M0-M7, M8000 etc.), pymodbus uses addresses starting from 0 for M0.
+                # However, some SCADA systems might refer to M0 as 8192 or similar.
+                # The user needs to provide the correct register number as expected by their setup and pymodbus.
+                # Example: If M0 is physical register 0, and M1 is physical register 1.
+                # To turn OFF (assume M1 controls OFF state, set M1 to True):
+                # plc_client.write_coil(args.plc_power_off_reg, True, unit=1)
+                # To ensure ON state is also off (assume M0 controls ON state, set M0 to False):
+                # plc_client.write_coil(args.plc_power_on_reg, False, unit=1)
+
+                # We assume direct control: plc_power_off_reg to TRUE means OFF, plc_power_on_reg to TRUE means ON.
+                # And they are mutually exclusive (setting one OFF might be needed before setting other ON).
+                plc_client.write_coil(args.plc_power_on_reg, False, unit=1) # Ensure ON is False
+                plc_client.write_coil(args.plc_power_off_reg, True, unit=1)  # Set OFF to True
+                log.info("[+] Turned OFF power via PLC. Sleeping for {} seconds.".format(args.powersupply_delay))
+                time.sleep(args.powersupply_delay)
+
+                log.info("Turning ON power via PLC (register: {})".format(args.plc_power_on_reg))
+                plc_client.write_coil(args.plc_power_off_reg, False, unit=1) # Ensure OFF is False
+                plc_client.write_coil(args.plc_power_on_reg, True, unit=1)   # Set ON to True
+                log.info("[+] Successfully turned ON power via PLC.")
+
+            except Exception as e:
+                log.error("PLC power control failed: {}".format(e))
+                sys.exit(1)
+            finally:
+                if plc_client.is_socket_open():
+                    plc_client.close()
+        else:
+            # Original network power supply logic
+            print("Turning off power supply (network switch) and sleeping for {:d} seconds".format(args.powersupply_delay))
+            subprocess.check_call(["tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "off"])
+            print("[+] Turned off power supply, sleeping")
+            time.sleep(args.powersupply_delay)
+            print("[+] Turned on power supply again")
+            subprocess.check_call(["tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "on"])
+            print("[+] Successfully turned on power supply")
 
 
     print("Looping now")
