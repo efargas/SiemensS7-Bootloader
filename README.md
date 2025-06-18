@@ -133,10 +133,84 @@ We spotted similar functionality in 2014 models of S7-1212C Siemens PLCs (6ES721
 
 ### Setup Environment
 
-As mentioned earlier we used a 6ES7 212-1AE40-0XB0 S7-1200 PLC with a [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html) Network controlled socket and a FTDI FT232RL USB to TTL Serial Converter. 
+This section details how to set up your environment to use this utility, compile payloads, and interact with the PLC.
 
+**Prerequisites:**
+*   An Ubuntu-based system (preferably Ubuntu 18.04 or similar for Python 2.7 compatibility).
+*   Root/sudo access to install packages.
+*   Hardware:
+    *   A target Siemens S7-1200 PLC.
+    *   An FTDI FT232RL USB to TTL Serial Converter (or equivalent 3.3V TTL adapter).
+    *   A network-controlled power supply (e.g., ALLNET ALL3075V3) or a Mitsubishi FX3u PLC for power cycling the target PLC.
 
+**1. Install System Dependencies and Tools:**
 
+First, run the provided script to install necessary system packages. This includes `build-essential` for compiling, `git`, `curl`, `socat` for serial-to-TCP forwarding, the `arm-none-eabi` toolchain for compiling ARM payloads, and Python 2.7 specific packages.
+
+```bash
+chmod +x ubuntu_setup.sh
+sudo ./ubuntu_setup.sh
+```
+
+**2. Set up Python 2.7 Virtual Environment:**
+
+It is highly recommended to use a virtual environment to manage Python dependencies.
+
+```bash
+# Create a directory for your project environment (if you haven't cloned the repo there)
+# mkdir project_env
+# cd project_env
+
+# Create a Python 2.7 virtual environment named 'venv_py2'
+virtualenv -p python2.7 venv_py2
+
+# Activate the virtual environment
+source venv_py2/bin/activate
+
+# To deactivate later, simply run:
+# deactivate
+```
+
+**3. Install Python Dependencies:**
+
+Once the virtual environment is activated, install the required Python libraries using `pip` and the `requirements.txt` file (which will be created in a subsequent step).
+
+```bash
+pip install -r requirements.txt
+```
+
+**4. Hardware Setup:**
+
+*   **UART Wiring:** Connect your USB to TTL serial converter to the PLC's UART interface.
+    *   PLC RX pin to TTL Adapter TX pin.
+    *   PLC TX pin to TTL Adapter RX pin.
+    *   PLC GND pin to TTL Adapter GND pin.
+    *   The pins on the side of the PLC (next to the RUN/STOP LEDs) should be populated on the top row as shown:
+        ![PLC RX-TX pinout](./pics/txrxgnd.png).
+
+*   **Power Supply:**
+    *   **ALLNET IP Power Supply:** Ensure it's connected to the network and configured. The default IP used in scripts is `192.168.0.100`. You can change this in `client.sh` or via command-line arguments to `client.py`.
+    *   **Mitsubishi PLC (FX3u):** If using PLC-based power control, ensure it's networked and you know its IP address, Modbus port, and the specific registers for power on/off.
+
+**5. Compile Payloads:**
+
+Payloads are located in the `payloads/` directory. Most payloads can be compiled using `make` within their respective subdirectories. Some might use a `build.sh` script.
+
+For example, to compile `hello_world`:
+```bash
+cd payloads/hello_world/
+sh build.sh
+cd ../..
+```
+To compile `tic_tac_toe`:
+```bash
+cd payloads/tic_tac_toe/
+make
+cd ../..
+```
+Ensure the `arm-none-eabi` toolchain (installed by `ubuntu_setup.sh`) is in your PATH or accessible by the build scripts.
+
+With the environment set up, you can proceed to use the tool as described in the "Using our tool" section.
 
 
 #### UART Wiring

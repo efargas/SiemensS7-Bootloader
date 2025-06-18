@@ -1,0 +1,3 @@
+pwn
+requests==2.22.0
+pymodbus==2.5.3
