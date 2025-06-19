@@ -536,8 +536,16 @@ def handle_conn(r, action, args):
     global next_payload_location
 
     print("[+] Got connection")
-    answ = recv_packet(r)
-    print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(answ, hexlify(answ))+ '\x1b[0m')
+    # The initial greeting from the PLC (unrecv'd by main) is not in our custom packet format.
+    # Read it raw, e.g., until newline.
+    try:
+        answ = r.recvuntil(b'\n', timeout=2.0)
+        log.info("Raw PLC greeting received: %r", answ)
+        print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(answ, hexlify(answ))+ '\x1b[0m')
+    except Exception as e:
+        log.error("Error receiving initial PLC greeting: %s", str(e))
+        # Decide if to proceed or raise. For now, log and proceed, get_version might fail.
+        # If this happens, the connection might be stale or PLC not responding as expected.
 
     for i in range(1):
         version = get_version(r)
