@@ -85,9 +85,9 @@ def print_answ(r, answ):
 def calc_checksum_byte(incoming): # Type hint for clarity
     # Format: <len_byte><byte_00>..<byte_xx><checksum_byte>
     # Checksum: LSB of negative sum of byte values
-    length_val = incoming[0]
-    # Sum bytes from index 1 up to 1+length_val (exclusive of checksum itself)
-    current_sum = sum(incoming[0:1+length_val]) # Sum includes the length byte itself up to last content byte
+    # 'incoming' is full_msg_before_checksum = bytes([len(msg) + 1]) + msg
+    # This means 'incoming' is exactly the bytes (Length + Payload) over which the sum should occur.
+    current_sum = sum(ord(c) for c in incoming)
     # LSB of negative sum
     checksum_val = (-current_sum) & 0xFF
     return bytes([checksum_val])
