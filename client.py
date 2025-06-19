@@ -758,7 +758,7 @@ def main():
         # We have 500000 microseconds (half a second) to hit the timing
         s.send(pad + magic)
 
-        answ = s.recv(256, timeout=0.3)
+        answ = s.recv(256, timeout=1.0) # Increased timeout
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
                 answ += s.recv(256)
