@@ -136,7 +136,103 @@ We spotted similar functionality in 2014 models of S7-1212C Siemens PLCs (6ES721
 As mentioned earlier we used a 6ES7 212-1AE40-0XB0 S7-1200 PLC with a [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html) Network controlled socket and a FTDI FT232RL USB to TTL Serial Converter. 
 
 
+## Build and Test Environment Setup (Ubuntu 18.04 LTS)
 
+This section describes how to set up the environment to compile the C payloads and run the Python client scripts.
+
+### 1. Install System Dependencies
+
+First, update your package list and install the necessary tools for C payload compilation and Python 2:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y clang make gcc-arm-none-eabi binutils-arm-linux-gnueabi python2.7 python2.7-dev python-pip
+```
+
+**Note:**
+- `clang` is used as the C compiler for the payloads.
+- `gcc-arm-none-eabi` provides the ARM cross-compilation toolchain (linker, etc.).
+- `binutils-arm-linux-gnueabi` provides the assembler for ARM (`arm-linux-gnueabi-as`).
+- `make` is used to manage the build process for C payloads.
+- `python2.7`, `python2.7-dev`, and `python-pip` are for the client scripts which are written in Python 2.
+
+### 2. Install Python Libraries
+
+The client scripts require specific Python libraries. Install them using `pip` (for Python 2):
+
+```bash
+python2.7 -m pip install --upgrade pip
+python2.7 -m pip install pwntools requests
+```
+*If `python-pip` installs pip for python2 correctly, you might be able to use `pip install pwntools requests` directly. Using `python2.7 -m pip` is more explicit.*
+
+
+### 3. Compile and Test Payloads
+
+All C and Assembly payloads are located in the `payloads/` directory.
+
+#### Common Makefile Configuration Fix
+A common Makefile configuration is used by several payloads (`dump_mem`, `hello_loop`, `tic_tac_toe`). A linker flag was adjusted for compatibility with `arm-none-eabi-ld` version 2.30+ (commonly found on Ubuntu 18.04 and later). This change has already been applied in the repository:
+- In `payloads/makeinc/config.mk`, the `LDFLAGS` no longer contains `--nostartfiles` as `-nostdlib` is sufficient.
+
+#### Compiling Individual Payloads
+
+You can compile all payloads as follows:
+
+1.  **dump_mem**:
+    ```bash
+    cd payloads/dump_mem
+    make clean && make
+    cd ../..
+    ```
+    This will produce `payloads/dump_mem/build/dump_mem.bin`.
+
+2.  **hello_loop**:
+    ```bash
+    cd payloads/hello_loop
+    make clean && make
+    cd ../..
+    ```
+    This will produce `payloads/hello_loop/build/hello_loop.bin`.
+
+3.  **hello_world**:
+    This payload uses a shell script for compilation.
+    ```bash
+    cd payloads/hello_world
+    chmod +x build.sh
+    ./build.sh
+    cd ../..
+    ```
+    This will produce `payloads/hello_world/hello_world.bin`.
+
+4.  **stager**:
+    This payload also uses a shell script.
+    ```bash
+    cd payloads/stager
+    chmod +x build.sh
+    ./build.sh
+    cd ../..
+    ```
+    This will produce `payloads/stager/stager.bin`.
+
+5.  **tic_tac_toe**:
+    ```bash
+    cd payloads/tic_tac_toe
+    make clean && make
+    cd ../..
+    ```
+    This will produce `payloads/tic_tac_toe/build/tic_tac_toe.bin`.
+
+#### Testing Compilation
+To test if your environment is set up correctly, run the compilation commands above for each payload. If all commands complete without error and the respective `.bin` files are generated, your build environment is ready.
+
+**Python Script Execution Note:**
+The client scripts (`client.py`, `tools/powersupply/switch_power.py`) are written for Python 2. Ensure you run them using `python2.7` or `python2` if `python` on your system defaults to Python 3. For example:
+```bash
+python2 client.py [arguments...]
+```
+
+The existing `client.sh` and `start.sh` scripts might need adjustment if they assume `python` is Python 2. You might need to modify them to explicitly call `python2.7` or `python2`.
 
 
 #### UART Wiring
@@ -154,11 +250,11 @@ One can use any TTL 3.3V device. Obviously you should connect TX pin of the TTL 
 Once you copied our repo go to uart_rce folder. You also need to get the name of your TTYUSB adapter in /dev folder of your linux machine. Generally it will be `/dev/TTYUSB0` (This name is hardcoded in start.sh). You also need to install required python libraries and `arm-none-eabi` compiler to compile payload for the PLC. Additionally, you must set the IP address of `ALLNET ALL3075V3` to `192.168.0.100` (you can change this value inside client.sh script). 
 
 
-To actually compile the payload go to `uart_rce/payloads` folder. There are various payloads available. Each payload have a [build.sh](https://github.com/RUB-SysSec/SiemensS7-Bootloader/blob/master/payloads/hello_world/build.sh) file. To compile them you can go inside the folder and run the build bash file. For example, here we compile the hello_world payload which is used for our test mode :
+To actually compile the payload go to `uart_rce/payloads` folder. There are various payloads available. Each payload have a [build.sh](https://github.com/RUB-SysSec/SiemensS7-Bootloader/blob/master/payloads/hello_world/build.sh) file or a `Makefile`. To compile them you can go inside the folder and run the build bash file or `make`. For example, here we compile the hello_world payload which is used for our test mode :
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce/payloads/hello_world/$ sh build.sh
+research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce/payloads/hello_world$ sh build.sh
 ```
 
 Once we are done compiling the payloads for Cortex-R4 CPU, we can open the channel for forwarding our UART serial data to a TCP port which will be used by our client utility. This console window should show you raw UART traffic between PLC and client utility:
@@ -299,5 +395,3 @@ We presented our research at multiple venues. Here is the list of them:
  * [A Deep Dive Into Unconstrained Code Execution on Siemens S7 PLCs](https://media.ccc.de/v/36c3-10709-a_deep_dive_into_unconstrained_code_execution_on_siemens_s7_plcs), Ali Abbasi, Tobias Scharnowski, Chaos Communication Congress (36C3), December 2019, Leipzig, Germany.
 
  * [Doors of Durin: The Veiled Gate to Siemens S7 Silicon](https://i.blackhat.com/eu-19/Wednesday/eu-19-Abbasi-Doors-Of-Durin-The-Veiled-Gate-To-Siemens-S7-Silicon.pdf), Ali Abbasi, Tobias Scharnowski, Thorsten Holz, Black Hat Europe, December 2019, London, United Kingdom.
-
-
