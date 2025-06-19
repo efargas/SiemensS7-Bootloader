@@ -556,12 +556,30 @@ def main():
                         help="local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH", required=True)
     parser.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
                         help='switch the power adapter on and off')
-    parser.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
-                        help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding')
-    parser.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
-                        help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding")
-    parser.add_argument('--powersupply-delay', dest='powersupply_delay', default=60, type=lambda x: int(x, 0),
-                        help="number of seconds to wait before turning on power supply. defaults to 60.")
+
+    # Power Supply Arguments
+    ps_group = parser.add_argument_group('Power Supply Options (used with --switch-power)')
+    ps_group.add_argument('--ps-type', dest='ps_type', choices=['http', 'mitsubishi_modbus'], default='http',
+                        help='Type of power supply to control (default: http).')
+    ps_group.add_argument('--powersupply-delay', dest='powersupply_delay', default=60, type=lambda x: int(x, 0),
+                        help="Number of seconds to wait between power off and on for power cycling (default: 60).")
+
+    # HTTP Power Supply specific arguments
+    ps_http_group = parser.add_argument_group('HTTP Power Supply (for --ps-type http)')
+    ps_http_group.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
+                        help='Hostname or IP for the HTTP power supply (e.g., ALLNET device, default: powersupply).')
+    ps_http_group.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
+                        help="Port for the HTTP power supply (default: 80).")
+
+    # Mitsubishi Modbus Power Supply specific arguments
+    ps_modbus_group = parser.add_argument_group('Mitsubishi Modbus TCP Power Supply (for --ps-type mitsubishi_modbus)')
+    ps_modbus_group.add_argument('--ps-modbus-host', dest='ps_modbus_host',
+                        help='Hostname or IP for the Mitsubishi PLC Modbus TCP server.')
+    ps_modbus_group.add_argument('--ps-modbus-port', dest='ps_modbus_port', default=502, type=int,
+                        help='Port for the Mitsubishi PLC Modbus TCP server (default: 502).')
+    ps_modbus_group.add_argument('--ps-modbus-coil', dest='ps_modbus_coil', default=0, type=int,
+                        help='Modbus coil address (0-indexed) to control (default: 0).')
+
     parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
                         help='the location of the stager payload')
     parser.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
@@ -603,14 +621,43 @@ def main():
     s = remote("localhost", args.port)
 
     if args.switch_power:
-        print("Turning off power supply and sleeping for {:d} seconds".format(args.powersupply_delay))
-        subprocess.check_call(["../tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "off"])
-        print("[+] Turned off power supply, sleeping")
-        time.sleep(args.powersupply_delay)
-        print("[+] Turned on power supply again")
-        subprocess.check_call(["../tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "on"])
-        print("[+] Successfully turned on power supply")
 
+        def call_switch_power(mode):
+            base_cmd = ["../tools/powersupply/switch_power.py"]
+
+            if args.ps_type == 'http':
+                if not args.powersupply_host:
+                    log.error("HTTP power supply host (--powersupply-host) not specified.")
+                    sys.exit(1)
+                type_args = ["--ps-type", "http",
+                             "--host", args.powersupply_host,
+                             "--port", str(args.powersupply_port)]
+            elif args.ps_type == 'mitsubishi_modbus':
+                if not args.ps_modbus_host:
+                    log.error("Mitsubishi Modbus host (--ps-modbus-host) not specified.")
+                    sys.exit(1)
+                type_args = ["--ps-type", "mitsubishi_modbus",
+                             "--modbus-host", args.ps_modbus_host,
+                             "--modbus-port", str(args.ps_modbus_port),
+                             "--modbus-coil", str(args.ps_modbus_coil)]
+            else:
+                # Should not be reached due to argparse choices
+                log.error("Invalid power supply type specified: {}".format(args.ps_type))
+                sys.exit(1)
+
+            full_cmd = base_cmd + type_args + [mode]
+            log.info("Executing power control: {}".format(" ".join(full_cmd)))
+            subprocess.check_call(full_cmd)
+
+        log.info("Turning off power supply (type: {}), then sleeping for {:d} seconds...".format(args.ps_type, args.powersupply_delay))
+        call_switch_power("off")
+
+        log.info("[+] Turned off power supply, sleeping for {}s...".format(args.powersupply_delay))
+        time.sleep(args.powersupply_delay)
+
+        log.info("[+] Turning on power supply (type: {}) again...".format(args.ps_type))
+        call_switch_power("on")
+        log.info("[+] Successfully executed power on command.")
 
     print("Looping now")
     for i in range(100):
