@@ -758,10 +758,15 @@ def main():
         # We have 500000 microseconds (half a second) to hit the timing
         s.send(pad + magic)
 
-        answ = s.recv(256, timeout=1.0) # Increased timeout
+        answ = s.recv(256, timeout=0.3) # Reverted to short timeout
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
-                answ += s.recv(256)
+                # Try to receive a bit more with a very short timeout
+                # to complete a potentially fragmented response.
+                try:
+                    answ += s.recv(64, timeout=0.2) # Short timeout for the append
+                except Exception: # Catch timeout or other read errors
+                    pass # Proceed with what answ has
             assert(answ.startswith("\5-CPU"))
             s.unrecv(answ)
 
