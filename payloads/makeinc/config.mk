@@ -14,6 +14,8 @@ CFLAGS := \
     -mcpu=cortex-r4 \
     -DGDBSTUB_PRINT \
     -I../lib \
+    -frwpi \
+    -fropi \
     -mbig-endian \
 	-target arm-none-eabi
 LDFLAGS := \
