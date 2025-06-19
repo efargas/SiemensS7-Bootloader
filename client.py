@@ -115,7 +115,7 @@ def send_packet(r, msg, step=2, sleep_amt=0.01): # Type hint for clarity
     checksum = calc_checksum_byte(full_msg_before_checksum)
     full_msg_with_checksum = full_msg_before_checksum + checksum
 
-    log.info("sending packet: {}".format(full_msg_with_checksum.hex()))
+    log.info("sending packet: {}".format(hexlify(full_msg_with_checksum)))
     for i in range(0, len(full_msg_with_checksum), step):
         time.sleep(sleep_amt)
         r.send(full_msg_with_checksum[i:i+step])
