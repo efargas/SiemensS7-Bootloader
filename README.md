@@ -129,17 +129,99 @@ The idea behind the implementation is as follows:
 #### RCE in older PLCs
 We spotted similar functionality in 2014 models of S7-1212C Siemens PLCs (6ES7212-1BE31-0XB0). The bootloader functionality was spotted at offset 0xE664 of older PLC bootloader (S7-1200v3).
 
+## Setting up the Build Environment (Ubuntu 16.04)
+
+This project requires specific versions of Python, Python libraries, and ARM cross-compilation toolchains. The following instructions are for setting up the environment on an Ubuntu 16.04 LTS system.
+
+### 1. System Package Installation
+
+First, update your package list and install essential tools like `make`, Python 2, pip for Python 2, and the necessary ARM cross-compilers:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y make python2.7 python-pip \
+                        gcc-arm-none-eabi binutils-arm-none-eabi \
+                        clang \
+                        gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+```
+
+**Toolchain Notes:**
+*   **`gcc-arm-none-eabi` / `binutils-arm-none-eabi`**: Used for compiling the C-based payloads (e.g., `tic_tac_toe`, `dump_mem`, `hello_loop`) via `make`. The configuration in `payloads/makeinc/config.mk` uses `clang` as the C compiler and `arm-none-eabi-ld` as the linker.
+*   **`clang`**: Required as it's specified as the C compiler for the `make`-based payloads.
+*   **`gcc-arm-linux-gnueabi` / `binutils-arm-linux-gnueabi`**: Used for assembling the `.s` assembly payloads (e.g., `hello_world`, `stager`) via their respective `build.sh` scripts.
+
+### 2. Python Library Installation
+
+The client scripts require Python 2 and specific libraries. Install them using `pip`:
+
+```bash
+sudo pip install pwntools requests
+```
+If you encounter issues installing `pwntools` due to dependencies, you might need to install Python development headers and other system libraries first:
+```bash
+sudo apt-get install -y python2.7-dev libffi-dev libssl-dev
+# Then retry pip install:
+sudo pip install pwntools requests
+```
+
+### 3. Note on `arm-none-eabi-ld` and `--nostartfiles` flag
+
+The linker flags in `payloads/makeinc/config.mk` include `--nostartfiles`. This flag is **not a standard option for `arm-none-eabi-ld`** and may cause errors with `arm-none-eabi-ld` version 2.42 and potentially other versions.
+
+If you are using `arm-none-eabi-ld` version 2.42 or newer, it is recommended to **remove `--nostartfiles`** from the `LDFLAGS` variable in `payloads/makeinc/config.mk`.
+
+The desired behavior (not linking standard system startup files) is already effectively achieved by the combination of:
+*   The `-nostdlib` flag (which is also present in `LDFLAGS`).
+*   The custom linker script (e.g., `link.ld` in each payload directory) specified with `-Tlink.ld`.
+*   The project providing its own startup code where necessary (e.g., `start.S` or specific C startup routines).
+
+To modify it, edit `payloads/makeinc/config.mk`. Change:
+```makefile
+LDFLAGS := \
+    -EB \
+    -Tlink.ld \
+    -nostdlib \
+    --gc-sections \
+    -nostartfiles
+```
+To:
+```makefile
+LDFLAGS := \
+    -EB \
+    -Tlink.ld \
+    -nostdlib \
+    --gc-sections
+```
+
+### 4. Compiling and Testing Payloads
+
+Once the environment is set up, you can compile the payloads.
+
+*   **For C-based payloads (in `payloads/dump_mem`, `payloads/hello_loop`, `payloads/tic_tac_toe`):**
+    Navigate to the payload's directory and run `make`:
+    ```bash
+    cd payloads/tic_tac_toe
+    make
+    ```
+    This will create the binary (e.g., `build/tic_tac_toe.bin`) in a `build` subdirectory.
+
+*   **For assembly-based payloads (in `payloads/hello_world`, `payloads/stager`):**
+    Navigate to the payload's directory and run the `build.sh` script:
+    ```bash
+    cd payloads/hello_world
+    sh build.sh
+    ```
+    This will create the binary (e.g., `hello_world.bin`) in the same directory.
+
+**Testing Compilation:**
+To ensure your environment is correctly set up, try compiling a few different payloads:
+1.  Compile `payloads/tic_tac_toe/` using `make`.
+2.  Compile `payloads/hello_world/` using `sh build.sh`.
+
+If these compilations succeed without error, your build environment should be ready. You can then proceed with using the `client.py` utility as described elsewhere in this README.
 
 
-### Setup Environment
-
-As mentioned earlier we used a 6ES7 212-1AE40-0XB0 S7-1200 PLC with a [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html) Network controlled socket and a FTDI FT232RL USB to TTL Serial Converter. 
-
-
-
-
-
-#### UART Wiring
+### UART Wiring
 To be able to utilize this utility you need to connect to a UART interface of the PLC. For the pins on the side of the PLC (next to the RUN/STOP LEDs), populate the top row like the following: 
 
 ![PLC RX-TX pinout](./pics/txrxgnd.png).
@@ -151,10 +233,17 @@ One can use any TTL 3.3V device. Obviously you should connect TX pin of the TTL 
 
 ## Using our tool
 
-Once you copied our repo go to uart_rce folder. You also need to get the name of your TTYUSB adapter in /dev folder of your linux machine. Generally it will be `/dev/TTYUSB0` (This name is hardcoded in start.sh). You also need to install required python libraries and `arm-none-eabi` compiler to compile payload for the PLC. Additionally, you must set the IP address of `ALLNET ALL3075V3` to `192.168.0.100` (you can change this value inside client.sh script). 
+After setting up the environment and compiling the payloads, you can use the main utility.
+Ensure your TTYUSB adapter (generally `/dev/ttyUSB0`, which is hardcoded in `start.sh`) is connected.
+You also need to set the IP address of your `ALLNET ALL3075V3` power supply to `192.168.0.100` (this can be changed in `client.sh`).
+
+The general workflow involves:
+1. Compiling the desired payload (as described in "Compiling and Testing Payloads" above).
+2. Running `start.sh` to forward UART serial data to a TCP port.
+3. Running `client.sh` with appropriate arguments to interact with the PLC.
 
 
-To actually compile the payload go to `uart_rce/payloads` folder. There are various payloads available. Each payload have a [build.sh](https://github.com/RUB-SysSec/SiemensS7-Bootloader/blob/master/payloads/hello_world/build.sh) file. To compile them you can go inside the folder and run the build bash file. For example, here we compile the hello_world payload which is used for our test mode :
+For example, to compile the `hello_world` payload (which is used for the `test` mode):
 
 
 ```console
