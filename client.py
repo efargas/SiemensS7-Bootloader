@@ -82,7 +82,7 @@ def print_answ(r, answ):
     print("Got answer: {} [{}]".format(repr(answ), answ.hex() if isinstance(answ, bytes) else hexlify(answ).decode()))
 
 
-def calc_checksum_byte(incoming: bytes) -> bytes: # Type hint for clarity
+def calc_checksum_byte(incoming): # Type hint for clarity
     # Format: <len_byte><byte_00>..<byte_xx><checksum_byte>
     # Checksum: LSB of negative sum of byte values
     length_val = incoming[0]
@@ -93,7 +93,7 @@ def calc_checksum_byte(incoming: bytes) -> bytes: # Type hint for clarity
     return bytes([checksum_val])
 
 
-def send_packet(r, msg: bytes, step=2, sleep_amt=0.01): # Type hint for clarity
+def send_packet(r, msg, step=2, sleep_amt=0.01): # Type hint for clarity
     """
     The base function to send a single packet. We need to chunk the packet
     up during transmission as to not overflowing the PLC's UART buffer.
@@ -254,7 +254,7 @@ def encode_packet_for_stager(chunk):
     print("Could not encode chunk: {}".format(chunk.hex())) # chunk is bytes
     assert (False)
 
-def send_full_msg_via_stager(r, msg: bytes, chunk_size=2, sleep_amt=0.01): # msg is bytes
+def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01): # msg is bytes
     """
     Transmit an arbitrarily sized message to a listening stager payload.
 
@@ -323,7 +323,7 @@ def subproto_read(r):
     send_packet(r, b"\x83") # Changed to bytes
     return recv_packet(r)
 
-def _raw_subproto_write(r, arg_dw, add_args: bytes, really=False, step=2, sleep_amt=0.01): # add_args is bytes
+def _raw_subproto_write(r, arg_dw, add_args, really=False, step=2, sleep_amt=0.01): # add_args is bytes
     """
     Only use when alredy in subprotocol handler.
     
@@ -345,7 +345,7 @@ def _raw_subproto_write(r, arg_dw, add_args: bytes, really=False, step=2, sleep_
     return recv_packet(r)
 
 
-def _exploit_write_chunk_to_iram(r, tar, contents: bytes, already_in_80_handler=False): # contents is bytes
+def _exploit_write_chunk_to_iram(r, tar, contents, already_in_80_handler=False): # contents is bytes
     """
     This function is part of the exploit and allows writing small chunks
     of bytes into IRAM memory. With the primitive itself being slow and
