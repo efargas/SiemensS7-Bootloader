@@ -219,8 +219,27 @@ Once your environment is set up and hardware connected:
     python tools/powersupply/switch_power.py --ps-type mitsubishi_modbus --modbus-host 192.168.1.10 --modbus-coil 0 on
     ```
 
-    **Integration with `client.py`:**
-    When using `client.py` with the `--switch-power` option, `client.py` itself needs to be configured to pass the correct parameters to `tools/powersupply/switch_power.py`. The original `client.sh` and `client.py` are set up for the HTTP power supply. To use the Mitsubishi Modbus method with `client.py`, you would need to modify `client.py` to accept and pass through the Modbus-specific arguments (like `--ps-type mitsubishi_modbus`, `--ps-modbus-host`, etc.) to `switch_power.py`. Refer to the `Conceptual Changes` section of the development log for how `client.py` might be adapted. The `client.sh` script would also need to be updated to pass these new arguments to `client.py`.
+    **Integration with `client.py` and `client.sh`:**
+    The `client.py` script has been updated to support these different power supply types. When using `client.py` with the `--switch-power` flag, you can now specify the power supply type and its parameters:
+    *   `--ps-type {http,mitsubishi_modbus}`: Selects the power supply control method (default: `http`).
+    *   For `http` type (default):
+        *   `--powersupply-host <ip_address>`: Hostname or IP of the HTTP power supply.
+        *   `--powersupply-port <port_number>`: Port for the HTTP power supply.
+    *   For `mitsubishi_modbus` type:
+        *   `--ps-modbus-host <ip_address>`: Hostname or IP of the Mitsubishi PLC.
+        *   `--ps-modbus-port <port_number>`: Modbus TCP port (default: 502).
+        *   `--ps-modbus-coil <coil_address>`: Modbus coil address (default: 0).
+    *   `--powersupply-delay <seconds>`: Delay between power-off and power-on commands.
+
+    The `client.sh` script has also been updated to provide an example of how to configure and pass these arguments to `client.py`. You can modify the `USE_PS_TYPE` variable and other parameters within `client.sh` to easily switch configurations when running exploits or tests that require power cycling.
+
+    Example usage via `client.sh` (after configuring `client.sh` for Mitsubishi Modbus):
+    ```bash
+    # Ensure client.sh is configured for mitsubishi_modbus and --switch-power is enabled within it.
+    # Then run your desired client.py command, e.g.:
+    sh client.sh test
+    ```
+    This would make `client.py` use the Mitsubishi PLC (as configured in `client.sh`) to power cycle the S7 PLC during its operation.
 
 3.  **Compile Payloads:**
     The C payloads need to be compiled for the ARM Cortex-R4 CPU. Navigate to the specific payload directory and use `make`. For example, for `hello_loop`:
