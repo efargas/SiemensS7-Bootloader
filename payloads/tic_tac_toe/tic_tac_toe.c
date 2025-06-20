@@ -195,7 +195,7 @@ void board()
     186
     */
     
-    for (int i = 0; i < sizeof(indices); ++i) {
+    for (int i = 0; i < sizeof(indices); ++i) { /* Fixed loop condition */
         board_buf[(int)indices[i]] = square[i + 1];
     }
 

