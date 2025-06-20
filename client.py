@@ -456,7 +456,7 @@ def handle_conn(r, action, args):
         # Attempt to read the greeting that was unrecv'd by main().
         # Max length of greeting read by main() could be 256 + 256 = 512.
         # Use a timeout to avoid blocking indefinitely if something went wrong with unrecv.
-        raw_greeting = r.recv(512, timeout=1.0)
+        raw_greeting = r.recv(512, timeout=0.05)
         log.info("Raw PLC greeting consumed in handle_conn: %r", raw_greeting)
         print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(raw_greeting, hexlify(raw_greeting))+ '\x1b[0m')
         # It's crucial that this greeting is what we expect, otherwise subsequent protocol messages will be misaligned.
