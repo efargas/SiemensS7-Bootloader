@@ -649,7 +649,7 @@ def main():
     if args.switch_power:
 
         def call_switch_power(mode):
-            base_cmd = ["tools/powersupply/switch_power.py"]
+            base_cmd = ["../tools/powersupply/switch_power.py"]
 
             if args.ps_type == 'http':
                 if not args.powersupply_host:
