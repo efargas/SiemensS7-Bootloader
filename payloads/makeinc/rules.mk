@@ -22,15 +22,6 @@ INC := -I..
 
 .PHONY: all clean build help
 
-# Macro for creating directories
-define make-dir
-ifeq ($(OS),Windows_NT)
-	@if not exist $(1) mkdir $(1)
-else
-	@mkdir -p $(1)
-endif
-endef
-
 all: $(TARGET).ihex $(TARGET).bin | build
 
 help:
@@ -43,28 +34,37 @@ help:
 # Dependency tracking is disabled. If you want incremental rebuilds, uncomment the next line:
 # -include $(DEP)
 
+# Macro for OS-specific directory creation
+define MKDIR
+ifeq ($(OS),Windows_NT)
+	@if not exist $(1) mkdir $(1)
+else
+	@mkdir -p $(1)
+endif
+endef
+
 build:
-	$(call make-dir,build)
+	$(call MKDIR,build)
 
 # General pattern rule for compiling .c and .S files from any directory into build/
 build/%.o: %.c | build
 	@echo $(CC) $<
-	$(call make-dir,$(dir $@))
+	$(call MKDIR,$(dir $@))
 	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
 
 build/%.o: %.S | build
 	@echo $(CC) $<
-	$(call make-dir,$(dir $@))
+	$(call MKDIR,$(dir $@))
 	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
 
 build/%.o: ../%/%.c | build
 	@echo $(CC) $<
-	$(call make-dir,$(dir $@))
+	$(call MKDIR,$(dir $@))
 	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
 
 build/%.o: ../%/%.S | build
 	@echo $(CC) $<
-	$(call make-dir,$(dir $@))
+	$(call MKDIR,$(dir $@))
 	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
 
 $(TARGET).sym: $(OBJ)
