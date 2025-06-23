@@ -1,2 +1,13 @@
-
 .DS_Store
+# Ignore compiled payload files and build artifacts
+payloads/*/build/
+payloads/*/*.bin
+payloads/*/*.ihex
+payloads/*/*.sym
+payloads/*/*.elf
+payloads/*/*.o
+payloads/*/*.d
+payloads/*/*.map
+# Ignore temporary files
+*.tmp
+*.log
