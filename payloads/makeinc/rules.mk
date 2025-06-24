@@ -22,6 +22,9 @@ INC := -I..
 
 .PHONY: all clean build help
 
+# Cross-platform directory creation command (used in recipes)
+MKDIR = mkdir -p $1 2>/dev/null || if not exist "$1" mkdir "$1"
+
 all: $(TARGET).ihex $(TARGET).bin | build
 
 help:
@@ -33,15 +36,6 @@ help:
 
 # Dependency tracking is disabled. If you want incremental rebuilds, uncomment the next line:
 # -include $(DEP)
-
-# Macro for OS-specific directory creation
-define MKDIR
-ifeq ($(OS),Windows_NT)
-	@if not exist $(1) mkdir $(1)
-else
-	@mkdir -p $(1)
-endif
-endef
 
 build:
 	$(call MKDIR,build)

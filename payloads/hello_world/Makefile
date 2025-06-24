@@ -1,3 +1,4 @@
+.PHONY: all clean
 # Makefile for hello_world
 BIN=hello_world.bin
 SRC=hello_world.s
@@ -13,12 +14,10 @@ ifeq ($(OS),Windows_NT)
 else
 	rm -f $(TMP)
 endif
-
 clean:
 ifeq ($(OS),Windows_NT)
-	@if exist $(BIN) del /Q $(BIN)
-	@if exist $(TMP) del /Q $(TMP)
+	if exist $(BIN) del /Q $(BIN)
+	if exist $(TMP) del /Q $(TMP)
 else
-	@if [ -f $(BIN) ]; then rm -f $(BIN); fi
-	@if [ -f $(TMP) ]; then rm -f $(TMP); fi
+	rm -f $(BIN) $(TMP)
 endif
