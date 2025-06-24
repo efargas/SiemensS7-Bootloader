@@ -23,7 +23,11 @@ INC := -I..
 .PHONY: all clean build help
 
 # Cross-platform directory creation command (used in recipes)
-MKDIR = mkdir -p $1 2>/dev/null || if not exist "$1" mkdir "$1"
+ifeq ($(OS),Windows_NT)
+	MKDIR = if not exist "$1" mkdir "$1"
+else
+	MKDIR = mkdir -p $1
+endif
 
 all: $(TARGET).ihex $(TARGET).bin | build
 
