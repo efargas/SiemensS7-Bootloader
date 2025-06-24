@@ -1,7 +1,10 @@
 # Root Makefile for all payloads
 
-# Find all subdirectories containing a Makefile
-SUBDIRS := $(shell find . -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Makefile' \; -print | sed 's|^\./||')
+# Detect all immediate subdirectories (excluding . and ..) by matching directories ending with a slash and removing the trailing slash.
+SUBDIRS := $(patsubst %/,%,$(wildcard */))
+
+# Only keep subdirs that contain a Makefile
+SUBDIRS := $(foreach dir,$(SUBDIRS),$(if $(wildcard $(dir)/Makefile),$(dir)))
 
 .PHONY: all clean $(SUBDIRS)
 

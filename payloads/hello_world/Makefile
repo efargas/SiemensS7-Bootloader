@@ -1,23 +1,7 @@
-.PHONY: all clean
 # Makefile for hello_world
-BIN=hello_world.bin
-SRC=hello_world.s
-TMP=tmp.elf
 
-all: $(BIN)
+TARGET := build/hello_world
 
-$(BIN): $(SRC)
-	arm-none-eabi-as -EB -o $(TMP) $(SRC)
-	arm-none-eabi-objcopy -j .text -Obinary $(TMP) $(BIN)
-ifeq ($(OS),Windows_NT)
-	del /Q $(TMP)
-else
-	rm -f $(TMP)
-endif
-clean:
-ifeq ($(OS),Windows_NT)
-	if exist $(BIN) del /Q $(BIN)
-	if exist $(TMP) del /Q $(TMP)
-else
-	rm -f $(BIN) $(TMP)
-endif
+SRC := hello_world.s
+
+include ../makeinc/rules.mk
