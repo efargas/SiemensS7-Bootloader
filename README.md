@@ -3,6 +3,109 @@
 </p>
 
 
+# Build Environment and Setup Instructions
+
+To reproduce the results and build payloads for this project, we recommend using a virtual machine (e.g., VMware) with Ubuntu 18.04 LTS. The following environment and steps have been tested to work with the Siemens S7-1200 PLC and this codebase.
+
+## Required Packages and Tools
+
+Install the following system packages (versions as available in Ubuntu 18.04, tested in 2019–2020):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+    build-essential \
+    gcc-arm-none-eabi \
+    binutils-arm-none-eabi \
+    clang=1:6.0-41~exp5~ubuntu1 \
+    make \
+    socat \
+    python2.7 \
+    python-pip \
+    git \
+    libffi-dev \
+    libssl-dev \
+    python2.7-dev \
+    virtualenv \
+    binutils \
+    gcc \
+    arm-linux-gnueabi-binutils \
+    arm-linux-gnueabi-gcc
+```
+
+> **Note:**  
+> - `gcc-arm-none-eabi`, `binutils-arm-none-eabi`, and `gdb-arm-none-eabi` are used for building ARM Cortex-R4 payloads.
+> - `clang` is used as the C compiler in some Makefiles.
+> - `arm-linux-gnueabi-as` and `arm-linux-gnueabi-objcopy` are provided by `binutils-arm-linux-gnueabi` and `gcc-arm-linux-gnueabi`.
+> - If you encounter version issues, use the closest available versions in Ubuntu 18.04.
+
+Add your user to the `dialout` group for serial port access:
+
+```bash
+sudo usermod -aG dialout $USER
+# Log out and log back in (or reboot) for this to take effect.
+```
+
+## Python 2 Environment and Libraries
+
+We recommend using a Python 2 virtual environment for compatibility with the client utility:
+
+```bash
+virtualenv -p python2.7 ~/s7env
+source ~/s7env/bin/activate
+pip install --upgrade pip
+pip install 'pwntools'
+```
+
+To activate this environment in the future, run:
+
+```bash
+source ~/s7env/bin/activate
+```
+
+## Building Payloads
+
+Navigate to the payload directory and run the provided build script or Makefile. For example:
+
+```bash
+cd payloads/hello_world
+sh build.sh
+# or
+make
+```
+
+Repeat for other payloads as needed.
+
+## Serial Bridge Setup
+
+Edit `start.sh` to match your serial device (e.g., `/dev/ttyUSB0`), then run:
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+This will bridge TCP port 1238 to the serial port for communication with the PLC.
+
+## Running the Client Utility
+
+Use the provided `client.sh` or run the Python script directly (ensure your Python 2 environment is activated):
+
+```bash
+./client.sh run -p payloads/hello_world/hello_world.bin
+# or
+python2 client.py --powersupply-host=localhost --powersupply-port=9001 --powersupply-delay=10 run -p payloads/hello_world/hello_world.bin
+```
+
+---
+
+**Note:**
+- This environment is designed for Ubuntu 18.04 LTS and Python 2.7. Later versions of Ubuntu or Python 3.x are not guaranteed to work with the original codebase.
+- The FTDI USB-to-TTL adapter is required for UART connection to the PLC.
+- For more details, see the instructions and troubleshooting sections below.
+
+---
+
 # Siemens S7 PLCs Bootloader Arbitrary Code Execution Utility
 
 This repository describes the way we get non-invasive arbitrary code execution on the Siemens S7 PLC by using an undocumented bootloader protocol over UART. Siemens assigned SSA-686531 (CVE-2019-13945) for this vulnerability. Affected devices are Siemens S7-1200 (all variants including SIPLUS) and S7-200 Smart. The list of the content are as follows:
