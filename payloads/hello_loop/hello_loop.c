@@ -13,12 +13,7 @@ int doit(unsigned char *, unsigned char *) __attribute__((noinline));
 
 int _start(unsigned char *read_buf, unsigned char *write_buf) {
     __asm__("stmfd sp!, {r2-r12, lr}");
-    // Define a local label at the beginning of the function's code
-    // and load its address (which is effectively the address of _start) into r9.
-    __asm__(
-        ".L_start_func_begin:\n"
-        "adr r9, .L_start_func_begin"
-    );
+    __asm__("adr r9, _start");
     
     int res = doit(read_buf, write_buf);
 

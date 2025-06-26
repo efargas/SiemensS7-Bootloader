@@ -1,7 +1,3 @@
-MAKEFLAGS += -r
-.SUFFIXES:
-.SUFFIXES: .c .o .S
-
 ifeq ($V, 1)
 	VERBOSE =
 else
@@ -10,59 +6,29 @@ endif
 
 include ../makeinc/config.mk
 
-# Allow linker script override
-LINKER_SCRIPT ?= link.ld
-LDFLAGS := -EB -T$(LINKER_SCRIPT) -nostdlib --gc-sections
-
-# Place all object files in build/ with just the filename
-OBJ := $(foreach f,$(SRC),build/$(notdir $(f:.c=.o)))
-OBJ += $(foreach f,$(SRC_ASM),build/$(notdir $(f:.S=.o)))
+OBJ := $(SRC:%.c=build/%.o)
+OBJ += $(SRC_ASM:%.S=build/%.o)
 DEP := $(OBJ:%.o=%.d)
 INC := -I..
 
-.PHONY: all clean build help
-
-# Cross-platform directory creation command (used in recipes)
-ifeq ($(OS),Windows_NT)
-	MKDIR = if not exist "$1" mkdir "$1"
-else
-	MKDIR = mkdir -p $1
-endif
-
 all: $(TARGET).ihex $(TARGET).bin | build
 
-help:
-	@echo "Available targets:"
-	@echo "  all     - Build all outputs"
-	@echo "  clean   - Remove build artifacts"
-	@echo "  build   - Create build directory"
-	@echo "  help    - Show this help message"
+.PHONY: clean all
+.SUFFIXES:
 
-# Dependency tracking is disabled. If you want incremental rebuilds, uncomment the next line:
-# -include $(DEP)
+-include $(DEP)
 
 build:
-	$(call MKDIR,build)
+	@mkdir -p build
 
-# General pattern rule for compiling .c and .S files from any directory into build/
-build/%.o: %.c | build
-	@echo $(CC) $<
-	$(call MKDIR,$(dir $@))
+build/%.o: %.S
+	@echo cc $<
+	@mkdir -p $(dir $@)
 	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
 
-build/%.o: %.S | build
-	@echo $(CC) $<
-	$(call MKDIR,$(dir $@))
-	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
-
-build/%.o: ../%/%.c | build
-	@echo $(CC) $<
-	$(call MKDIR,$(dir $@))
-	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
-
-build/%.o: ../%/%.S | build
-	@echo $(CC) $<
-	$(call MKDIR,$(dir $@))
+build/%.o: %.c
+	@echo cc $<
+	@mkdir -p $(dir $@)
 	$(VERBOSE) $(ENV) $(CC) $(CFLAGS) $(CFLAGS_OPT) $(INC) $(DEF) -MMD -MT $@ -MF build/$*.d -o $@ -c $<
 
 $(TARGET).sym: $(OBJ)
@@ -82,18 +48,4 @@ $(TARGET).ihex: $(TARGET)
 	$(VERBOSE) $(ENV) $(OBJCOPY) -O ihex $(TARGET) $@
 
 clean:
-ifeq ($(OS),Windows_NT)
-	-@if exist build rmdir /S /Q build
-	-@if exist lib rmdir /S /Q lib
-	-@del /Q /F *.bin 2>nul
-	-@del /Q /F *.ihex 2>nul
-	-@del /Q /F *.sym 2>nul
-	-@del /Q /F $(TARGET) 2>nul
-	-@del /Q /F $(TARGET).sym 2>nul
-	-@del /Q /F $(TARGET).bin 2>nul
-	-@del /Q /F $(TARGET).ihex 2>nul
-	-@del /Q /F *.d 2>nul
-	-@del /Q /F *.o 2>nul
-else
-	$(VERBOSE) rm -rf build lib *.bin *.ihex *.sym $(TARGET) $(TARGET).sym $(TARGET).bin $(TARGET).ihex *.d *.o
-endif
+	@rm -rf build lib
