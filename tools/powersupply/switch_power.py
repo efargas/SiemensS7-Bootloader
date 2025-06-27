@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 
 from sys import argv
 import argparse
@@ -11,7 +12,7 @@ parser.add_argument('--method', dest='method', default='allnet', choices=['allne
 parser.add_argument('-p', '--port', dest='port', default=80, type=lambda x: int(x, 0), help='the port to use (may be changed away from 80 for local port forwarding)')
 parser.add_argument('-H', '--host', dest='host', default="powersupply", help='the host to connect to (may be changed away from powersupply for local port forwarding)')
 
-# Modbus TCP arguments (genérico)
+# Modbus TCP arguments (generic)
 parser.add_argument('--modbus-ip', dest='modbus_ip', help='IP address of the Modbus TCP device. Required if method is modbus.')
 parser.add_argument('--modbus-port', dest='modbus_port', default=502, type=int, help='Port for Modbus TCP communication (default: 502).')
 parser.add_argument('--modbus-output', dest='modbus_output', type=int, help='Modbus coil address (integer) to control (e.g., 0, 1). Required if method is modbus.')

