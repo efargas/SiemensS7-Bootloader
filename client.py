@@ -655,31 +655,75 @@ def main():
                 '--port', str(args.powersupply_port),
                 '--host', args.powersupply_host,
             ]
-        subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['off'])
-        print("[+] Turned off power supply, sleeping")
-        time.sleep(args.powersupply_delay / 1000.0)
-        print("[+] Turned on power supply again after {:d} ms".format(args.powersupply_delay))
-        subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['on'])
-        print("[+] Successfully turned on power supply")
+        try:
+            ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['off'])
+            print("[+] Turned off power supply, sleeping and starting handshake attempts")
+        except subprocess.CalledProcessError as e:
+            print("[!] Failed to turn off power supply: {}".format(e))
+            sys.exit(1)
 
+        power_off_success = ret
+        if power_off_success == 0:
+            power_off_time = time.time()
 
-    print("Looping now")
-    for i in range(100):
-        # while True:
-        # We have 500000 microseconds (half a second) to hit the timing
-        s.send(pad + magic)
+        handshake_received = False
+        handshake_start = time.time()
+        delay_sec = args.powersupply_delay / 1000.0
+        power_on_time = power_off_time + delay_sec #handshake_start + delay_sec
+        power_on_actual = None
+        i = 0
+        while not handshake_received:
+            now = time.time()
+            if now >= power_on_time and power_on_actual is None:
+                try:
+                    ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['on'])
+                    print("[+] Turned on power supply after {:d} ms".format(args.powersupply_delay))
+                except subprocess.CalledProcessError as e:
+                    print("[!] Failed to turn on power supply: {}".format(e))
+                    sys.exit(1)
+                power_on_actual = time.time()
+            # If powered on, check for handshake timeout
+            if power_on_actual is not None and (now - power_on_actual) > 5.0:
+                print("[!] Handshake timeout: did not receive special access greeting within 5 seconds after power on.")
+                sys.exit(1)
+            # Send handshake
+            #print(power_on_time, now, power_on_time - now)
+            if power_on_time - now < 0.2 or power_on_actual is not None:
+                s.send(pad + magic)
+                try:
+                    answ = s.recv(256, timeout=0.1)
+                except Exception:
+                    answ = ''
+                if answ and answ.startswith("\5-CPU"):
+                    if not answ.startswith("\5-CPU"):
+                        answ += s.recv(256)
+                    assert(answ.startswith("\5-CPU"))
+                    s.unrecv(answ)
+                    handshake_received = True
+                    print("[+] Special access greeting received!")
+                    handle_conn(s, args.action, args)
+                    break
+            i += 1
+        print("Done.")
+        return
 
-        answ = s.recv(256, timeout=0.1)
-        if len(answ) > 0:
-            if not answ.startswith("\5-CPU"):
-                answ += s.recv(256)
-            assert(answ.startswith("\5-CPU"))
-            s.unrecv(answ)
-
-            handle_conn(s, args.action, args)
-            break
-
-    print("Done.")
+    # print("Looping now")
+    # for i in range(100):
+    #     # while True:
+    #     # We have 500000 microseconds (half a second) to hit the timing
+    #     s.send(pad + magic)
+    #
+    #     answ = s.recv(256, timeout=0.1)
+    #     if len(answ) > 0:
+    #         if not answ.startswith("\5-CPU"):
+    #             answ += s.recv(256)
+    #         assert(answ.startswith("\5-CPU"))
+    #         s.unrecv(answ)
+    #
+    #         handle_conn(s, args.action, args)
+    #         break
+    #
+    # print("Done.")
 
 
 if __name__ == "__main__":
