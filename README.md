@@ -1,119 +1,14 @@
+# Siemens S7 PLCs Bootloader Arbitrary Code Execution Utility
+
 <p align="center">
   <img src="pics/x-ray.gif" alt="Siemens S7-1200 3D X-Ray"/>
 </p>
 
-
-# Build Environment and Setup Instructions
-
-To reproduce the results and build payloads for this project, we recommend using a virtual machine (e.g., VMware) with Ubuntu 18.04 LTS. The following environment and steps have been tested to work with the Siemens S7-1200 PLC and this codebase.
-
-## Required Packages and Tools
-
-Install the following system packages (versions as available in Ubuntu 18.04, tested in 2019–2020):
-
-```bash
-sudo apt-get update
-sudo apt-get install -y \
-    build-essential \
-    gcc-arm-none-eabi \
-    binutils-arm-none-eabi \
-    clang=1:6.0-41~exp5~ubuntu1 \
-    make \
-    socat \
-    python2.7 \
-    python-pip \
-    git \
-    libffi-dev \
-    libssl-dev \
-    python2.7-dev \
-    virtualenv \
-    binutils \
-    gcc \
-    arm-linux-gnueabi-binutils \
-    arm-linux-gnueabi-gcc
-```
-
-> **Note:**  
-> - `gcc-arm-none-eabi`, `binutils-arm-none-eabi`, and `gdb-arm-none-eabi` are used for building ARM Cortex-R4 payloads.
-> - `clang` is used as the C compiler in some Makefiles.
-> - `arm-linux-gnueabi-as` and `arm-linux-gnueabi-objcopy` are provided by `binutils-arm-linux-gnueabi` and `gcc-arm-linux-gnueabi`.
-> - If you encounter version issues, use the closest available versions in Ubuntu 18.04.
-
-Add your user to the `dialout` group for serial port access:
-
-```bash
-sudo usermod -aG dialout $USER
-# Log out and log back in (or reboot) for this to take effect.
-```
-
-## Python 2 Environment and Libraries
-
-We recommend using a Python 2 virtual environment for compatibility with the client utility:
-
-```bash
-virtualenv -p python2.7 ~/s7env
-source ~/s7env/bin/activate
-pip install --upgrade pip
-pip install 'pwntools'
-```
-
-To activate this environment in the future, run:
-
-```bash
-source ~/s7env/bin/activate
-```
-
-## Building Payloads
-
-Navigate to the payload directory and run the provided build script or Makefile. For example:
-
-```bash
-cd payloads/hello_world
-sh build.sh
-# or
-make
-```
-
-Repeat for other payloads as needed.
-
-## Serial Bridge Setup
-
-Edit `start.sh` to match your serial device (e.g., `/dev/ttyUSB0`), then run:
-
-```bash
-chmod +x start.sh
-./start.sh
-```
-
-This will bridge TCP port 1238 to the serial port for communication with the PLC.
-
-## Running the Client Utility
-
-Use the provided `client.sh` or run the Python script directly (ensure your Python 2 environment is activated):
-
-```bash
-./client.sh run -p payloads/hello_world/hello_world.bin
-# or
-python2 client.py --powersupply-host=localhost --powersupply-port=9001 --powersupply-delay=10 run -p payloads/hello_world/hello_world.bin
-```
-
 ---
 
-**Note:**
-- This environment is designed for Ubuntu 18.04 LTS and Python 2.7. Later versions of Ubuntu or Python 3.x are not guaranteed to work with the original codebase.
-- The FTDI USB-to-TTL adapter is required for UART connection to the PLC.
-- For more details, see the instructions and troubleshooting sections below.
+# 1. Project Overview and Technical Background
 
----
-
-# Siemens S7 PLCs Bootloader Arbitrary Code Execution Utility
-
-This repository describes the way we get non-invasive arbitrary code execution on the Siemens S7 PLC by using an undocumented bootloader protocol over UART. Siemens assigned SSA-686531 (CVE-2019-13945) for this vulnerability. Affected devices are Siemens S7-1200 (all variants including SIPLUS) and S7-200 Smart. The list of the content are as follows:
-
-
-
-
-
+This repository describes the way we get non-invasive arbitrary code execution on the Siemens S7 PLC by using an undocumented bootloader protocol over UART. Siemens assigned SSA-686531 (CVE-2019-13945) for this vulnerability. Affected devices are Siemens S7-1200 (all variants including SIPLUS) and S7-200 Smart.
 
 ## Target Device Overview
 
@@ -257,17 +152,17 @@ One can use any TTL 3.3V device. Obviously you should connect TX pin of the TTL 
 Once you copied our repo go to uart_rce folder. You also need to get the name of your TTYUSB adapter in /dev folder of your linux machine. Generally it will be `/dev/TTYUSB0` (This name is hardcoded in start.sh). You also need to install required python libraries and `arm-none-eabi` compiler to compile payload for the PLC. Additionally, you must set the IP address of `ALLNET ALL3075V3` to `192.168.0.100` (you can change this value inside client.sh script). 
 
 
-To actually compile the payload go to `uart_rce/payloads` folder. There are various payloads available. Each payload have a [build.sh](https://github.com/RUB-SysSec/SiemensS7-Bootloader/blob/master/payloads/hello_world/build.sh) file. To compile them you can go inside the folder and run the build bash file. For example, here we compile the hello_world payload which is used for our test mode :
+To actually compile the payload go to `payloads` folder. There are various payloads available. Each payload have a [build.sh](https://github.com/RUB-SysSec/SiemensS7-Bootloader/blob/master/payloads/hello_world/build.sh) file. To compile them you can go inside the folder and run the build bash file. For example, here we compile the hello_world payload which is used for our test mode :
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce/payloads/hello_world/$ sh build.sh
+research@ali-Plex-9:~/SiemensS7-Bootloader/payloads/hello_world/$ sh build.sh
 ```
 
 Once we are done compiling the payloads for Cortex-R4 CPU, we can open the channel for forwarding our UART serial data to a TCP port which will be used by our client utility. This console window should show you raw UART traffic between PLC and client utility:
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh start.sh
+research@ali-Plex-9:~/SiemensS7-Bootloader$ sh start.sh
 ```
 
 ### DEMO 1: Upload and executing stager and test payloads 
@@ -293,7 +188,7 @@ In this demo we decided to upload the Tic-tac-toe game to the PLC. The goal of t
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce/payloads/tic_tac_toe$ make
+research@ali-Plex-9:~/SiemensS7-Bootloader/payloads/tic_tac_toe$ make
 cc tic_tac_toe.c
 cc ../lib/stdlib.c
 cc ../lib/print.c
@@ -309,19 +204,19 @@ Now we must use the tictactoe mode of our script utility as it allows us to inte
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/tictactoe/build/tictactoe.bin
+research@ali-Plex-9:~/SiemensS7-Bootloader$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/tic_tac_toe/build/tic_tac_toe.bin
 ```
 
-Note that the tictactoe mode, allow us to use alternative payloads using `--payload` argument. So we are not bounded to only use the tictactoe.bin payload. 
+Note that the tictactoe mode, allow us to use alternative payloads using `--payload` argument. So we are not bounded to only use the tic_tac_toe.bin payload. 
 
 
 ### DEMO 3: Running the Greetings From PLC in an infinite loop
 
-We have alternate version of `hello_world` which the PLC instead of sending a single string `TEST` back to the client utility, it will send string `Gretings from PLC` in an infinite loop to the client utility.  This payload is located inside `uart_rce/payloads/hello_loop/`. Since this payload is written in C, you need to compile it using make command: 
+We have alternate version of `hello_world` which the PLC instead of sending a single string `TEST` back to the client utility, it will send string `Greetings from PLC` in an infinite loop to the client utility.  This payload is located inside `payloads/hello_loop/`. Since this payload is written in C, you need to compile it using make command: 
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce/payloads/hello_loop$ make
+research@ali-Plex-9:~/SiemensS7-Bootloader/payloads/hello_loop$ make
 cc hello_loop.c
 cc ../lib/stdlib.c
 cc ../lib/print.c
@@ -337,7 +232,7 @@ This will generate `hello_loop.bin` file, which will be used by our client utili
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/hello_loop/build/hello_loop.bin
+research@ali-Plex-9:~/SiemensS7-Bootloader$ sh client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/hello_loop/build/hello_loop.bin
 ```
 
 
@@ -349,7 +244,7 @@ To dump the PLC memory, we would recommend to first turn on the PLC for few seco
 Similar to other demos we need to first compile our payload:
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce/payloads/dump_mem$ make
+research@ali-Plex-9:~/SiemensS7-Bootloader/payloads/dump_mem$ make
 cc dump_mem.c
 cc ../lib/stdlib.c
 cc ../lib/print.c
@@ -366,10 +261,10 @@ Now we are ready to dump the PLC. Here we put power supply delay argument to 30 
 
 
 ```console
-research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client_bricked.sh --switch-power --powersupply-delay=30 dump -a 0x691E28 -l 256
+research@ali-Plex-9:~/SiemensS7-Bootloader$ sh client_bricked.sh --switch-power --powersupply-delay=30 dump -a 0x691E28 -l 256
 ```
 
-In this example, we dump 256 bytes starting from offset `0x691E28` of the PLC memory. Once utility dump the memory, it place it in `uart_rce/` folder with the prefix `mem_dump_` plus start and end range address (mem_dump_00691e28_00691f28). 
+In this example, we dump 256 bytes starting from offset `0x691E28` of the PLC memory. Once utility dump the memory, it place it in root folder with the prefix `mem_dump_` plus start and end range address (mem_dump_00691e28_00691f28). 
 
 
 
@@ -387,7 +282,7 @@ Looping now
 ```
 
 
-Our utility currently only supports S7 bootloader version `4.2.1`. The client utility can inform you which bootloader version you are using but fails to communicate with stager or upload the payload. To use it with different S7 PLC with other bootloader version, you probably need to dump the new bootloader from the PLC SPI flash (no desoldering required) and identify various hardcoded function addresses we have in `uart_rce/payloads/`, `uart_rce/stager/` and `uart_rce/lib/`. 
+Our utility currently only supports S7 bootloader version `4.2.1`. The client utility can inform you which bootloader version you are using but fails to communicate with stager or upload the payload. To use it with different S7 PLC with other bootloader version, you probably need to dump the new bootloader from the PLC SPI flash (no desoldering required) and identify various hardcoded function addresses we have in `payloads/`, `payloads/stager/` and `payloads/lib/`. 
 
 
 
@@ -402,5 +297,163 @@ We presented our research at multiple venues. Here is the list of them:
  * [A Deep Dive Into Unconstrained Code Execution on Siemens S7 PLCs](https://media.ccc.de/v/36c3-10709-a_deep_dive_into_unconstrained_code_execution_on_siemens_s7_plcs), Ali Abbasi, Tobias Scharnowski, Chaos Communication Congress (36C3), December 2019, Leipzig, Germany.
 
  * [Doors of Durin: The Veiled Gate to Siemens S7 Silicon](https://i.blackhat.com/eu-19/Wednesday/eu-19-Abbasi-Doors-Of-Durin-The-Veiled-Gate-To-Siemens-S7-Silicon.pdf), Ali Abbasi, Tobias Scharnowski, Thorsten Holz, Black Hat Europe, December 2019, London, United Kingdom.
+
+## Power Supply Control Methods
+
+The client utility supports two methods for controlling the power supply to the PLC:
+
+### 1. Modbus TCP (Generic, Default)
+- Uses a generic Modbus TCP device for power control (e.g., industrial relay).
+- Arguments:
+  - `--powersupply-method=modbus` (default)
+  - `--modbus-ip=<ip>` (default: 192.168.1.18)
+  - `--modbus-port=<port>` (default: 502)
+  - `--modbus-output=<output>` (output/channel to control)
+  - `--powersupply-delay=<milliseconds>` (default: 60000)
+
+### 2. ALLNET (Web-controlled Socket)
+- Uses the ALLNET ALL3075V3 network-controlled socket.
+- Arguments:
+  - `--powersupply-method=allnet`
+  - `--powersupply-host=<ip or hostname>` (default: powersupply or 192.168.0.100)
+  - `--powersupply-port=<port>` (default: 80)
+  - `--powersupply-delay=<milliseconds>` (default: 60000)
+
+### Example Usage
+
+**Modbus TCP (default):**
+```bash
+./client.sh --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
+```
+
+**ALLNET:**
+```bash
+./client.sh --switch-power --powersupply-method=allnet --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
+```
+
+- The script will power cycle the PLC using the selected method before running the payload.
+- All Modbus arguments use the `--modbus-*` prefix for clarity.
+- The method is selected via `--powersupply-method` (default: modbus).
+
+#### When to Use Each Method
+- **ALLNET:** Use if you have the ALLNET ALL3075V3 socket (legacy setup).
+- **Modbus TCP:** Use for generic/industrial Modbus TCP relays or power controllers (default).
+
+---
+
+# 2. Build Environment Setup
+
+Before compiling payloads or running the client utility, set up your environment:
+
+1. **Install dependencies:**
+   - Python 2.x (for `client.py`)
+   - `arm-none-eabi` toolchain (for building payloads)
+   - Required Python libraries (see below)
+
+2. **Run the environment setup script:**
+   - This script will install Python dependencies and check for required tools.
+   - Usage:
+     ```bash
+     ./setup_env.sh
+     ```
+
+3. **Set up your UART adapter:**
+   - Ensure your USB-to-TTL adapter is connected (default: `/dev/TTYUSB0`).
+   - You may need to adjust the device name in `start.sh` if different.
+
+---
+
+# 3. Compiling Payloads
+
+To compile a payload, navigate to its directory and run the build script. For example, to build the hello_world payload:
+
+```bash
+cd payloads/hello_world
+sh build.sh
+```
+
+For C-based payloads (e.g., `hello_loop`, `dump_mem`, `tic_tac_toe`), use `make`:
+
+```bash
+cd payloads/hello_loop
+make
+```
+
+---
+
+# 4. Running the Client Utility
+
+You can use the provided `client.sh` wrapper or run the Python script directly (ensure your Python 2 environment is activated):
+
+```bash
+./client.sh --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
+# or
+python2 client.py --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
+```
+
+---
+
+# 5. Demos and Usage Examples
+
+## DEMO 1: Upload and Execute Test Payload
+
+Compile the hello_world payload:
+```bash
+cd payloads/hello_world
+sh build.sh
+```
+
+Start the UART forwarding channel:
+```bash
+./start.sh
+```
+
+In a new terminal, upload and execute the test payload:
+```bash
+./client.sh --switch-power --powersupply-delay=1 test
+```
+
+## DEMO 2: Tic-tac-toe Game on PLC
+
+Compile the tic_tac_toe payload:
+```bash
+cd payloads/tic_tac_toe
+make
+```
+
+Upload and interact with the game:
+```bash
+./client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/tic_tac_toe/build/tic_tac_toe.bin
+```
+
+## DEMO 3: Infinite Greetings from PLC
+
+Compile the hello_loop payload:
+```bash
+cd payloads/hello_loop
+make
+```
+
+Upload and run the infinite greetings payload:
+```bash
+./client.sh --switch-power --powersupply-delay=1 tictactoe --payload=payloads/hello_loop/build/hello_loop.bin
+```
+
+## DEMO 4: Dumping S7 PLC RAM
+
+Compile the dump_mem payload:
+```bash
+cd payloads/dump_mem
+make
+```
+
+Dump memory (example: 256 bytes from 0x691E28, with 30s power delay):
+```bash
+./client.sh --switch-power --powersupply-delay=30 dump -a 0x691E28 -l 256
+```
+
+The dumped memory will be saved in the root folder with a name like `mem_dump_00691e28_00691f28`.
+
+---
 
 

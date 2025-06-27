@@ -552,20 +552,33 @@ ACTION_HELLO_LOOP = "hello_loop"
 def main():
     parser = argparse.ArgumentParser(description='Trigger code execution on Siemens PLC')
 
-    parser.add_argument('-P', '--port', dest='port', type=lambda x: int(x, 0),
-                        help="local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH", required=True)
-    parser.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
+    # Common arguments group
+    common_group = parser.add_argument_group('Common arguments')
+    common_group.add_argument('-P', '--port', dest='port', type=lambda x: int(x, 0),
+                        help="local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH)", required=True)
+    common_group.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
                         help='switch the power adapter on and off')
-    parser.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
-                        help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding')
-    parser.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
-                        help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding")
-    parser.add_argument('--powersupply-delay', dest='powersupply_delay', default=60, type=lambda x: int(x, 0),
-                        help="number of seconds to wait before turning on power supply. defaults to 60.")
-    parser.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
+    common_group.add_argument('--powersupply-method', dest='powersupply_method', default='modbus', choices=['allnet', 'modbus'],
+                        help='Power supply control method: modbus (default) or allnet')
+    common_group.add_argument('--powersupply-delay', dest='powersupply_delay', default=60000, type=lambda x: int(x, 0),
+                        help="number of milliseconds to wait before turning on power supply. defaults to 60000 (60s).")
+    common_group.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
                         help='the location of the stager payload')
-    parser.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
-    parser.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic")
+    common_group.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
+    common_group.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic")
+
+    # ALLNET arguments group
+    allnet_group = parser.add_argument_group('ALLNET arguments')
+    allnet_group.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
+                        help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding')
+    allnet_group.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
+                        help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding")
+
+    # Modbus arguments group
+    modbus_group = parser.add_argument_group('Modbus TCP arguments')
+    modbus_group.add_argument('--modbus-ip', dest='modbus_ip', default='192.168.1.18', help='Modbus TCP IP address (default: 192.168.1.18)')
+    modbus_group.add_argument('--modbus-port', dest='modbus_port', default=502, type=lambda x: int(x, 0), help='Modbus TCP port (default: 502)')
+    modbus_group.add_argument('--modbus-output', dest='modbus_output', default=None, help='Modbus output/channel to control')
 
     subparsers = parser.add_subparsers(dest="action")
     parser_invoke_hook = subparsers.add_parser(ACTION_INVOKE_HOOK)
@@ -603,12 +616,28 @@ def main():
     s = remote("localhost", args.port)
 
     if args.switch_power:
-        print("Turning off power supply and sleeping for {:d} seconds".format(args.powersupply_delay))
-        subprocess.check_call(["../tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "off"])
+        print("Turning off power supply and sleeping for {:d} milliseconds".format(args.powersupply_delay))
+        power_args = []
+        if args.powersupply_method == 'modbus':
+            power_args = [
+                '--method', 'modbus',
+                '--modbus-ip', str(args.modbus_ip) if args.modbus_ip else '',
+                '--modbus-port', str(args.modbus_port),
+                ]
+                if args.modbus_output is not None:
+                    power_args += ['--modbus-output', str(args.modbus_output)]
+            ]
+        else:
+            power_args = [
+                '--method', 'allnet',
+                '--port', str(args.powersupply_port),
+                '--host', args.powersupply_host,
+            ]
+        subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['off'])
         print("[+] Turned off power supply, sleeping")
-        time.sleep(args.powersupply_delay)
-        print("[+] Turned on power supply again")
-        subprocess.check_call(["../tools/powersupply/switch_power.py", "--port", str(args.powersupply_port), "--host", args.powersupply_host, "on"])
+        time.sleep(args.powersupply_delay / 1000.0)
+        print("[+] Turned on power supply again after {:d} ms".format(args.powersupply_delay))
+        subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['on'])
         print("[+] Successfully turned on power supply")
 
 

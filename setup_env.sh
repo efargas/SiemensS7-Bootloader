@@ -27,7 +27,7 @@ sudo apt-get install -y \
 echo "Adding current user to dialout group for serial access..."
 sudo usermod -aG dialout $USER
 
-echo "Creating Python 2 virtualenv for pwntools..."
+echo "Creating Python 2 virtualenv for pwntools and dependencies..."
 cd ~
 virtualenv -p python2.7 s7env
 source ~/s7env/bin/activate
@@ -35,8 +35,8 @@ source ~/s7env/bin/activate
 echo "Upgrading pip in virtualenv..."
 pip install --upgrade pip
 
-echo "Installing pwntools for Python 2..."
-pip install 'pwntools'
+echo "Installing pwntools, pymodbus, and requests for Python 2..."
+pip install 'pwntools' pymodbus==2.5.3 requests
 
 echo "Setup complete!"
 echo "To activate your Python 2 environment in the future, run:"
