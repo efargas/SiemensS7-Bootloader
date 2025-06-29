@@ -131,8 +131,7 @@ We spotted similar functionality in 2014 models of S7-1212C Siemens PLCs (6ES721
 
 ### Setup Environment
 
-As mentioned earlier we used a 6ES7 212-1AE40-0XB0 S7-1200 PLC with a [ALLNET ALL3075V3](https://www.allnet-shop.de/ALLNET/Gebaeudeautomation/Netzwerk-Steckdosen-und-Schaltgeraete/ALLNET-Netzwerksteckdose-mit-WLAN-Verbrauchserfassung-16A-ALL3075v3.html) Network controlled socket and a FTDI FT232RL USB to TTL Serial Converter. 
-
+As mentioned earlier we used a 6ES7 212-1AE40-0XB0 S7-1200 PLC with a Modbus TCP relay or power controller and a FTDI FT232RL USB to TTL Serial Converter. 
 
 
 
@@ -149,8 +148,7 @@ One can use any TTL 3.3V device. Obviously you should connect TX pin of the TTL 
 
 ## Using our tool
 
-Once you copied our repo go to uart_rce folder. You also need to get the name of your TTYUSB adapter in /dev folder of your linux machine. Generally it will be `/dev/TTYUSB0` (This name is hardcoded in start.sh). You also need to install required python libraries and `arm-none-eabi` compiler to compile payload for the PLC. Additionally, you must set the IP address of `ALLNET ALL3075V3` to `192.168.0.100` (you can change this value inside client.sh script). 
-
+Once you copied our repo go to uart_rce folder. You also need to get the name of your TTYUSB adapter in /dev folder of your linux machine. Generally it will be `/dev/TTYUSB0` (This name is hardcoded in start.sh). You also need to install required python libraries and `arm-none-eabi` compiler to compile payload for the PLC. 
 
 To actually compile the payload go to `payloads` folder. There are various payloads available. Each payload have a [build.sh](https://github.com/RUB-SysSec/SiemensS7-Bootloader/blob/master/payloads/hello_world/build.sh) file. To compile them you can go inside the folder and run the build bash file. For example, here we compile the hello_world payload which is used for our test mode :
 
@@ -174,7 +172,6 @@ research@ali-Plex-9:~/SiemensS7-Bootloader/uart_rce$ sh client.sh --switch-power
 ```
 
 The `--powersupply-delay` is provided for Cold-boot style firmware dumping (we do not use it at this stage but providing this item is required). The argument `test` uses the payload in `payloads/hello_world/hello_world.bin` file. This payload literraly just run inside the PLC and send string `TEST` back to the client, thus client knows the code successfully executed inside the PLC.  
-
 
 
 
@@ -298,46 +295,27 @@ We presented our research at multiple venues. Here is the list of them:
 
  * [Doors of Durin: The Veiled Gate to Siemens S7 Silicon](https://i.blackhat.com/eu-19/Wednesday/eu-19-Abbasi-Doors-Of-Durin-The-Veiled-Gate-To-Siemens-S7-Silicon.pdf), Ali Abbasi, Tobias Scharnowski, Thorsten Holz, Black Hat Europe, December 2019, London, United Kingdom.
 
-## Power Supply Control Methods
+## Power Supply Control Method
 
-The client utility supports two methods for controlling the power supply to the PLC:
+The client utility now supports only one method for controlling the power supply to the PLC:
 
-### 1. Modbus TCP (Generic, Default)
+### Modbus TCP (Default and Only Supported)
 - Uses a generic Modbus TCP device for power control (e.g., industrial relay).
 - Arguments:
-  - `--powersupply-method=modbus` (default)
   - `--modbus-ip=<ip>` (default: 192.168.1.18)
   - `--modbus-port=<port>` (default: 502)
   - `--modbus-output=<output>` (output/channel to control)
   - `--powersupply-delay=<milliseconds>` (default: 60000)
 
-### 2. ALLNET (Web-controlled Socket)
-- Uses the ALLNET ALL3075V3 network-controlled socket.
-- Arguments:
-  - `--powersupply-method=allnet`
-  - `--powersupply-host=<ip or hostname>` (default: powersupply or 192.168.0.100)
-  - `--powersupply-port=<port>` (default: 80)
-  - `--powersupply-delay=<milliseconds>` (default: 60000)
-
 ### Example Usage
 
-**Modbus TCP (default):**
+**Modbus TCP (default and only):**
 ```bash
 ./client.sh --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
 ```
 
-**ALLNET:**
-```bash
-./client.sh --switch-power --powersupply-method=allnet --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
-```
-
-- The script will power cycle the PLC using the selected method before running the payload.
+- The script will power cycle the PLC using the Modbus TCP method before running the payload.
 - All Modbus arguments use the `--modbus-*` prefix for clarity.
-- The method is selected via `--powersupply-method` (default: modbus).
-
-#### When to Use Each Method
-- **ALLNET:** Use if you have the ALLNET ALL3075V3 socket (legacy setup).
-- **Modbus TCP:** Use for generic/industrial Modbus TCP relays or power controllers (default).
 
 ---
 
@@ -455,5 +433,4 @@ Dump memory (example: 256 bytes from 0x691E28, with 30s power delay):
 The dumped memory will be saved in the root folder with a name like `mem_dump_00691e28_00691f28`.
 
 ---
-
 

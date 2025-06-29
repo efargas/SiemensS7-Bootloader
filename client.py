@@ -353,20 +353,12 @@ def main():
                         help="local port that socat is listening to, forwarding to serial device (may also be a port forwarded via SSH)", required=True)
     common_group.add_argument('--switch-power', dest='switch_power', default=False, action='store_true',
                         help='switch the power adapter on and off')
-    common_group.add_argument('--powersupply-method', dest='powersupply_method', default='modbus', choices=['allnet', 'modbus'],
-                        help='Power supply control method: modbus (default) or allnet')
     common_group.add_argument('--powersupply-delay', dest='powersupply_delay', default=60000, type=lambda x: int(x, 0),
                         help="number of milliseconds to wait before turning on power supply. defaults to 60000 (60s).")
     common_group.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME,
                         help='the location of the stager payload')
     common_group.add_argument('-c', '--continue', dest='cont', default=False, action='store_true', help="Continue PLC execution after action completed")
     common_group.add_argument('-e', '--extra', default="", dest='extra', nargs='+', help="Additional arguments for custom logic")
-
-    allnet_group = parser.add_argument_group('ALLNET arguments')
-    allnet_group.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply',
-                        help='host of powersupply, defaults to "powersupply", can be changed to support ssh port forwarding')
-    allnet_group.add_argument('--powersupply-port', dest='powersupply_port', default=80, type=lambda x: int(x, 0),
-                        help="port of powersupply. defaults to 80, can be changed to support ssh port forwarding")
 
     modbus_group = parser.add_argument_group('Modbus TCP arguments')
     modbus_group.add_argument('--modbus-ip', dest='modbus_ip', default='192.168.1.18', help='Modbus TCP IP address (default: 192.168.1.18)')
@@ -408,21 +400,13 @@ def main():
 
     if args.switch_power:
         logger.info("Turning off power supply and sleeping for {:d} milliseconds".format(args.powersupply_delay))
-        power_args = []
-        if args.powersupply_method == 'modbus':
-            power_args = [
-                '--method', 'modbus',
-                '--modbus-ip', str(args.modbus_ip) if args.modbus_ip else '',
-                '--modbus-port', str(args.modbus_port),
-                ]
-            if args.modbus_output is not None:
-                power_args += ['--modbus-output', str(args.modbus_output)]
-        else:
-            power_args = [
-                '--method', 'allnet',
-                '--port', str(args.powersupply_port),
-                '--host', args.powersupply_host,
-            ]
+        power_args = [
+            '--method', 'modbus',
+            '--modbus-ip', str(args.modbus_ip) if args.modbus_ip else '',
+            '--modbus-port', str(args.modbus_port),
+        ]
+        if args.modbus_output is not None:
+            power_args += ['--modbus-output', str(args.modbus_output)]
         try:
             ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['off'])
             logger.info("[+] Turned off power supply, sleeping and starting handshake attempts")
