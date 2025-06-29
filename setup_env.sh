@@ -1,43 +1,30 @@
 #!/bin/bash
-set -e
 
-echo "Updating package lists..."
+# Install dependencies
 sudo apt-get update
+sudo apt-get install -y python2 python3 python3-venv python-is-python3
 
-echo "Installing system packages..."
-sudo apt-get install -y \
-    build-essential \
-    gcc-arm-none-eabi \
-    binutils-arm-none-eabi \
-    clang=1:6.0-41~exp5~ubuntu1 \
-    make \
-    socat \
-    python2.7 \
-    python-pip \
-    git \
-    libffi-dev \
-    libssl-dev \
-    python2.7-dev \
-    virtualenv \
-    binutils \
-    gcc \
-    binutils-arm-linux-gnueabi \
-    gcc-arm-linux-gnueabi
+# Create Python 3 virtual environment
+python3 -m venv venv3
 
-echo "Adding current user to dialout group for serial access..."
-sudo usermod -aG dialout $USER
+# Activate Python 3 virtual environment and install dependencies
+. venv3/bin/activate
+pip install -r requirements-py3.txt
+deactivate
 
-echo "Creating Python 2 virtualenv for pwntools and dependencies..."
-cd ~
-virtualenv -p python2.7 s7env
-source ~/s7env/bin/activate
+# Create Python 2 virtual environment
+python2 -m virtualenv venv2
 
-echo "Upgrading pip in virtualenv..."
-pip install --upgrade pip
+# Activate Python 2 virtual environment and install dependencies
+. venv2/bin/activate
+pip install -r requirements-py2.txt
+deactivate
 
-echo "Installing pwntools, pymodbus, and requests for Python 2..."
-pip install 'pwntools' pymodbus==2.5.3 requests
+# Set up update-alternatives
+sudo update-alternatives --install /usr/bin/python python /usr/bin/python2 1
+sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 2
 
-echo "Setup complete!"
-echo "To activate your Python 2 environment in the future, run:"
-echo "  source ~/s7env/bin/activate"
+echo "Setup complete."
+echo "To switch between Python versions, use: sudo update-alternatives --config python"
+echo "To activate the Python 3 virtual environment, run: . venv3/bin/activate"
+echo "To activate the Python 2 virtual environment, run: . venv2/bin/activate"

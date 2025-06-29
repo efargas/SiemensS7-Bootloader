@@ -324,16 +324,34 @@ The client utility now supports only one method for controlling the power supply
 Before compiling payloads or running the client utility, set up your environment:
 
 1. **Install dependencies:**
-   - Python 2.x (for `client.py`)
+   - Python 2.x and Python 3.x
    - `arm-none-eabi` toolchain (for building payloads)
-   - Required Python libraries (see below)
+   - `python-is-python3` and `python3-venv` packages
 
 2. **Run the environment setup script:**
-   - This script will install Python dependencies and check for required tools.
+   - This script will create virtual environments for both Python 2 and Python 3 and install the required dependencies.
+   - It will also set up `update-alternatives` to allow switching between Python versions.
    - Usage:
      ```bash
      ./setup_env.sh
      ```
+
+3. **Switch between Python versions:**
+   - To switch between Python 2 and Python 3, use the following command:
+     ```bash
+     sudo update-alternatives --config python
+     ```
+
+4. **Activate the virtual environment:**
+   - Before running the client, you need to activate the appropriate virtual environment:
+     - For Python 3:
+       ```bash
+       . venv3/bin/activate
+       ```
+     - For Python 2:
+       ```bash
+       . venv2/bin/activate
+       ```
 
 3. **Set up your UART adapter:**
    - Ensure your USB-to-TTL adapter is connected (default: `/dev/TTYUSB0`).
@@ -366,7 +384,7 @@ You can use the provided `client.sh` wrapper or run the Python script directly (
 ```bash
 ./client.sh --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
 # or
-python2 client.py --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
+python3 client.py --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
 ```
 
 ---
