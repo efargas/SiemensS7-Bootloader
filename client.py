@@ -19,7 +19,7 @@ from pwn import remote, context, log, xor
 context.update(log_level="info", bits=32, endian="big")
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Runtime configs
@@ -99,12 +99,33 @@ def recv_packet(r):
     else:
         return answ[1:-1]
 
-def recv_many(r, verbose=False, total_bytes=None, baudrate=115200):
+def recv_many(r, total_bytes=None, baudrate=115200):
     import sys
     answ = ""
     stop = False
     start_time = time.time()
     last_print = 0
+
+    def format_bytes(n):
+        if n < 1024:
+            return "%d B" % n
+        elif n < 1024 * 1024:
+            return "%.2f KB" % (n / 1024.0)
+        elif n < 1024 * 1024 * 1024:
+            return "%.2f MB" % (n / (1024.0 * 1024.0))
+        else:
+            return "%.2f GB" % (n / (1024.0 * 1024.0 * 1024.0))
+
+    def format_time(s):
+        s = int(s)
+        if s < 60:
+            return "%ds" % s
+        m, s = divmod(s, 60)
+        if m < 60:
+            return "%dm %ds" % (m, s)
+        h, m = divmod(m, 60)
+        return "%dh %dm" % (h, m)
+
     while not stop:
         next_chunk = recv_packet(r)
         if next_chunk == "":
@@ -124,10 +145,19 @@ def recv_many(r, verbose=False, total_bytes=None, baudrate=115200):
                 bar_len = 30
                 filled = int(bar_len * percent)
                 bar = '[' + '=' * filled + ' ' * (bar_len - filled) + ']'
-                logger.debug("\r%s {:6.1f}%% %d/%d bytes | Elapsed: %.1fs | ETA: %.1fs",
-                             bar, percent * 100, done, total_bytes, elapsed, est_left)
+                
+                sys.stdout.write("\r%s %6.1f%% %s/%s | Speed: %s/s | Elapsed: %s | ETA: %s  " % (
+                    bar, 
+                    percent * 100, 
+                    format_bytes(done), 
+                    format_bytes(total_bytes), 
+                    format_bytes(speed), 
+                    format_time(elapsed), 
+                    format_time(est_left)
+                ))
+                sys.stdout.flush()
     if total_bytes:
-        logger.debug("\n")
+        sys.stdout.write("\n")
     return answ
 
 def encode_packet_for_stager(chunk):
@@ -266,7 +296,7 @@ def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind, baudrate=115200):
     answ = invoke_add_hook(r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
     log.debug("[payload_dump_mem] answ (len: %d): %s", len(answ), answ)
     assert(answ.startswith("Ok"))
-    contents = recv_many(r, verbose=False, total_bytes=num_bytes, baudrate=baudrate)
+    contents = recv_many(r, total_bytes=num_bytes, baudrate=baudrate)
     return contents
 
 def handle_conn(r, action, args, payload_manager):
