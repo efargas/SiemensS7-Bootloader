@@ -453,10 +453,10 @@ def main():
             if power_on_actual is not None and (now - power_on_actual) > 5.0:
                 logger.error("[!] Handshake timeout: did not receive special access greeting within 5 seconds after power on.")
                 sys.exit(1)
-            if power_on_time - now < 0.2 or power_on_actual is not None:
+            if power_on_time - now <= 0.2 or power_on_actual is not None:
                 s.send(pad + magic)
                 try:
-                    answ = s.recv(256, timeout=0.1)
+                    answ = s.recv(256, timeout=0.3)
                 except Exception:
                     answ = ''
                 if answ and answ.startswith("\5-CPU"):
