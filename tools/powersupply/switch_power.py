@@ -4,6 +4,10 @@
 from sys import argv
 import argparse
 import re
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 parser = argparse.ArgumentParser(description='Switch power on the remote power supply')
 parser.add_argument('--method', dest='method', default='allnet', choices=['allnet', 'modbus'], help='Control method: allnet (default) or modbus (Modbus TCP)')
@@ -29,7 +33,7 @@ if args.method == 'allnet':
     regex = re.compile('<meta name="X-Request-Token" content="([a-f0-9]+)">')
     match = regex.search(r.text)
     if not match:
-        print("[!] Could not find X-Request-Token in response from {}".format(host))
+        logger.error("[!] Could not find X-Request-Token in response from %s", host)
         exit(1)
     request_token = match.group(1)
     headers = {"X-Request-Token": request_token}
@@ -43,22 +47,22 @@ elif args.method == 'modbus':
     try:
         from pymodbus.client.sync import ModbusTcpClient
     except ImportError:
-        print("[!] pymodbus not installed. Please install with: pip install pymodbus==2.5.3")
+        logger.error("[!] pymodbus not installed. Please install with: pip install pymodbus==2.5.3")
         exit(1)
     toggle = True if args.mode == "on" else False
     client = ModbusTcpClient(args.modbus_ip, port=args.modbus_port)
     if not client.connect():
-        print("[!] Could not connect to Modbus TCP device at {}:{}".format(args.modbus_ip, args.modbus_port))
+        logger.error("[!] Could not connect to Modbus TCP device at %s:%d", args.modbus_ip, args.modbus_port)
         exit(2)
     rr = client.write_coil(args.modbus_output, toggle)
     if rr.isError():
-        print("[!] Modbus write_coil failed: {}".format(rr))
+        logger.error("[!] Modbus write_coil failed: %s", rr)
         client.close()
         exit(3)
     client.close()
-    print("[+] Modbus coil {} set to {} (Modbus TCP at {}:{})".format(args.modbus_output, toggle, args.modbus_ip, args.modbus_port))
+    logger.info("[+] Modbus coil %d set to %s (Modbus TCP at %s:%d)", args.modbus_output, toggle, args.modbus_ip, args.modbus_port)
     exit(0)
 
 else:
-    print("[!] Unknown method: {}".format(args.method))
+    logger.error("[!] Unknown method: %s", args.method)
     exit(1)
