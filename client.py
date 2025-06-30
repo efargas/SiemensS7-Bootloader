@@ -12,7 +12,7 @@ import subprocess
 import os
 import argparse
 import logging
-from pymodbus.client import ModbusTcpClient
+from pymodbus.client.sync import ModbusTcpClient # Changed for pymodbus 2.x compatibility
 
 from binascii import hexlify
 
