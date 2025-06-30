@@ -6,12 +6,18 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QStatusBar, QMenuBar, QA
 from PyQt5.QtCore import QThread, pyqtSignal, QProcess # For running socat
 
 # Attempt to import client functionalities
+# Ensure the script's directory is in the Python path for robust client import
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
+
 try:
-    import client # Assuming client.py is in the same directory or PYTHONPATH
-except ImportError:
-    print("ERROR: client.py not found. Please ensure it's in the same directory or PYTHONPATH.")
-    # A real application might handle this more gracefully, e.g., disable functionality
-    # For now, if it fails, the GUI might crash when trying to use client functions.
+    import client
+except ImportError as e:
+    print(f"ERROR: client.py not found or failed to import. Ensure it's in the script's directory ({script_dir}) and has no errors. Detail: {e}")
+    client = None
+except Exception as e: # Catch other potential errors during import
+    print(f"ERROR: An unexpected error occurred while importing client.py: {e}")
     client = None
 
 
