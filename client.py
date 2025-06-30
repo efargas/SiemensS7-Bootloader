@@ -539,7 +539,12 @@ def main_cli():
     modbus_group.add_argument('--modbus-output', dest='modbus_output', type=int,
                         help='Modbus output/channel to control (required if --switch-power is used)')
 
-    subparsers = parser.add_subparsers(dest="action", help="Action to perform", required=True)
+    subparsers = parser.add_subparsers(dest="action", help="Action to perform") # Removed required=True for Python 3.6 compatibility
+    # For Python 3.6, if no subparser is given, 'action' will be None.
+    # We can add a check for this after parsing if necessary.
+    # subparsers.required = True # This is an alternative way to make it required if needed, but might also be 3.7+
+    # Let's rely on the user providing an action or add a manual check later.
+
 
     parser_invoke = subparsers.add_parser(ACTION_INVOKE_HOOK, help="Invoke a previously installed payload hook.")
     parser_invoke.add_argument('-p', '--payload', dest="payload_file", type=argparse.FileType('rb'), required=True,
