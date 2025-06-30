@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+#Ubuntu 18.04+ setup script for Python 2 and Python 3 environments
+
 echo "Updating package lists..."
 sudo apt-get update
 
@@ -27,24 +29,30 @@ sudo apt-get install -y \
     python3-venv
 
 echo "Creating Python 3 virtual environment..."
-#mkdir ~/venv3
-#python3 -m venv ~/venv3
+if [ ! -d "$HOME/venv3" ]; then
+    python3 -m venv ~/venv3
+else
+    echo "Python 3 virtual environment already exists, skipping creation."
+fi
 
 echo "Activating Python 3 virtual environment and install dependencies..."
-#source ~/venv3/bin/activate
+source ~/venv3/bin/activate
 
 echo "Upgrading pip3 in virtualenv..."
-#pip3 install --upgrade pip
+pip3 install --upgrade pip
 
 echo "Installinq requirements for Python 3 on virtualenv..."
-#pip3 install -r requirements-py3.txt
+pip3 install -r requirements-py3.txt
 
 echo "Deactivating Python 3 virtualenv..."
-#deactivate
+deactivate
 
 echo "Creating Python 2 virtual environment..."
-virtualenv -p python2.7 ~/venv2
-#python2 -m virtualenv ~/venv2
+if [ ! -d "$HOME/venv2" ]; then
+    virtualenv -p python2.7 ~/venv2
+else
+    echo "Python 2 virtual environment already exists, skipping creation."
+fi
 
 echo "Activating Python 2 virtual environment and install dependencies..."
 source ~/venv2/bin/activate
@@ -55,7 +63,7 @@ pip2 install --upgrade pip
 echo "Installinq requirements for Python 2 on virtualenv..."
 pip2 install -r requirements-py2.txt
 
-echo "Deactivating Python 2 on virtualenv..."
+echo "Deactivating Python 2 virtualenv..."
 deactivate
 
 # Set up update-alternatives
