@@ -38,6 +38,31 @@ class PLCExploitGUI(QMainWindow):
         self._create_execute_payload_group() # Add this before terminal outputs
         self._create_terminal_outputs_group()
 
+    def _create_menu_bar(self):
+        self.menu_bar = QMenuBar(self)
+        self.setMenuBar(self.menu_bar)
+
+        # File menu
+        file_menu = self.menu_bar.addMenu("&File")
+        exit_action = QAction("&Exit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+        # Help menu
+        help_menu = self.menu_bar.addMenu("&Help")
+        about_action = QAction("&About", self)
+        # about_action.triggered.connect(self._show_about_dialog) # To be implemented
+        help_menu.addAction(about_action)
+
+    def _create_status_bar(self):
+        self.status_bar = QStatusBar(self)
+        self.setStatusBar(self.status_bar)
+        self.status_bar.showMessage("Ready")
+
+    # def _show_about_dialog(self):
+    #     QMessageBox.about(self, "About PLC Exploitation Tool",
+    #                       "A GUI tool for interacting with Siemens S7 PLCs.")
+
     def _create_execute_payload_group(self):
         execute_group = QGroupBox("Execute Generic Payload")
         layout = QGridLayout()
