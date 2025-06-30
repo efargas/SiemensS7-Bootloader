@@ -23,31 +23,31 @@ sudo apt-get install -y \
     gcc \
     binutils-arm-linux-gnueabi \
     gcc-arm-linux-gnueabi \
-    python2 \
     python3 \
-    python3-venv \
-    python-is-python3
+    python3-venv
 
 echo "Creating Python 3 virtual environment..."
-python3 -m venv ~/venv3
+#mkdir ~/venv3
+#python3 -m venv ~/venv3
 
 echo "Activating Python 3 virtual environment and install dependencies..."
-. ~/venv3/bin/activate
+#source ~/venv3/bin/activate
 
 echo "Upgrading pip3 in virtualenv..."
-pip3 install --upgrade pip
+#pip3 install --upgrade pip
 
 echo "Installinq requirements for Python 3 on virtualenv..."
-pip3 install -r requirements-py3.txt
+#pip3 install -r requirements-py3.txt
 
-echo "Deactivating Python 3 on virtualenv..."
-deactivate
+echo "Deactivating Python 3 virtualenv..."
+#deactivate
 
 echo "Creating Python 2 virtual environment..."
-python2 -m virtualenv ~/venv2
+virtualenv -p python2.7 ~/venv2
+#python2 -m virtualenv ~/venv2
 
 echo "Activating Python 2 virtual environment and install dependencies..."
-. ~/venv2/bin/activate
+source ~/venv2/bin/activate
 
 echo "Upgrading pip2 in virtualenv..."
 pip2 install --upgrade pip
