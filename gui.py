@@ -34,8 +34,8 @@ class PLCExploitGUI(QMainWindow):
         self._create_power_supply_group()
         self._create_connection_config_group()
         self._create_connection_management_group()
-        self._create_dump_memory_group()
-        self._create_execute_payload_group() # Add this before terminal outputs
+        self._create_dump_memory_group() # Corrected typo from self.dump_mem_group
+        self._create_execute_payload_group()
         self._create_terminal_outputs_group()
 
     def _create_menu_bar(self):
