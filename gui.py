@@ -65,6 +65,125 @@ class PLCExploitGUI(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready")
 
+    def _create_power_supply_group(self):
+        power_supply_group = QGroupBox("Power Supply")
+        layout = QGridLayout()
+
+        # Modbus IP
+        self.modbus_ip_label = QLabel("Modbus IP:")
+        self.modbus_ip_input = QLineEdit("192.168.1.18")
+        self.modbus_ip_input.setToolTip("IP address of the Modbus TCP power supply device.")
+        layout.addWidget(self.modbus_ip_label, 0, 0)
+        layout.addWidget(self.modbus_ip_input, 0, 1)
+
+        # Modbus Port
+        self.modbus_port_label = QLabel("Modbus Port:")
+        self.modbus_port_input = QLineEdit("502")
+        self.modbus_port_input.setToolTip("Port of the Modbus TCP power supply device.")
+        layout.addWidget(self.modbus_port_label, 1, 0)
+        layout.addWidget(self.modbus_port_input, 1, 1)
+
+        # Modbus Output
+        self.modbus_output_label = QLabel("Modbus Output:")
+        self.modbus_output_input = QLineEdit("1") # Default to an example output
+        self.modbus_output_input.setToolTip("Modbus coil/output number to control.")
+        layout.addWidget(self.modbus_output_label, 2, 0)
+        layout.addWidget(self.modbus_output_input, 2, 1)
+
+        # Power Supply Delay
+        self.power_delay_label = QLabel("Power ON Delay (ms):")
+        self.power_delay_input = QLineEdit("1000") # Default to 1 second
+        self.power_delay_input.setToolTip("Delay in milliseconds before turning power ON after turning it OFF.")
+        layout.addWidget(self.power_delay_label, 3, 0)
+        layout.addWidget(self.power_delay_input, 3, 1)
+
+        # Power ON Button
+        self.power_on_button = QPushButton("Power ON")
+        self.power_on_button.setToolTip("Manually turn the power supply ON.")
+        self.power_on_button.clicked.connect(self._power_on)
+        layout.addWidget(self.power_on_button, 4, 0)
+
+        # Power OFF Button
+        self.power_off_button = QPushButton("Power OFF")
+        self.power_off_button.setToolTip("Manually turn the power supply OFF.")
+        self.power_off_button.clicked.connect(self._power_off)
+        layout.addWidget(self.power_off_button, 4, 1)
+
+        power_supply_group.setLayout(layout)
+        self.main_layout.addWidget(power_supply_group)
+
+    def _create_connection_config_group(self):
+        connection_group = QGroupBox("Connection Configuration")
+        layout = QGridLayout()
+
+        # Socat TCP Forward Port
+        self.socat_port_label = QLabel("Forwarded TCP Port:")
+        self.socat_port_input = QLineEdit("1238") # Default from start.sh
+        self.socat_port_input.setToolTip("Local TCP port that socat will forward to the serial device.")
+        layout.addWidget(self.socat_port_label, 0, 0)
+        layout.addWidget(self.socat_port_input, 0, 1)
+
+        # ttyUSB Selection
+        self.tty_label = QLabel("Serial Device (ttyUSB):")
+        self.tty_combo = QComboBox()
+        # Populate with common options, autodetect will refresh this
+        for i in range(4): # Add ttyUSB0 to ttyUSB3
+            self.tty_combo.addItem(f"/dev/ttyUSB{i}")
+        self.tty_combo.setToolTip("Select the ttyUSB serial device connected to the PLC.")
+        layout.addWidget(self.tty_label, 1, 0)
+        layout.addWidget(self.tty_combo, 1, 1)
+
+        # Autodetect Devices Button
+        self.autodetect_button = QPushButton("Autodetect Devices")
+        self.autodetect_button.setToolTip("Attempt to find connected serial devices (e.g., /dev/ttyUSB*).")
+        self.autodetect_button.clicked.connect(self._autodetect_devices)
+        layout.addWidget(self.autodetect_button, 2, 0, 1, 2) # Span button across two columns
+
+        connection_group.setLayout(layout)
+        self.main_layout.addWidget(connection_group)
+
+    def _create_connection_management_group(self):
+        management_group = QGroupBox("PLC Connection")
+        layout = QGridLayout() # Using GridLayout for potentially more items later
+
+        self.connect_button = QPushButton("Connect to PLC")
+        self.connect_button.setToolTip("Start socat, connect to PLC and attempt handshake.")
+        self.connect_button.clicked.connect(self._connect_plc)
+        layout.addWidget(self.connect_button, 0, 0)
+
+        self.disconnect_button = QPushButton("Disconnect PLC")
+        self.disconnect_button.setToolTip("Send bye() command to PLC and stop socat.")
+        self.disconnect_button.clicked.connect(self._disconnect_plc)
+        self.disconnect_button.setEnabled(False) # Initially disabled until connected
+        layout.addWidget(self.disconnect_button, 0, 1)
+
+        management_group.setLayout(layout)
+        self.main_layout.addWidget(management_group)
+
+    def _autodetect_devices(self):
+        self._log_to_program_output("Autodetecting serial devices...")
+        self.tty_combo.clear()
+        
+        # Common patterns for serial devices on Linux
+        # For Windows, it would be "COM1", "COM2", etc.
+        # For macOS, it's often /dev/tty.usbserial-* or /dev/tty.usbmodem-*
+        
+        # Simple glob-based detection for Linux
+        import glob
+        potential_devices = []
+        for pattern in ["/dev/ttyUSB*", "/dev/ttyACM*", "/dev/ttyS*"]:
+            potential_devices.extend(glob.glob(pattern))
+        
+        if not potential_devices:
+            self._log_to_program_output("No common serial devices found automatically. Please enter manually if needed.")
+            self.tty_combo.addItem("") # Add a blank item
+        else:
+            for device in sorted(list(set(potential_devices))): # Sort and unique
+                self.tty_combo.addItem(device)
+                self._log_to_program_output(f"Found: {device}")
+        
+        self.status_bar.showMessage(f"Device detection complete. Found {len(potential_devices)} potential devices.")
+
     # def _show_about_dialog(self):
     #     QMessageBox.about(self, "About PLC Exploitation Tool",
     #                       "A GUI tool for interacting with Siemens S7 PLCs.")
@@ -583,125 +702,11 @@ class PLCConnectionThread(QThread):
             self.parent_gui.client_instance = None
 
 
-    def _create_connection_management_group(self):
-        management_group = QGroupBox("PLC Connection")
-        layout = QGridLayout() # Using GridLayout for potentially more items later
+    # (Moved into PLCExploitGUI class above)
 
-        self.connect_button = QPushButton("Connect to PLC")
-        self.connect_button.setToolTip("Start socat, connect to PLC and attempt handshake.")
-        self.connect_button.clicked.connect(self._connect_plc)
-        layout.addWidget(self.connect_button, 0, 0)
+    # (Moved into PLCExploitGUI class above)
 
-        self.disconnect_button = QPushButton("Disconnect PLC")
-        self.disconnect_button.setToolTip("Send bye() command to PLC and stop socat.")
-        self.disconnect_button.clicked.connect(self._disconnect_plc)
-        self.disconnect_button.setEnabled(False) # Initially disabled until connected
-        layout.addWidget(self.disconnect_button, 0, 1)
-
-        management_group.setLayout(layout)
-        self.main_layout.addWidget(management_group)
-
-
-    def _create_connection_config_group(self):
-        connection_group = QGroupBox("Connection Configuration")
-        layout = QGridLayout()
-
-        # Socat TCP Forward Port
-        self.socat_port_label = QLabel("Forwarded TCP Port:")
-        self.socat_port_input = QLineEdit("1238") # Default from start.sh
-        self.socat_port_input.setToolTip("Local TCP port that socat will forward to the serial device.")
-        layout.addWidget(self.socat_port_label, 0, 0)
-        layout.addWidget(self.socat_port_input, 0, 1)
-
-        # ttyUSB Selection
-        self.tty_label = QLabel("Serial Device (ttyUSB):")
-        self.tty_combo = QComboBox()
-        # Populate with common options, autodetect will refresh this
-        for i in range(4): # Add ttyUSB0 to ttyUSB3
-            self.tty_combo.addItem(f"/dev/ttyUSB{i}")
-        self.tty_combo.setToolTip("Select the ttyUSB serial device connected to the PLC.")
-        layout.addWidget(self.tty_label, 1, 0)
-        layout.addWidget(self.tty_combo, 1, 1)
-
-        # Autodetect Devices Button
-        self.autodetect_button = QPushButton("Autodetect Devices")
-        self.autodetect_button.setToolTip("Attempt to find connected serial devices (e.g., /dev/ttyUSB*).")
-        self.autodetect_button.clicked.connect(self._autodetect_devices)
-        layout.addWidget(self.autodetect_button, 2, 0, 1, 2) # Span button across two columns
-
-        connection_group.setLayout(layout)
-        self.main_layout.addWidget(connection_group)
-
-    def _autodetect_devices(self):
-        self._log_to_program_output("Autodetecting serial devices...")
-        self.tty_combo.clear()
-        
-        # Common patterns for serial devices on Linux
-        # For Windows, it would be "COM1", "COM2", etc.
-        # For macOS, it's often /dev/tty.usbserial-* or /dev/tty.usbmodem-*
-        
-        # Simple glob-based detection for Linux
-        import glob
-        potential_devices = []
-        for pattern in ["/dev/ttyUSB*", "/dev/ttyACM*", "/dev/ttyS*"]:
-            potential_devices.extend(glob.glob(pattern))
-        
-        if not potential_devices:
-            self._log_to_program_output("No common serial devices found automatically. Please enter manually if needed.")
-            self.tty_combo.addItem("") # Add a blank item
-        else:
-            for device in sorted(list(set(potential_devices))): # Sort and unique
-                self.tty_combo.addItem(device)
-                self._log_to_program_output(f"Found: {device}")
-        
-        self.status_bar.showMessage(f"Device detection complete. Found {len(potential_devices)} potential devices.")
-
-    def _create_power_supply_group(self):
-        power_supply_group = QGroupBox("Power Supply")
-        layout = QGridLayout()
-
-        # Modbus IP
-        self.modbus_ip_label = QLabel("Modbus IP:")
-        self.modbus_ip_input = QLineEdit("192.168.1.18")
-        self.modbus_ip_input.setToolTip("IP address of the Modbus TCP power supply device.")
-        layout.addWidget(self.modbus_ip_label, 0, 0)
-        layout.addWidget(self.modbus_ip_input, 0, 1)
-
-        # Modbus Port
-        self.modbus_port_label = QLabel("Modbus Port:")
-        self.modbus_port_input = QLineEdit("502")
-        self.modbus_port_input.setToolTip("Port of the Modbus TCP power supply device.")
-        layout.addWidget(self.modbus_port_label, 1, 0)
-        layout.addWidget(self.modbus_port_input, 1, 1)
-
-        # Modbus Output
-        self.modbus_output_label = QLabel("Modbus Output:")
-        self.modbus_output_input = QLineEdit("1") # Default to an example output
-        self.modbus_output_input.setToolTip("Modbus coil/output number to control.")
-        layout.addWidget(self.modbus_output_label, 2, 0)
-        layout.addWidget(self.modbus_output_input, 2, 1)
-
-        # Power Supply Delay
-        self.power_delay_label = QLabel("Power ON Delay (ms):")
-        self.power_delay_input = QLineEdit("1000") # Default to 1 second
-        self.power_delay_input.setToolTip("Delay in milliseconds before turning power ON after turning it OFF.")
-        layout.addWidget(self.power_delay_label, 3, 0)
-        layout.addWidget(self.power_delay_input, 3, 1)
-
-        # Power ON Button
-        self.power_on_button = QPushButton("Power ON")
-        self.power_on_button.setToolTip("Manually turn the power supply ON.")
-        self.power_on_button.clicked.connect(self._power_on)
-        layout.addWidget(self.power_on_button, 4, 0)
-
-        # Power OFF Button
-        self.power_off_button = QPushButton("Power OFF")
-        self.power_off_button.setToolTip("Manually turn the power supply OFF.")
-        self.power_off_button.clicked.connect(self._power_off)
-        layout.addWidget(self.power_off_button, 4, 1)
-
-        power_supply_group.setLayout(layout)
-        self.main_layout.addWidget(power_supply_group)
+    # (Moved into PLCExploitGUI class above)
 
     def _create_menu_bar(self):
         self.menu_bar = QMenuBar(self)
