@@ -98,6 +98,10 @@ class PayloadManager(object):
 
 
 class PLCInterface(object):
+    # Custom exception for handshake failures
+    class HandshakeError(Exception):
+        pass
+
     def __init__(self, host, port, progress_callback=None):
         self.host = host
         self.port = port
@@ -474,7 +478,8 @@ class PLCInterface(object):
                 first_packet = self._recv_packet_internal()
                 if first_packet is None:
                     logger.error("Failed to receive the initial packet after handshake.")
-                    return False, "Failed initial packet read"
+                    # self.disconnect() # Ensure connection is closed
+                    raise self.HandshakeError("Failed to receive the initial packet after special access greeting.")
 
                 logger.info(f"[+] Got special access greeting packet: {first_packet} [{hexlify(first_packet)}]")
                 greeting_message = first_packet # This is the actual first message like "-CPU"
@@ -483,8 +488,9 @@ class PLCInterface(object):
             time.sleep(0.05) # Wait a bit before retrying
 
         if not handshake_received:
-            logger.error("[!] Handshake timeout: did not receive special access greeting.")
-            return False, "Timeout"
+            logger.error("[!] Handshake timeout: did not receive special access greeting within the 2s window.")
+            # self.disconnect()
+            raise self.HandshakeError("Timeout: Did not receive special access greeting.")
         
         return True, greeting_message
 
