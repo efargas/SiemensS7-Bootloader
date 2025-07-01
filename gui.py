@@ -622,7 +622,7 @@ class PLCExploitGUI(QMainWindow):
             "-v", # verbose
             "-b", "4", # buffer size (example, might not be critical here)
             "-x", # hex output for data
-            f"TCP-LISTEN:{forward_port},fork,reuseaddr",
+            f"TCP-LISTEN:{forward_port},bind=localhost,fork,reuseaddr", # Bind to localhost
             f"{serial_dev}" # socat should apply raw settings by default to serial TTYs
         ]
         # Pre-configure serial port using stty (Important!)
@@ -887,14 +887,21 @@ class PLCExploitGUI(QMainWindow):
                 self.client_instance.disconnect() # This logs internally
                 self.client_instance = None
         
-        self._stop_socat() # Always stop socat on disconnect
+        # self._stop_socat() # DO NOT stop socat on PLC disconnect as per new requirement
 
-        self.status_bar.showMessage("Disconnected.")
-        self.connect_button.setEnabled(True)
+        self.status_bar.showMessage("Disconnected from PLC.")
+        # If socat is running, Connect button should be enabled.
+        # If socat is NOT running, Connect button should remain disabled.
+        # This state is managed by _start_socat_manual, _stop_socat_manual, and _socat_finished.
+        if self.socat_process and self.socat_process.state() == QProcess.Running:
+            self.connect_button.setEnabled(True)
+        else:
+            self.connect_button.setEnabled(False)
+
         self.disconnect_button.setEnabled(False)
         self.start_dump_button.setEnabled(False)
         self.execute_payload_button.setEnabled(False)
-        self._log_to_program_output("Disconnected from PLC and socat stopped.", "INFO")
+        self._log_to_program_output("Disconnected from PLC. Socat state unchanged by this action.", "INFO")
 
 
 # --- Worker Threads ---
