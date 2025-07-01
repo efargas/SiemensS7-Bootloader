@@ -1003,9 +1003,9 @@ class PLCConnectionThread(QThread):
             # CRITICAL TIMING SECTION STARTS AFTER POWER_ON IS CONFIRMED
             # This sleep is to allow the PLC's bootloader to initialize before we attempt connection.
             # The 500ms window for handshake starts roughly when the PLC is internally ready.
-            # Adjust this value based on testing; 0.1s = 100ms.
-            initial_plc_boot_wait = 0.1
-            self.log_message_signal.emit(f"Power ON confirmed. Waiting {initial_plc_boot_wait}s for PLC bootloader...", "DEBUG")
+            # Setting to a very small delay (10ms). The perform_handshake() loop will do the active probing.
+            initial_plc_boot_wait = 0.01
+            self.log_message_signal.emit(f"Power ON confirmed. Minimal wait of {initial_plc_boot_wait}s before handshake attempt...", "DEBUG")
             time.sleep(initial_plc_boot_wait)
 
             # --- Connection and Handshake Step (Optimized for speed) ---
