@@ -379,17 +379,47 @@ make
 
 # 4. Running the Client Utility
 
-You can use the provided `client.sh` wrapper or run the Python script directly (ensure your Python 2 environment is activated):
+There are two main ways to use the client utility:
 
+**A. Command-Line Interface (CLI)**
+
+You can use the provided `client.sh` wrapper or run the Python script `client.py` directly. Ensure your Python 3 environment (e.g., `venv3`) is activated.
+
+The `client.sh` script is a convenience wrapper:
 ```bash
 ./client.sh --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
-# or
-python3 client.py --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
 ```
+It can also take a `--port=<port_number>` argument if you need `client.py` to connect to a `socat` instance running on a different port than the default (1238).
+
+Alternatively, run `client.py` directly (useful for more direct control or debugging):
+```bash
+python3 client.py --port=1238 --switch-power --modbus-output=1 --powersupply-delay=10000 invoke -p payloads/hello_world/hello_world.bin
+```
+Remember that `client.py` requires the `--port` argument specifying the local TCP port `socat` is listening on.
+
+**B. Graphical User Interface (GUI)**
+
+A PyQt5-based GUI is available for a more interactive experience. Ensure your Python 3 environment with PyQt5 installed (see `requirements-py3.txt`) is activated.
+
+To run the GUI:
+```bash
+python3 gui.py
+```
+
+The GUI provides controls for:
+- Power supply management (Modbus TCP).
+- Configuration of serial device and `socat` forwarding port.
+- Starting/stopping `socat` and `stty` for serial communication.
+- Connecting to the PLC, performing handshake, and installing the stager.
+- Dumping memory with progress indication.
+- Executing generic payloads.
+- Viewing `socat` and program logs.
+
+The GUI aims to simplify the workflow by managing `stty` and `socat` internally.
 
 ---
 
-# 5. Demos and Usage Examples
+# 5. Demos and Usage Examples (CLI)
 
 ## DEMO 1: Upload and Execute Test Payload
 

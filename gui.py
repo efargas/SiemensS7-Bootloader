@@ -3,7 +3,8 @@ import os # For path operations
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QStatusBar, QMenuBar, QAction, QVBoxLayout, QWidget,
                              QGroupBox, QGridLayout, QLabel, QLineEdit, QPushButton, QComboBox,
                              QTabWidget, QTextEdit, QFileDialog, QProgressBar, QMessageBox)
-from PyQt5.QtCore import QThread, pyqtSignal, QProcess # For running socat
+from PyQt5.QtCore import QThread, pyqtSignal, QProcess, Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
+from PyQt5.QtWidgets import QToolButton, QSizePolicy, QFrame, QScrollArea
 
 # Attempt to import client functionalities
 # Ensure the script's directory is in the Python path for robust client import
@@ -19,6 +20,87 @@ except ImportError as e:
 except Exception as e: # Catch other potential errors during import
     print(f"ERROR: An unexpected error occurred while importing client.py: {e}")
     client = None
+
+
+class CollapsibleGroupBox(QWidget):
+    def __init__(self, title="", parent=None, animation_duration=300):
+        super(CollapsibleGroupBox, self).__init__(parent)
+
+        self.animation_duration = animation_duration
+        self.is_expanded = True # Start expanded by default
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        self.toggle_button = QToolButton(self)
+        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.toggle_button.setArrowType(Qt.DownArrow)
+        self.toggle_button.setText(str(title))
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(self.is_expanded)
+        self.toggle_button.clicked.connect(self._toggle)
+
+        self.content_area = QFrame(self)
+        self.content_area.setFrameShape(QFrame.StyledPanel) # or QFrame.NoFrame
+        self.content_area.setFrameShadow(QFrame.Plain)
+        self.content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed) # Start with fixed, then expand
+        self.content_layout = QVBoxLayout(self.content_area) # Layout for the actual content
+
+        # Animation setup
+        self.animation = QPropertyAnimation(self.content_area, b"maximumHeight")
+        self.animation.setDuration(self.animation_duration)
+        self.animation.setEasingCurve(QEasingCurve.InOutQuad)
+
+        main_layout.addWidget(self.toggle_button)
+        main_layout.addWidget(self.content_area)
+
+        # Set initial state without animation
+        if not self.is_expanded:
+            self.content_area.setMaximumHeight(0)
+
+    def setLayout(self, layout):
+        # Clear any existing layout in content_layout first
+        while self.content_layout.count():
+            child = self.content_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        self.content_layout.addLayout(layout)
+        # Adjust content_area's initial size based on its new layout,
+        # especially when starting in expanded state.
+        if self.is_expanded:
+            self.content_area.setMaximumHeight(self.content_area.sizeHint().height() + self.content_layout.contentsMargins().top() + self.content_layout.contentsMargins().bottom())
+
+
+    def _toggle(self):
+        self.is_expanded = not self.is_expanded
+        self.toggle_button.setArrowType(Qt.DownArrow if self.is_expanded else Qt.RightArrow)
+
+        current_height = self.content_area.height()
+        self.animation.stop() # Stop any ongoing animation
+
+        if self.is_expanded:
+            # To expand, set maximumHeight to something large enough for content
+            # Get the actual preferred height of the content
+            self.content_area.setMaximumHeight(self.content_area.sizeHint().height() + self.content_layout.contentsMargins().top() + self.content_layout.contentsMargins().bottom())
+            # If sizeHint is not enough, might need to calculate it more robustly
+            # or use a very large number like self.content_area.parentWidget().height() or a fixed large value.
+            # For dynamic content, sizeHint should be updated.
+            # Let's try a fixed large value for simplicity for now if sizeHint is problematic.
+            # target_height = self.content_area.layout().sizeHint().height() # Preferred height of content
+            target_height = self.content_area.sizeHint().height()
+            if target_height == 0 and self.content_layout.count() > 0 : # if sizeHint is 0, try to get it from layout
+                 target_height = self.content_layout.sizeHint().height()
+
+            self.animation.setStartValue(0) # Assuming it was 0 (collapsed)
+            self.animation.setEndValue(target_height if target_height > 0 else 300) # Use a default if target_height is 0
+        else:
+            # To collapse
+            self.animation.setStartValue(self.content_area.height())
+            self.animation.setEndValue(0)
+
+        self.animation.start()
 
 
 class PLCExploitGUI(QMainWindow):
@@ -37,12 +119,20 @@ class PLCExploitGUI(QMainWindow):
         self.main_layout = QVBoxLayout(self.central_widget)
         self.setCentralWidget(self.central_widget)
 
+        # Create a top widget for all collapsible sections
+        self.sections_widget = QWidget()
+        self.sections_layout = QVBoxLayout(self.sections_widget)
+        self.sections_layout.setContentsMargins(0,0,0,0)
+
         self._create_power_supply_group()
         self._create_connection_config_group()
         self._create_connection_management_group()
-        self._create_dump_memory_group() # Corrected typo from self.dump_mem_group
+        self._create_dump_memory_group()
         self._create_execute_payload_group() 
-        self._create_terminal_outputs_group()
+
+        self.main_layout.addWidget(self.sections_widget) # Add all sections together
+
+        self._create_terminal_outputs_group() # Terminals are separate and should expand
 
     def _create_menu_bar(self):
         self.menu_bar = QMenuBar(self)
@@ -66,7 +156,7 @@ class PLCExploitGUI(QMainWindow):
         self.status_bar.showMessage("Ready")
 
     def _create_power_supply_group(self):
-        power_supply_group = QGroupBox("Power Supply")
+        power_supply_group = CollapsibleGroupBox("Power Supply Configuration")
         layout = QGridLayout()
 
         # Modbus IP
@@ -110,10 +200,10 @@ class PLCExploitGUI(QMainWindow):
         layout.addWidget(self.power_off_button, 4, 1)
 
         power_supply_group.setLayout(layout)
-        self.main_layout.addWidget(power_supply_group)
+        self.sections_layout.addWidget(power_supply_group) # Add to sections_layout
 
     def _create_connection_config_group(self):
-        connection_group = QGroupBox("Connection Configuration")
+        connection_group = CollapsibleGroupBox("Connection Configuration")
         layout = QGridLayout()
 
         # Socat TCP Forward Port
@@ -140,10 +230,10 @@ class PLCExploitGUI(QMainWindow):
         layout.addWidget(self.autodetect_button, 2, 0, 1, 2) # Span button across two columns
 
         connection_group.setLayout(layout)
-        self.main_layout.addWidget(connection_group)
+        self.sections_layout.addWidget(connection_group) # Add to sections_layout
 
     def _create_connection_management_group(self):
-        management_group = QGroupBox("PLC Connection")
+        management_group = CollapsibleGroupBox("PLC Connection Management")
         layout = QGridLayout() # Using GridLayout for potentially more items later
 
         self.connect_button = QPushButton("Connect to PLC")
@@ -158,7 +248,7 @@ class PLCExploitGUI(QMainWindow):
         layout.addWidget(self.disconnect_button, 0, 1)
 
         management_group.setLayout(layout)
-        self.main_layout.addWidget(management_group)
+        self.sections_layout.addWidget(management_group) # Add to sections_layout
 
     def _autodetect_devices(self):
         self._log_to_program_output("Autodetecting serial devices...")
@@ -189,7 +279,7 @@ class PLCExploitGUI(QMainWindow):
     #                       "A GUI tool for interacting with Siemens S7 PLCs.")
 
     def _create_execute_payload_group(self):
-        execute_group = QGroupBox("Execute Generic Payload")
+        execute_group = CollapsibleGroupBox("Execute Generic Payload")
         layout = QGridLayout()
 
         # Payload File
@@ -214,15 +304,15 @@ class PLCExploitGUI(QMainWindow):
         # Execute Payload Button
         self.execute_payload_button = QPushButton("Execute Payload")
         self.execute_payload_button.setToolTip("Upload and execute the selected payload.")
-        # self.execute_payload_button.clicked.connect(self._execute_generic_payload) # To be implemented
+        self.execute_payload_button.clicked.connect(self._execute_generic_payload) # Connect to implemented method
         self.execute_payload_button.setEnabled(False) # Disabled until connected and in special mode
         layout.addWidget(self.execute_payload_button, 2, 0, 1, 3) # Span across columns
 
         execute_group.setLayout(layout)
-        self.main_layout.addWidget(execute_group)
+        self.sections_layout.addWidget(execute_group) # Add to sections_layout
 
     def _create_dump_memory_group(self):
-        dump_group = QGroupBox("Memory Dump")
+        dump_group = CollapsibleGroupBox("Memory Dump")
         layout = QGridLayout()
 
         # Start Address
@@ -264,7 +354,7 @@ class PLCExploitGUI(QMainWindow):
         # Start Dump Button
         self.start_dump_button = QPushButton("Start Dump")
         self.start_dump_button.setToolTip("Begin the memory dumping process.")
-        # self.start_dump_button.clicked.connect(self._start_dump) # To be implemented
+        self.start_dump_button.clicked.connect(self._start_dump) # Connect to implemented method
         self.start_dump_button.setEnabled(False) # Disabled until connected and in special mode
         layout.addWidget(self.start_dump_button, 4, 0, 1, 3) # Span across columns
 
@@ -285,7 +375,7 @@ class PLCExploitGUI(QMainWindow):
 
 
         dump_group.setLayout(layout)
-        self.main_layout.addWidget(dump_group)
+        self.sections_layout.addWidget(dump_group) # Add to sections_layout
 
 
     def _create_terminal_outputs_group(self):
@@ -320,8 +410,18 @@ class PLCExploitGUI(QMainWindow):
             msg_box.setIcon(QMessageBox.Critical)
         msg_box.exec_()
 
+    def _append_text_to_log(self, text_edit_widget, message):
+        """Helper function to append text and manage scrolling."""
+        scrollbar = text_edit_widget.verticalScrollBar()
+        at_bottom = scrollbar.value() >= (scrollbar.maximum() - 4) # A little tolerance
+
+        text_edit_widget.append(message)
+
+        if at_bottom:
+            scrollbar.setValue(scrollbar.maximum()) # Auto-scroll
+
     def _log_to_program_output(self, message):
-        self.program_output_terminal.append(message)
+        self._append_text_to_log(self.program_output_terminal, message)
 
     def _power_on(self):
         if not client:
@@ -401,18 +501,31 @@ class PLCExploitGUI(QMainWindow):
     # --- socat Process Handlers ---
     def _socat_ready_read_stdout(self):
         output = self.socat_process.readAllStandardOutput().data().decode(errors='ignore')
-        self.socat_output_terminal.append(output)
+        self._append_text_to_log(self.socat_output_terminal, output)
 
     def _socat_ready_read_stderr(self):
         error_output = self.socat_process.readAllStandardError().data().decode(errors='ignore')
-        self.socat_output_terminal.append(f"<font color='red'>{error_output}</font>") # Show errors in red
+        # For HTML formatted text, QTextEdit's append might not be ideal with the scroll check.
+        # Let's use insertHtml and then manage scroll.
+        # However, simple append with HTML also works with the _append_text_to_log if we pass HTML.
+        # Let's keep it simple first.
+        self._append_text_to_log(self.socat_output_terminal, f"<font color='red'>{error_output}</font>")
+
 
     def _socat_finished(self, exit_code, exit_status):
         self._log_to_program_output(f"socat process finished. Exit code: {exit_code}, Status: {exit_status}")
         self.socat_output_terminal.append(f"<b>socat process finished. Exit code: {exit_code}</b>")
-        self.connect_button.setEnabled(True)
+        self.connect_button.setEnabled(True) # Ready for a new connection attempt
+
+        # If socat died, any existing PLC connection is severed.
+        if self.client_instance and self.client_instance.r:
+            self._log_to_program_output("socat terminated while PLC connection was active. Cleaning up client.")
+            self.client_instance.disconnect() # Close the pwnlib remote object
+            self.client_instance = None
+            self.status_bar.showMessage("Disconnected from PLC (socat terminated).")
+
+        # Ensure UI reflects that PLC connection is gone
         self.disconnect_button.setEnabled(False)
-        # Also disable payload/dump buttons if socat dies unexpectedly
         self.start_dump_button.setEnabled(False)
         self.execute_payload_button.setEnabled(False)
 
@@ -702,11 +815,250 @@ class PLCConnectionThread(QThread):
             self.parent_gui.client_instance = None
 
 
-    # (Moved into PLCExploitGUI class above)
+class MemoryDumpThread(QThread):
+    dump_progress = pyqtSignal(int, int, float, float, float) # done, total, speed, elapsed, eta
+    dump_succeeded = pyqtSignal(str, int) # output_path, bytes_written
+    dump_failed = pyqtSignal(str) # error_message
 
-    # (Moved into PLCExploitGUI class above)
+    def __init__(self, client_instance, dump_payload_path, dump_address, num_bytes, output_file_path, parent_gui):
+        super().__init__(parent_gui)
+        self.client_instance = client_instance
+        self.dump_payload_path = dump_payload_path
+        self.dump_address = dump_address
+        self.num_bytes = num_bytes
+        self.output_file_path = output_file_path
+        self.parent_gui = parent_gui # For logging mainly
 
-    # (Moved into PLCExploitGUI class above)
+    def run(self):
+        original_callback = None
+        try:
+            self.parent_gui._log_to_program_output(f"Dump Thread: Loading dump payload from {self.dump_payload_path}")
+            with open(self.dump_payload_path, "rb") as f:
+                dump_payload_code = f.read()
+
+            self.parent_gui._log_to_program_output("Dump Thread: Executing memory dump operation...")
+
+            original_callback = self.client_instance.progress_callback
+            self.client_instance.progress_callback = self.dump_progress.emit
+
+            dumped_data = self.client_instance.execute_memory_dump(
+                dump_payload_code,
+                self.dump_address,
+                self.num_bytes
+            )
+
+            self.client_instance.progress_callback = original_callback
+            original_callback = None # Indicate callback was restored
+
+            self.parent_gui._log_to_program_output(f"Dump Thread: Saving {len(dumped_data)} bytes to {self.output_file_path}")
+            with open(self.output_file_path, "wb") as f:
+                f.write(dumped_data)
+
+            self.dump_succeeded.emit(self.output_file_path, len(dumped_data))
+
+        except FileNotFoundError as fnf_err:
+            self.dump_failed.emit(f"Dump payload file not found: {fnf_err}")
+        except Exception as e:
+            self.parent_gui._log_to_program_output(f"Dump Thread: Exception: {e}")
+            # import traceback # Keep this commented out unless debugging locally
+            # traceback.print_exc()
+            self.dump_failed.emit(f"An error occurred during memory dump: {e}")
+        finally:
+            if original_callback is not None and hasattr(self.client_instance, 'progress_callback'):
+                # Restore callback if it hasn't been restored yet (e.g. due to an exception before explicit restore)
+                self.client_instance.progress_callback = original_callback
+
+
+class ExecutePayloadThread(QThread):
+    payload_execution_succeeded = pyqtSignal(str, object)  # hook_idx_str, response (bytes or None)
+    payload_execution_failed = pyqtSignal(str)    # error_message
+
+    def __init__(self, client_instance, payload_path, payload_args_str, parent_gui):
+        super().__init__(parent_gui)
+        self.client_instance = client_instance
+        self.payload_path = payload_path
+        self.payload_args_str = payload_args_str # String, will be encoded
+        self.parent_gui = parent_gui
+
+    def run(self):
+        try:
+            self.parent_gui._log_to_program_output(f"Payload Thread: Loading payload from {self.payload_path}")
+            with open(self.payload_path, "rb") as f:
+                payload_code = f.read()
+
+            # Convert string args to bytes, assuming UTF-8. Payload might expect specific encoding.
+            payload_args_bytes = self.payload_args_str.encode('utf-8')
+
+            self.parent_gui._log_to_program_output(f"Payload Thread: Installing payload ({len(payload_code)} bytes) with args '{self.payload_args_str}'...")
+
+            # Using default hook from client.py, can be made configurable in GUI later if needed
+            hook_idx = self.client_instance.install_payload_via_stager(payload_code)
+
+            self.parent_gui._log_to_program_output(f"Payload Thread: Invoking payload hook 0x{hook_idx:02x}...")
+            # For generic payloads, we usually want a response.
+            # The invoke_add_hook has an await_response=True by default.
+            response = self.client_instance.invoke_add_hook(hook_idx, payload_args_bytes)
+
+            self.payload_execution_succeeded.emit(f"0x{hook_idx:02x}", response)
+
+        except FileNotFoundError:
+            self.payload_execution_failed.emit(f"Payload file not found: {self.payload_path}")
+        except Exception as e:
+            self.parent_gui._log_to_program_output(f"Payload Thread: Exception: {e}")
+            # import traceback
+            # traceback.print_exc()
+            self.payload_execution_failed.emit(f"An error occurred during payload execution: {e}")
+
+
+    # --- Memory Dump Methods ---
+
+    # --- Generic Payload Execution Methods ---
+    def _execute_generic_payload(self):
+        if not self.client_instance or not self.client_instance.r:
+            self._show_message("Error", "Not connected to PLC. Cannot execute payload.", "error")
+            return
+
+        payload_path = self.gen_payload_path_input.text()
+        payload_args = self.gen_payload_args_input.text() # Keep as string, thread will encode
+
+        if not payload_path or not os.path.exists(payload_path):
+            self._show_message("Input Error", f"Payload file not found: {payload_path}", "error")
+            return
+
+        self.execute_payload_button.setEnabled(False)
+        self._log_to_program_output(f"Starting generic payload execution: Path={payload_path}, Args='{payload_args}'")
+        self.status_bar.showMessage("Executing payload...")
+
+        if hasattr(self, 'payload_thread') and self.payload_thread and self.payload_thread.isRunning():
+            self._log_to_program_output("Payload execution already in progress.")
+            # self.execute_payload_button.setEnabled(True) # Re-enable if stuck
+            return
+
+        self.payload_thread = ExecutePayloadThread(
+            self.client_instance,
+            payload_path,
+            payload_args,
+            self
+        )
+        self.payload_thread.payload_execution_succeeded.connect(self._handle_payload_success)
+        self.payload_thread.payload_execution_failed.connect(self._handle_payload_failure)
+        self.payload_thread.finished.connect(self._on_payload_thread_finished)
+
+        self.payload_thread.start()
+
+    def _handle_payload_success(self, hook_idx_str, response):
+        decoded_response = ""
+        if response is not None:
+            try:
+                decoded_response = response.decode(errors='replace')
+                self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed successfully. Response (hex): {response.hex()}")
+                self._log_to_program_output(f"Payload (hook {hook_idx_str}) response (decoded): {decoded_response}")
+            except Exception as e:
+                self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed successfully. Response (hex): {response.hex()}")
+                self._log_to_program_output(f"Could not decode response: {e}")
+                decoded_response = f"[Binary data: {response.hex()}]"
+        else:
+            self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed. No response data returned.")
+
+        self._show_message("Payload Success", f"Payload from hook {hook_idx_str} executed.\nResponse:\n{decoded_response}", "info")
+        self.status_bar.showMessage(f"Payload executed (hook {hook_idx_str}).")
+
+    def _handle_payload_failure(self, error_message):
+        self._log_to_program_output(f"Generic payload execution failed: {error_message}")
+        self._show_message("Payload Failed", f"Generic payload execution failed: {error_message}", "error")
+        self.status_bar.showMessage("Payload execution failed.")
+
+    def _on_payload_thread_finished(self):
+        self._log_to_program_output("Generic payload execution thread has finished.")
+        self.execute_payload_button.setEnabled(True)
+
+
+    def _start_dump(self):
+        if not self.client_instance or not self.client_instance.r:
+            self._show_message("Error", "Not connected to PLC. Cannot start dump.", "error")
+            return
+
+        try:
+            dump_addr_str = self.dump_addr_input.text()
+            dump_addr = int(dump_addr_str, 16)
+            dump_len = int(self.dump_len_input.text())
+            dump_payload_path = self.dump_payload_path_input.text()
+            output_file_path = self.dump_output_path_input.text()
+        except ValueError:
+            self._show_message("Input Error", "Dump address must be a valid hex number and length must be an integer.", "error")
+            return
+
+        if not dump_payload_path or not os.path.exists(dump_payload_path):
+            self._show_message("Input Error", f"Dump payload file not found: {dump_payload_path}", "error")
+            return
+
+        if not output_file_path:
+            self._show_message("Input Error", "Output file path for dump not specified.", "error")
+            return
+
+        # Disable button, reset progress
+        self.start_dump_button.setEnabled(False)
+        self.dump_progress_bar.setValue(0)
+        self.dump_speed_label.setText("Speed: N/A")
+        self.dump_elapsed_label.setText("Elapsed: 0s")
+        self.dump_remaining_label.setText("ETA: N/A")
+        self._log_to_program_output(f"Starting memory dump: Addr=0x{dump_addr:08x}, Len={dump_len}, Payload={dump_payload_path}, Output={output_file_path}")
+
+        # Create and start the dump thread
+        if hasattr(self, 'dump_thread') and self.dump_thread and self.dump_thread.isRunning():
+            self._log_to_program_output("Dump operation already in progress.")
+            # self.start_dump_button.setEnabled(True) # Re-enable if it was stuck
+            return
+
+        self.dump_thread = MemoryDumpThread(
+            self.client_instance,
+            dump_payload_path,
+            dump_addr,
+            dump_len,
+            output_file_path,
+            self # parent_gui for logging and client_instance access (though client_instance is passed directly)
+        )
+        self.dump_thread.dump_progress.connect(self._update_dump_progress)
+        self.dump_thread.dump_succeeded.connect(self._handle_dump_success)
+        self.dump_thread.dump_failed.connect(self._handle_dump_failure)
+        self.dump_thread.finished.connect(self._on_dump_thread_finished)
+
+        self.status_bar.showMessage(f"Memory dump started to {output_file_path}...")
+        self.dump_thread.start()
+
+    def _update_dump_progress(self, done, total, speed, elapsed, eta):
+        if total > 0:
+            percent = int((done / total) * 100)
+            self.dump_progress_bar.setValue(percent)
+        else:
+            self.dump_progress_bar.setValue(0) # Or indeterminate if possible
+
+        self.dump_speed_label.setText(f"Speed: {client._format_bytes(int(speed))}/s")
+        self.dump_elapsed_label.setText(f"Elapsed: {client._format_time(elapsed)}")
+        self.dump_remaining_label.setText(f"ETA: {client._format_time(eta)}")
+        self.status_bar.showMessage(f"Dumping... {client._format_bytes(done)} / {client._format_bytes(total)}")
+
+    def _handle_dump_success(self, output_path, bytes_written):
+        self._log_to_program_output(f"Memory dump successful. {client._format_bytes(bytes_written)} saved to {output_path}")
+        self._show_message("Dump Success", f"Memory dump completed.\n{client._format_bytes(bytes_written)} saved to:\n{output_path}", "info")
+        self.status_bar.showMessage(f"Dump successful: {output_path}")
+
+    def _handle_dump_failure(self, error_message):
+        self._log_to_program_output(f"Memory dump failed: {error_message}")
+        self._show_message("Dump Failed", f"Memory dump failed: {error_message}", "error")
+        self.dump_progress_bar.setValue(0) # Reset progress bar on failure
+        self.status_bar.showMessage("Dump failed.")
+
+    def _on_dump_thread_finished(self):
+        self._log_to_program_output("Memory dump thread has finished.")
+        self.start_dump_button.setEnabled(True) # Re-enable button
+        # Reset progress bar and stats if not already handled by success/failure
+        if self.dump_progress_bar.value() != 100 and self.dump_progress_bar.value() != 0 : # If not full or reset
+            self.dump_progress_bar.setValue(0)
+            self.dump_speed_label.setText("Speed: N/A")
+            self.dump_elapsed_label.setText("Elapsed: 0s")
+            self.dump_remaining_label.setText("ETA: N/A")
+
 
     def _create_menu_bar(self):
         self.menu_bar = QMenuBar(self)
@@ -732,6 +1084,68 @@ class PLCConnectionThread(QThread):
     # def _show_about_dialog(self):
     #     QMessageBox.about(self, "About PLC Exploitation Tool",
     #                       "A GUI tool for interacting with Siemens S7 PLCs.")
+
+    def closeEvent(self, event):
+        self._log_to_program_output("Close event triggered. Cleaning up...")
+
+        # Confirm exit if connected or operations are in progress
+        confirm_exit = True
+        if (self.client_instance and self.client_instance.r) or \
+           (hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning()) or \
+           (hasattr(self, 'dump_thread') and self.dump_thread and self.dump_thread.isRunning()) or \
+           (hasattr(self, 'payload_thread') and self.payload_thread and self.payload_thread.isRunning()):
+
+            reply = QMessageBox.question(self, 'Confirm Exit',
+                                       "Are you sure you want to exit? Active connections or operations might be interrupted.",
+                                       QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                confirm_exit = False
+
+        if not confirm_exit:
+            event.ignore()
+            self._log_to_program_output("Exit cancelled by user.")
+            return
+
+        # Stop any running worker threads (gracefully if possible)
+        # Connection Thread
+        if hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning():
+            self._log_to_program_output("Stopping connection thread...")
+            self.connection_thread.quit() # Request termination
+            if not self.connection_thread.wait(1000): # Wait 1s
+                 self._log_to_program_output("Connection thread did not terminate gracefully.")
+                 # self.connection_thread.terminate() # Force if needed, but can be risky
+
+        # Dump Thread
+        if hasattr(self, 'dump_thread') and self.dump_thread and self.dump_thread.isRunning():
+            self._log_to_program_output("Stopping dump thread...")
+            self.dump_thread.quit()
+            if not self.dump_thread.wait(1000):
+                self._log_to_program_output("Dump thread did not terminate gracefully.")
+
+        # Payload Thread
+        if hasattr(self, 'payload_thread') and self.payload_thread and self.payload_thread.isRunning():
+            self._log_to_program_output("Stopping payload thread...")
+            self.payload_thread.quit()
+            if not self.payload_thread.wait(1000):
+                self._log_to_program_output("Payload thread did not terminate gracefully.")
+
+        # Disconnect from PLC if connected (without further user prompt here as exit is confirmed)
+        if self.client_instance and self.client_instance.r:
+            self._log_to_program_output("Sending bye() to PLC before exiting...")
+            try:
+                self.client_instance.send_bye()
+            except Exception as e:
+                self._log_to_program_output(f"Error sending bye() on exit: {e}")
+            finally:
+                self.client_instance.disconnect()
+                self.client_instance = None
+
+        # Stop socat process
+        self._stop_socat()
+
+        self._log_to_program_output("Cleanup complete. Exiting.")
+        event.accept()
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

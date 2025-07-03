@@ -382,10 +382,10 @@ class PLCInterface(object):
         return add_hook_no
 
 
-    def execute_memory_dump(self, dump_payload_shellcode_bytes, dump_address, num_bytes_to_dump, baudrate=38400):
+    def execute_memory_dump(self, dump_payload_shellcode_bytes, dump_address, num_bytes_to_dump):
         if self.stager_addhook_ind is None:
-            logger.warning("Stager not explicitly installed via GUI, attempting to use default or assuming pre-installed.")
-            # For GUI, we should ensure stager is installed first.
+            logger.warning("Stager not explicitly installed, attempting to use default or assuming pre-installed. Ensure stager is installed for reliable operation.")
+            # For GUI, we should ensure stager is installed first by the connection thread.
             # Here, we'll proceed assuming it might be handled by a prior call or is already there.
 
         dump_payload_hook_index = self.install_payload_via_stager(
