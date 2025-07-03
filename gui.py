@@ -972,6 +972,11 @@ class ExecutePayloadThread(QThread):
         self._log_to_program_output("Generic payload execution thread has finished.")
         self.execute_payload_button.setEnabled(True)
 
+    # --- Memory Dump Methods ---
+    # Note: The following five methods (_start_dump, _update_dump_progress,
+    # _handle_dump_success, _handle_dump_failure, _on_dump_thread_finished)
+    # were identified as missing or misplaced, causing an AttributeError.
+    # They are being restored here to their correct place within the PLCExploitGUI class.
 
     def _start_dump(self):
         if not self.client_instance or not self.client_instance.r:
