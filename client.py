@@ -453,12 +453,12 @@ class PLCInterface(object):
         greeting_message = None
         
         # Try sending handshake for a short period (e.g., 2 seconds as in original)
-        while not handshake_received and (time.time() - handshake_start_time) < 2.0:
+        while not handshake_received and (time.time() - handshake_start_time) < 5.0:
             logger.debug(f"Sending handshake: {pad + magic}")
             self.r.send(pad + magic)
             try:
                 # Expecting "\5-CPU" or similar
-                answ = self.r.recv(256, timeout=0.1) # Short timeout for quick check
+                answ = self.r.recv(256, timeout=0.05) # Short timeout for quick check
             except socket.timeout:
                 answ = b''
             except Exception as e:
@@ -485,7 +485,7 @@ class PLCInterface(object):
                 greeting_message = first_packet # This is the actual first message like "-CPU"
                 handshake_received = True
                 break 
-            time.sleep(0.05) # Wait a bit before retrying
+            time.sleep(SEND_REQ_SAFETY_SLEEP_AMT) # Wait a bit before retrying
 
         if not handshake_received:
             logger.error("[!] Handshake timeout: did not receive special access greeting within the 2s window.")
@@ -602,7 +602,7 @@ def main_cli():
         # as PLC bootloader might take a moment.
         # The handshake itself has a 2-second window.
         logger.info("Waiting 500ms for PLC to initialize after power on...")
-        time.sleep(0.5)
+        time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
 
 
     # --- PLC Connection and Operations ---
