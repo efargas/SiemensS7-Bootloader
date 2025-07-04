@@ -3,7 +3,7 @@ import os # For path operations
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QStatusBar, QMenuBar, QAction, QVBoxLayout, QWidget,
                              QGroupBox, QGridLayout, QLabel, QLineEdit, QPushButton, QComboBox,
                              QTabWidget, QTextEdit, QFileDialog, QProgressBar, QMessageBox)
-from PyQt5.QtCore import QThread, pyqtSignal, QProcess, Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
+from PyQt5.QtCore import QThread, pyqtSignal, QProcess, Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QSettings
 from PyQt5.QtWidgets import QToolButton, QSizePolicy, QFrame, QScrollArea
 
 # Attempt to import client functionalities
@@ -13,13 +13,54 @@ if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 
 try:
-    import client 
+    import client
 except ImportError as e:
     print(f"ERROR: client.py not found or failed to import. Ensure it's in the script's directory ({script_dir}) and has no errors. Detail: {e}")
+    # In a real application, you might want to disable functionality or exit if client is critical
+    # For now, we allow the GUI to load so client.py issues can be debugged if it's a pathing problem.
     client = None
+    # Simulate a minimal client structure if client is None to prevent crashes in GUI code trying to access client.switch_power etc.
+    # This is a band-aid. Ideally, GUI elements requiring `client` would be disabled if `client` is None.
+    class MinimalClientMock:
+        def switch_power(self, *args, **kwargs): print("MockClient: switch_power called"); return False
+        STAGER_PL_FILENAME = "payloads/stager/stager.bin" # Default path
+        def _format_bytes(self, b): return f"{b} B"
+        def _format_time(self, t): return f"{t} s"
+
+    if client is None:
+        print("WARNING: client.py could not be imported. Using a minimal mock for GUI stability. Some features will not work.")
+        # client = MinimalClientMock() # Uncomment this line if you want the GUI to run with mock functionality
+        # For now, let's keep client as None and handle it in the GUI methods that use it.
+
 except Exception as e: # Catch other potential errors during import
     print(f"ERROR: An unexpected error occurred while importing client.py: {e}")
     client = None
+
+
+# --- Custom Logging Handler for Qt ---
+import logging
+
+class QtLogHandler(logging.Handler):
+    """
+    A custom logging handler that emits a Qt signal for each log record.
+    """
+    log_received = pyqtSignal(str)
+
+    def __init__(self, parent_signal_emitter):
+        super().__init__()
+        # self.parent_gui = parent_gui
+        # It's better to pass a specific signal emitter object or connect directly
+        # For simplicity, let's assume parent_signal_emitter has a 'log_received' signal
+        # Or, more directly, make this handler emit its own signal that the GUI connects to.
+        # Let's make it emit its own signal.
+        # The signal needs to be defined at class level if this handler is instantiated multiple times
+        # or if connected from outside the class instance.
+        # For now, assuming one instance tied to the main GUI.
+
+    def emit(self, record):
+        msg = self.format(record)
+        # self.parent_gui.log_received.emit(msg) # If using a passed-in signal emitter
+        QtLogHandler.log_received.emit(msg) # Emitting its own class-level signal
 
 
 class CollapsibleGroupBox(QWidget):
@@ -134,6 +175,8 @@ class PLCExploitGUI(QMainWindow):
 
         self._create_terminal_outputs_group() # Terminals are separate and should expand
 
+        self._load_settings() # Load settings after UI is created
+
     def _create_menu_bar(self):
         self.menu_bar = QMenuBar(self)
         self.setMenuBar(self.menu_bar)
@@ -149,6 +192,25 @@ class PLCExploitGUI(QMainWindow):
         about_action = QAction("&About", self)
         # about_action.triggered.connect(self._show_about_dialog) # To be implemented
         help_menu.addAction(about_action)
+
+        # Settings Menu
+        settings_menu = self.menu_bar.addMenu("&Settings")
+
+        # Logging Submenu
+        logging_menu = settings_menu.addMenu("Logging")
+
+        self.log_to_file_action = QAction("Enable Log to File", self, checkable=True)
+        self.log_to_file_action.triggered.connect(self._toggle_file_logging)
+        logging_menu.addAction(self.log_to_file_action)
+
+        set_log_file_action = QAction("Set Log File Path...", self)
+        set_log_file_action.triggered.connect(self._set_log_file_path)
+        logging_menu.addAction(set_log_file_action)
+
+        # save_settings_action = QAction("&Save Settings Now", self) # Could be useful for explicit save
+        # save_settings_action.triggered.connect(self._save_settings)
+        # settings_menu.addAction(save_settings_action)
+
 
     def _create_status_bar(self):
         self.status_bar = QStatusBar(self)
@@ -395,10 +457,89 @@ class PLCExploitGUI(QMainWindow):
         
         # Add a stretch factor to make terminals take up more space if needed
         self.main_layout.addWidget(terminal_tabs, 1) # Add with stretch factor
+        self._setup_logging()
+
+
+    def _setup_logging(self):
+        # Configure the root logger or a specific logger
+        # For now, let's configure the root logger to catch everything
+        # In a larger app, you might want specific loggers: logging.getLogger('gui') or logging.getLogger('client')
+
+        # Get the root logger
+        self.app_logger = logging.getLogger() # Using root logger
+        self.app_logger.setLevel(logging.DEBUG) # Set desired logging level for all logs captured by root
+
+        # Remove all existing handlers from the root logger to avoid duplicates
+        # if _setup_logging is called multiple times or if basicConfig was called before.
+        # This gives us a clean slate for the root logger's handlers.
+        for handler in self.app_logger.handlers[:]:
+            self.app_logger.removeHandler(handler)
+
+        # Propagation for root logger is not a concept in the same way as for named loggers.
+        # It's the end of the line.
+
+        # Create QtLogHandler instance
+        # The signal emitter needs to be an object that can emit signals, like a QObject or the handler itself.
+        # If QtLogHandler defines its own signal, we connect to that.
+        self.qt_log_handler = QtLogHandler(self) # Pass self as a QObject context (though not strictly used by this handler version)
+
+        # Create a formatter and set it for the handler
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.qt_log_handler.setFormatter(formatter)
+
+        # Add the handler to the logger
+        self.app_logger.addHandler(self.qt_log_handler)
+
+        # Connect the handler's signal to the GUI's slot
+        QtLogHandler.log_received.connect(self._append_text_to_gui_log_terminal)
+
+        # Initial log message
+        self.app_logger.info("Logging system initialized and connected to GUI.")
+
+        # File logging setup will be done in load_settings or a dedicated method
+        self._configure_file_logging()
+
+
+    def _configure_file_logging(self):
+        # Remove existing file handler if any
+        if hasattr(self, 'file_log_handler') and self.file_log_handler:
+            self.app_logger.removeHandler(self.file_log_handler)
+            self.file_log_handler.close()
+            self.file_log_handler = None
+
+        settings = QSettings("MyCompany", "PLCExploitTool")
+        log_to_file = settings.value("logging/log_to_file_enabled", False, type=bool)
+        log_file_path = settings.value("logging/log_file_path", "plc_exploit_tool.log")
+        log_max_bytes = settings.value("logging/log_max_bytes", 1024*1024*5, type=int) # 5MB
+        log_backup_count = settings.value("logging/log_backup_count", 3, type=int)
+
+        if log_to_file and log_file_path:
+            try:
+                self.file_log_handler = logging.handlers.RotatingFileHandler(
+                    log_file_path, maxBytes=log_max_bytes, backupCount=log_backup_count
+                )
+                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                self.file_log_handler.setFormatter(formatter)
+                self.app_logger.addHandler(self.file_log_handler)
+                self.app_logger.info(f"File logging enabled. Logging to: {log_file_path}")
+            except Exception as e:
+                self.app_logger.error(f"Failed to configure file logging to {log_file_path}: {e}")
+                self.file_log_handler = None # Ensure it's None if setup failed
+        else:
+            self.app_logger.info("File logging is disabled.")
+
 
     # --- Action Methods ---
 
     def _show_message(self, title, message, level="info"):
+        # Log the message that is being shown to the user
+        log_level_map = {
+            "info": logging.INFO,
+            "warning": logging.WARNING,
+            "error": logging.CRITICAL # QMessageBox.Critical is more like logging.CRITICAL
+        }
+        self.app_logger.log(log_level_map.get(level, logging.INFO), f"Showing message box: Title='{title}', Message='{message}'")
+
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle(title)
         msg_box.setText(message)
@@ -410,62 +551,79 @@ class PLCExploitGUI(QMainWindow):
             msg_box.setIcon(QMessageBox.Critical)
         msg_box.exec_()
 
-    def _append_text_to_log(self, text_edit_widget, message):
-        """Helper function to append text and manage scrolling."""
-        scrollbar = text_edit_widget.verticalScrollBar()
-        at_bottom = scrollbar.value() >= (scrollbar.maximum() - 4) # A little tolerance
+    def _append_text_to_gui_log_terminal(self, message):
+        """
+        Slot to append messages from the QtLogHandler to the program_output_terminal.
+        Manages auto-scrolling.
+        """
+        scrollbar = self.program_output_terminal.verticalScrollBar()
+        # Check if scrollbar is near the bottom BEFORE appending text
+        at_bottom = scrollbar.value() >= (scrollbar.maximum() - scrollbar.pageStep()/2) # A bit more robust check
 
-        text_edit_widget.append(message)
+        self.program_output_terminal.append(message) # Append the formatted message
 
         if at_bottom:
-            scrollbar.setValue(scrollbar.maximum()) # Auto-scroll
+            scrollbar.setValue(scrollbar.maximum()) # Auto-scroll to new maximum
 
     def _log_to_program_output(self, message):
-        self._append_text_to_log(self.program_output_terminal, message)
+        # This method is now a wrapper around the new logging system
+        # It should be used for general program messages originating from the GUI.
+        # client.py will use its own logger, which should also be configured to use QtLogHandler if desired.
+        self.app_logger.info(message) # Default to INFO level for these messages
+
+    def _run_power_control(self, mode):
+        if not client:
+            self._show_message("Error", "client.py module not loaded.", "error")
+            return
+
+        if hasattr(self, 'power_thread') and self.power_thread and self.power_thread.isRunning():
+            self.app_logger.warning(f"Power control operation already in progress.")
+            self._show_message("Busy", "Another power control operation is already running.", "warning")
+            return
+
+        try:
+            modbus_ip = self.modbus_ip_input.text()
+            modbus_port = int(self.modbus_port_input.text())
+            modbus_output = int(self.modbus_output_input.text())
+        except ValueError:
+            self._show_message("Input Error", "Modbus port and output must be integers.", "error")
+            return
+
+        self.power_on_button.setEnabled(False)
+        self.power_off_button.setEnabled(False)
+        self.status_bar.showMessage(f"Attempting to turn power {mode.upper()}...")
+        self.app_logger.info(f"Initiating power {mode.upper()}: {modbus_ip}:{modbus_port} output {modbus_output}")
+
+        self.power_thread = PowerControlThread(mode, modbus_ip, modbus_port, modbus_output, self)
+        self.power_thread.power_control_succeeded.connect(self._handle_power_control_success)
+        self.power_thread.power_control_failed.connect(self._handle_power_control_failure)
+        self.power_thread.finished.connect(self._on_power_thread_finished)
+        self.power_thread.start()
 
     def _power_on(self):
-        if not client:
-            self._show_message("Error", "client.py module not loaded.", "error")
-            return
-        try:
-            modbus_ip = self.modbus_ip_input.text()
-            modbus_port = int(self.modbus_port_input.text())
-            modbus_output = int(self.modbus_output_input.text())
-            
-            self._log_to_program_output(f"Attempting to power ON: {modbus_ip}:{modbus_port} output {modbus_output}")
-            if client.switch_power('on', modbus_ip, modbus_port, modbus_output):
-                self._log_to_program_output("Power ON command successful.")
-                self.status_bar.showMessage("Power ON successful.")
-            else:
-                self._log_to_program_output("Power ON command failed. Check logs/Modbus settings.")
-                self._show_message("Power Control", "Failed to turn power ON. Check Modbus settings and connection.", "error")
-        except ValueError:
-            self._show_message("Input Error", "Modbus port and output must be integers.", "error")
-        except Exception as e:
-            self._show_message("Power Control Error", f"An error occurred: {e}", "error")
-            self._log_to_program_output(f"Error during power ON: {e}")
+        self._run_power_control('on')
 
     def _power_off(self):
-        if not client:
-            self._show_message("Error", "client.py module not loaded.", "error")
-            return
-        try:
-            modbus_ip = self.modbus_ip_input.text()
-            modbus_port = int(self.modbus_port_input.text())
-            modbus_output = int(self.modbus_output_input.text())
+        self._run_power_control('off')
 
-            self._log_to_program_output(f"Attempting to power OFF: {modbus_ip}:{modbus_port} output {modbus_output}")
-            if client.switch_power('off', modbus_ip, modbus_port, modbus_output):
-                self._log_to_program_output("Power OFF command successful.")
-                self.status_bar.showMessage("Power OFF successful.")
-            else:
-                self._log_to_program_output("Power OFF command failed. Check logs/Modbus settings.")
-                self._show_message("Power Control", "Failed to turn power OFF. Check Modbus settings and connection.", "error")
-        except ValueError:
-            self._show_message("Input Error", "Modbus port and output must be integers.", "error")
-        except Exception as e:
-            self._show_message("Power Control Error", f"An error occurred: {e}", "error")
-            self._log_to_program_output(f"Error during power OFF: {e}")
+    def _handle_power_control_success(self, mode):
+        self.app_logger.info(f"Successfully turned power {mode.upper()}.")
+        self.status_bar.showMessage(f"Power {mode.upper()} successful.")
+        # self._show_message("Power Control", f"Power {mode.upper()} successful.", "info") # Optional: too noisy?
+
+    def _handle_power_control_failure(self, mode, error_message):
+        self.app_logger.error(f"Failed to turn power {mode.upper()}: {error_message}")
+        self.status_bar.showMessage(f"Power {mode.upper()} failed.")
+        self._show_message("Power Control Error", f"Failed to turn power {mode.upper()}: {error_message}", "error")
+
+    def _on_power_thread_finished(self):
+        self.app_logger.info("Power control thread finished.")
+        self.power_on_button.setEnabled(True)
+        self.power_off_button.setEnabled(True)
+        # Clear the thread instance
+        if hasattr(self, 'power_thread'):
+            self.power_thread = None
+
 
     def _browse_file(self, caption, directory, file_filter, line_edit_widget):
         # Use os.path.expanduser to start in user's home directory if 'directory' is empty or not specific
@@ -613,6 +771,7 @@ class PLCExploitGUI(QMainWindow):
         self.payload_thread.finished.connect(self._on_payload_thread_finished)
 
         self.payload_thread.start()
+
     def _browse_generic_payload(self):
         self._browse_file("Select Generic Payload File", "./payloads/", 
                           "Binary files (*.bin);;All files (*)", 
@@ -645,21 +804,23 @@ class PLCExploitGUI(QMainWindow):
 
     # --- socat Process Handlers ---
     def _socat_ready_read_stdout(self):
-        output = self.socat_process.readAllStandardOutput().data().decode(errors='ignore')
-        self._append_text_to_log(self.socat_output_terminal, output)
+        output = self.socat_process.readAllStandardOutput().data().decode(errors='ignore').strip()
+        if output: # Avoid logging empty lines
+            self.app_logger.info(f"[socat STDOUT] {output}")
+            # If a dedicated socat terminal is still desired for raw view:
+            self.socat_output_terminal.append(output) # Keep this for direct view if needed
 
     def _socat_ready_read_stderr(self):
-        error_output = self.socat_process.readAllStandardError().data().decode(errors='ignore')
-        # For HTML formatted text, QTextEdit's append might not be ideal with the scroll check.
-        # Let's use insertHtml and then manage scroll.
-        # However, simple append with HTML also works with the _append_text_to_log if we pass HTML.
-        # Let's keep it simple first.
-        self._append_text_to_log(self.socat_output_terminal, f"<font color='red'>{error_output}</font>")
+        error_output = self.socat_process.readAllStandardError().data().decode(errors='ignore').strip()
+        if error_output: # Avoid logging empty lines
+            self.app_logger.error(f"[socat STDERR] {error_output}")
+            # If a dedicated socat terminal is still desired for raw view:
+            self.socat_output_terminal.append(f"<font color='red'>{error_output}</font>") # Keep this for direct view
 
 
     def _socat_finished(self, exit_code, exit_status):
-        self._log_to_program_output(f"socat process finished. Exit code: {exit_code}, Status: {exit_status}")
-        self.socat_output_terminal.append(f"<b>socat process finished. Exit code: {exit_code}</b>")
+        self.app_logger.info(f"socat process finished. Exit code: {exit_code}, Status: {exit_status}")
+        # self.socat_output_terminal.append(f"<b>socat process finished. Exit code: {exit_code}</b>") # Also logged
         self.connect_button.setEnabled(True) # Ready for a new connection attempt
 
         # If socat died, any existing PLC connection is severed.
@@ -1052,7 +1213,38 @@ class ExecutePayloadThread(QThread):
             self.parent_gui._log_to_program_output(f"Payload Thread: Exception: {e}")
             # import traceback
             # traceback.print_exc()
-            self.payload_execution_failed.emit(f"An error occurred during payload execution: {e}")
+        self.payload_execution_failed.emit(f"An error occurred during payload execution: {e}")
+
+
+class PowerControlThread(QThread):
+    power_control_succeeded = pyqtSignal(str) # mode ("on" or "off")
+    power_control_failed = pyqtSignal(str, str) # mode, error_message
+
+    def __init__(self, mode, modbus_ip, modbus_port, modbus_output, parent_gui):
+        super().__init__(parent_gui)
+        self.mode = mode
+        self.modbus_ip = modbus_ip
+        self.modbus_port = modbus_port
+        self.modbus_output = modbus_output
+        self.parent_gui = parent_gui # For logging via app_logger
+
+    def run(self):
+        if not client:
+            self.power_control_failed.emit(self.mode, "client.py module not loaded.")
+            return
+        try:
+            self.parent_gui.app_logger.info(f"PowerControlThread: Attempting to power {self.mode.upper()}...")
+            success = client.switch_power(self.mode, self.modbus_ip, self.modbus_port, self.modbus_output)
+            if success:
+                self.parent_gui.app_logger.info(f"PowerControlThread: Power {self.mode.upper()} command successful.")
+                self.power_control_succeeded.emit(self.mode)
+            else:
+                self.parent_gui.app_logger.warning(f"PowerControlThread: Power {self.mode.upper()} command failed (client.switch_power returned False).")
+                self.power_control_failed.emit(self.mode, "client.switch_power returned false. Check Modbus settings and connection.")
+        except Exception as e:
+            self.parent_gui.app_logger.error(f"PowerControlThread: Exception during power {self.mode.upper()}: {e}")
+            self.power_control_failed.emit(self.mode, f"An error occurred: {e}")
+
 
     def _create_menu_bar(self):
         self.menu_bar = QMenuBar(self)
@@ -1138,11 +1330,158 @@ class ExecutePayloadThread(QThread):
         self._stop_socat()
 
         self._log_to_program_output("Cleanup complete. Exiting.")
+        self._save_settings() # Save settings on close
         event.accept()
+
+    # --- Settings Management ---
+    def _load_settings(self):
+        self._log_to_program_output("Loading application settings...")
+        settings = QSettings("MyCompany", "PLCExploitTool") # Or your organization and app name
+
+        # Power Supply
+        self.modbus_ip_input.setText(settings.value("power/modbus_ip", "192.168.1.18"))
+        self.modbus_port_input.setText(settings.value("power/modbus_port", "502"))
+        self.modbus_output_input.setText(settings.value("power/modbus_output", "1"))
+        self.power_delay_input.setText(settings.value("power/delay", "1000"))
+
+        # Connection Configuration
+        self.socat_port_input.setText(settings.value("connection/socat_port", "1238"))
+        # For QComboBox, store current text. If not found on load, add it and set as current.
+        saved_tty = settings.value("connection/tty_device", "/dev/ttyUSB0")
+        if self.tty_combo.findText(saved_tty) == -1:
+            self.tty_combo.addItem(saved_tty) # Add if not exists from auto-detect
+        self.tty_combo.setCurrentText(saved_tty)
+
+
+        # Memory Dump Paths
+        self.dump_payload_path_input.setText(settings.value("dump/payload_path", "payloads/dump_mem/build/dump_mem.bin"))
+        self.dump_addr_input.setText(settings.value("dump/address", "0x10010100"))
+        self.dump_len_input.setText(settings.value("dump/length", "1024"))
+        self.dump_output_path_input.setText(settings.value("dump/output_path", "memory_dump.bin"))
+
+        # Execute Payload Paths
+        self.gen_payload_path_input.setText(settings.value("execute/payload_path", ""))
+        self.gen_payload_args_input.setText(settings.value("execute/args", ""))
+
+        # Window Geometry
+        geometry = settings.value("window/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+        # Collapsible Group States (Example for one group, repeat for others if desired)
+        # power_supply_group_expanded = settings.value("groups/power_supply_expanded", True, type=bool)
+        # if self.sections_layout.itemAt(0).widget().is_expanded != power_supply_group_expanded:
+        #    self.sections_layout.itemAt(0).widget()._toggle() # Call private toggle if needed, or make a public one
+        # This part is a bit more involved due to how CollapsibleGroupBox is structured.
+        # For simplicity, starting expanded and not saving state of collapsibles initially.
+
+        # Logging settings (load them so _configure_file_logging can use them)
+        # self.log_to_file_checkbox.setChecked(settings.value("logging/log_to_file_enabled", False, type=bool))
+        # self.log_file_path_input.setText(settings.value("logging/log_file_path", "plc_exploit_tool.log"))
+        # self.log_max_bytes_input.setText(settings.value("logging/log_max_bytes", 1024*1024*5, type=int))
+        # self.log_backup_count_input.setText(settings.value("logging/log_backup_count", 3, type=int))
+        # Actual UI elements for these settings are not yet created, this is placeholder logic.
+        # _configure_file_logging() is called during _setup_logging, which is called after _load_settings in __init__
+        # So, we need to ensure logging settings are loaded before _setup_logging if it depends on them.
+        # Current setup: _load_settings -> UI elements created -> _setup_logging -> _configure_file_logging (reads from QSettings)
+        # This order is fine.
+
+        # Update log_to_file_action state based on loaded settings
+        log_to_file_enabled = settings.value("logging/log_to_file_enabled", False, type=bool)
+        self.log_to_file_action.setChecked(log_to_file_enabled)
+        # _configure_file_logging will be called by _setup_logging which ensures file logging is active if enabled
+
+        self.app_logger.info("Settings loaded.") # Use new logger
+
+
+    def _save_settings(self):
+        self.app_logger.info("Saving application settings...") # Use new logger
+        settings = QSettings("MyCompany", "PLCExploitTool")
+
+        # Power Supply
+        settings.setValue("power/modbus_ip", self.modbus_ip_input.text())
+        settings.setValue("power/modbus_port", self.modbus_port_input.text())
+        settings.setValue("power/modbus_output", self.modbus_output_input.text())
+        settings.setValue("power/delay", self.power_delay_input.text())
+
+        # Connection Configuration
+        settings.setValue("connection/socat_port", self.socat_port_input.text())
+        settings.setValue("connection/tty_device", self.tty_combo.currentText())
+
+        # Memory Dump Paths
+        settings.setValue("dump/payload_path", self.dump_payload_path_input.text())
+        settings.setValue("dump/address", self.dump_addr_input.text())
+        settings.setValue("dump/length", self.dump_len_input.text())
+        settings.setValue("dump/output_path", self.dump_output_path_input.text())
+
+        # Execute Payload Paths
+        settings.setValue("execute/payload_path", self.gen_payload_path_input.text())
+        settings.setValue("execute/args", self.gen_payload_args_input.text())
+
+        # Window Geometry
+        settings.setValue("window/geometry", self.saveGeometry())
+
+        # Collapsible Group States (if implemented)
+        # settings.setValue("groups/power_supply_expanded", self.sections_layout.itemAt(0).widget().is_expanded)
+
+        # Logging Settings (assuming UI elements exist, e.g., self.log_to_file_checkbox)
+        # For now, as UI elements for these settings are not created yet, we'll save placeholder values
+        # or skip saving them until the UI is there.
+        # settings.setValue("logging/log_to_file_enabled", self.log_to_file_checkbox.isChecked())
+        # settings.setValue("logging/log_file_path", self.log_file_path_input.text())
+        # settings.setValue("logging/log_max_bytes", int(self.log_max_bytes_input.text()))
+        # settings.setValue("logging/log_backup_count", int(self.log_backup_count_input.text()))
+        # Example: to allow programmatic changes to be saved if UI isn't ready:
+        if hasattr(self, 'file_log_handler') and self.file_log_handler is not None:
+             settings.setValue("logging/log_to_file_enabled", True)
+             settings.setValue("logging/log_file_path", self.file_log_handler.baseFilename)
+             settings.setValue("logging/log_max_bytes", self.file_log_handler.maxBytes)
+             settings.setValue("logging/log_backup_count", self.file_log_handler.backupCount)
+        else:
+             settings.setValue("logging/log_to_file_enabled", False)
+        # These will be properly set when UI controls for these settings are added.
+
+        self.app_logger.info("Settings saved.") # Use new logger
+
+    # --- Logging UI Methods ---
+    def _toggle_file_logging(self):
+        settings = QSettings("MyCompany", "PLCExploitTool")
+        is_enabled = self.log_to_file_action.isChecked()
+        settings.setValue("logging/log_to_file_enabled", is_enabled)
+
+        self.app_logger.info(f"File logging toggled via UI. Enabled: {is_enabled}")
+        self._configure_file_logging() # Reconfigure (add or remove file handler)
+
+    def _set_log_file_path(self):
+        settings = QSettings("MyCompany", "PLCExploitTool")
+        current_path = settings.value("logging/log_file_path", "plc_exploit_tool.log")
+
+        # Use QFileDialog to get the new log file path
+        # Using QFileDialog.getSaveFileName for this, as it's a more natural fit for "choosing a file to write to"
+        new_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Set Log File Path",
+            current_path,
+            "Log files (*.log);;All files (*)"
+        )
+
+        if new_path:
+            settings.setValue("logging/log_file_path", new_path)
+            self.app_logger.info(f"Log file path changed to: {new_path}")
+            # If logging is already enabled, we need to reconfigure to use the new path.
+            if self.log_to_file_action.isChecked():
+                self._configure_file_logging()
+        else:
+            self.app_logger.info("Log file path selection cancelled.")
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    # Set organization and application name for QSettings to work without explicit paths
+    # This is usually done once at the application level.
+    QApplication.setOrganizationName("MyCompany")
+    QApplication.setApplicationName("PLCExploitTool")
+
     main_window = PLCExploitGUI()
     main_window.show()
     sys.exit(app.exec_())

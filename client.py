@@ -17,11 +17,42 @@ from pymodbus.client.sync import ModbusTcpClient # Changed for pymodbus 2.x comp
 from binascii import hexlify
 
 from pwn import remote, context, log, xor
-context.update(log_level="info", bits=32, endian="big")
+context.update(log_level="info", bits=32, endian="big") # pwnlib context
 
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Setup logging for this module (client.py)
+# The GUI will configure the root logger or a specific application logger ('PLCExploitTool')
+# to include handlers (like QtLogHandler and FileHandler).
+# So, client.py just needs to get its own logger and use it.
+# The messages will propagate up to the handlers configured in the GUI if the logger name
+# is part of the main application logger's namespace (e.g., "PLCExploitTool.client")
+# or if the root logger is configured by the GUI.
+
+# For simplicity, let's assume the GUI configures a logger named "PLCExploitTool"
+# and client.py logs will be children of that, or that the GUI configures the root logger.
+# If client.py uses logging.getLogger(__name__), its logger name will be 'client'.
+# If the GUI's app_logger is 'PLCExploitTool', then 'client' logs won't automatically
+# go to 'PLCExploitTool' handlers unless 'client' is a child (e.g. 'PLCExploitTool.client')
+# or if the root logger is the one with the handlers.
+
+# Let's make the client logger a child of the main app logger defined in gui.py
+# This requires gui.py to set up "PLCExploitTool" logger, and client.py uses "PLCExploitTool.client"
+# Alternatively, if gui.py configures the *root* logger, then any logger will use those handlers.
+# The current gui.py setup uses `logging.getLogger("PLCExploitTool")`.
+# So, for client.py logs to be captured by those handlers, they should also use a logger
+# that is either "PLCExploitTool" or a child, like "PLCExploitTool.client".
+# Or, the GUI's `app_logger.propagate = True` and the root logger has the handlers.
+# Current GUI sets `app_logger.propagate = False`.
+
+# Simpler approach for now: client.py uses its own logger.
+# The GUI will add its handlers to the *root* logger, so all named loggers will propagate to it by default.
+# Let's adjust gui.py to configure the root logger instead of a named one for wider capture.
+# (This change will be made in gui.py separately if needed, for now client.py uses its own logger name)
+logger = logging.getLogger(__name__) # This will be 'client'
+# Ensure a default basicConfig if client.py is run standalone,
+# but it won't interfere if imported by GUI which sets up its own handlers.
+if not logging.getLogger().hasHandlers(): # Check if root logger has handlers
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 
 # Runtime configs
 SEND_REQ_SAFETY_SLEEP_AMT = 0.01
