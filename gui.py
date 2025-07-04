@@ -728,7 +728,7 @@ class PLCExploitGUI(QMainWindow):
         self.status_bar.showMessage("Dump failed.")
 
     def _on_dump_thread_finished(self):
-        self._log_to_program_output("Memory dump thread has finished.")
+        self.app_logger.info("Memory dump thread has finished.")
         self.start_dump_button.setEnabled(True) # Re-enable button
         # Reset progress bar and stats if not already handled by success/failure
         if self.dump_progress_bar.value() != 100 and self.dump_progress_bar.value() != 0 : # If not full or reset
@@ -736,6 +736,8 @@ class PLCExploitGUI(QMainWindow):
             self.dump_speed_label.setText("Speed: N/A")
             self.dump_elapsed_label.setText("Elapsed: 0s")
             self.dump_remaining_label.setText("ETA: N/A")
+        if hasattr(self, 'dump_thread'):
+            self.dump_thread = None
 
 # --- Generic Payload Execution Methods ---
     def _execute_generic_payload(self):
@@ -798,8 +800,10 @@ class PLCExploitGUI(QMainWindow):
         self.status_bar.showMessage("Payload execution failed.")
 
     def _on_payload_thread_finished(self):
-        self._log_to_program_output("Generic payload execution thread has finished.")
+        self.app_logger.info("Generic payload execution thread has finished.")
         self.execute_payload_button.setEnabled(True)
+        if hasattr(self, 'payload_thread'):
+            self.payload_thread = None
 
     # --- socat Process Handlers ---
     def _socat_ready_read_stdout(self):
@@ -976,15 +980,18 @@ class PLCExploitGUI(QMainWindow):
         # UI state should be primarily managed by _handle_plc_connected and _handle_plc_connection_error.
         # If the connect button is still disabled AND we are not connected, it means the thread might have
         # exited without emitting a success/failure signal properly or was interrupted.
-        if self.connect_button.isEnabled() == False and self.disconnect_button.isEnabled() == False:
-             self._log_to_program_output("Connection thread finished, but state unclear. Re-enabling connect button.")
+        if not self.connect_button.isEnabled() and not self.disconnect_button.isEnabled():
+             self.app_logger.warning("Connection thread finished, but state unclear (neither connect nor disconnect enabled). Re-enabling connect button.")
              self.connect_button.setEnabled(True)
+
+        if hasattr(self, 'connection_thread'):
+            self.connection_thread = None
 
 
     def _handle_plc_connected(self, version_str, greeting_hex):
-        self._log_to_program_output(f"Thread: Handshake successful! Greeting: {greeting_hex}")
-        self._log_to_program_output(f"Thread: PLC Version: {version_str}")
-        self._log_to_program_output(f"Thread: Stager installed.")
+        self.app_logger.info(f"PLC Handshake successful! Greeting: {greeting_hex}")
+        self.app_logger.info(f"PLC Version: {version_str}")
+        self.app_logger.info(f"Stager installed.")
         self.status_bar.showMessage(f"Connected to PLC. Version: {version_str}. Stager installed.")
         
         self.disconnect_button.setEnabled(True)
@@ -1113,7 +1120,14 @@ class PLCConnectionThread(QThread):
             if self.parent_gui.client_instance:
                  self.parent_gui.client_instance.disconnect()
             self.parent_gui.client_instance = None
+        except FileNotFoundError as fnf_err: # Specific exception type
+            self.parent_gui.app_logger.error(f"ConnectionThread: FileNotFoundError - {fnf_err}")
+            self.connection_failed.emit(str(fnf_err))
+            if self.parent_gui.client_instance:
+                 self.parent_gui.client_instance.disconnect()
+            self.parent_gui.client_instance = None
         except Exception as e:
+            self.parent_gui.app_logger.error(f"ConnectionThread: An unexpected error occurred - {e}", exc_info=True) # Log traceback
             self.connection_failed.emit(f"An unexpected error occurred in connection thread: {e}")
             if self.parent_gui.client_instance: # Ensure client is cleaned up
                  self.parent_gui.client_instance.disconnect()
@@ -1137,11 +1151,11 @@ class MemoryDumpThread(QThread):
     def run(self):
         original_callback = None
         try:
-            self.parent_gui._log_to_program_output(f"Dump Thread: Loading dump payload from {self.dump_payload_path}")
+            self.parent_gui.app_logger.info(f"DumpThread: Loading dump payload from {self.dump_payload_path}")
             with open(self.dump_payload_path, "rb") as f:
                 dump_payload_code = f.read()
 
-            self.parent_gui._log_to_program_output("Dump Thread: Executing memory dump operation...")
+            self.parent_gui.app_logger.info("DumpThread: Executing memory dump operation...")
 
             original_callback = self.client_instance.progress_callback
             self.client_instance.progress_callback = self.dump_progress.emit
@@ -1155,22 +1169,21 @@ class MemoryDumpThread(QThread):
             self.client_instance.progress_callback = original_callback
             original_callback = None # Indicate callback was restored
 
-            self.parent_gui._log_to_program_output(f"Dump Thread: Saving {len(dumped_data)} bytes to {self.output_file_path}")
+            self.parent_gui.app_logger.info(f"DumpThread: Saving {len(dumped_data)} bytes to {self.output_file_path}")
             with open(self.output_file_path, "wb") as f:
                 f.write(dumped_data)
 
             self.dump_succeeded.emit(self.output_file_path, len(dumped_data))
 
         except FileNotFoundError as fnf_err:
+            self.parent_gui.app_logger.error(f"DumpThread: FileNotFoundError - {fnf_err}")
             self.dump_failed.emit(f"Dump payload file not found: {fnf_err}")
         except Exception as e:
-            self.parent_gui._log_to_program_output(f"Dump Thread: Exception: {e}")
-            # import traceback # Keep this commented out unless debugging locally
-            # traceback.print_exc()
+            self.parent_gui.app_logger.error(f"DumpThread: Exception - {e}", exc_info=True)
             self.dump_failed.emit(f"An error occurred during memory dump: {e}")
         finally:
-            if original_callback is not None and hasattr(self.client_instance, 'progress_callback'):
-                # Restore callback if it hasn't been restored yet (e.g. due to an exception before explicit restore)
+            if original_callback is not None and hasattr(self.client_instance, 'progress_callback') and self.client_instance:
+                # Restore callback if it hasn't been restored yet and client_instance still exists
                 self.client_instance.progress_callback = original_callback
 
 
@@ -1187,32 +1200,31 @@ class ExecutePayloadThread(QThread):
 
     def run(self):
         try:
-            self.parent_gui._log_to_program_output(f"Payload Thread: Loading payload from {self.payload_path}")
+            self.parent_gui.app_logger.info(f"PayloadThread: Loading payload from {self.payload_path}")
             with open(self.payload_path, "rb") as f:
                 payload_code = f.read()
 
             # Convert string args to bytes, assuming UTF-8. Payload might expect specific encoding.
             payload_args_bytes = self.payload_args_str.encode('utf-8')
 
-            self.parent_gui._log_to_program_output(f"Payload Thread: Installing payload ({len(payload_code)} bytes) with args '{self.payload_args_str}'...")
+            self.parent_gui.app_logger.info(f"PayloadThread: Installing payload ({len(payload_code)} bytes) with args '{self.payload_args_str}'...")
 
             # Using default hook from client.py, can be made configurable in GUI later if needed
             hook_idx = self.client_instance.install_payload_via_stager(payload_code)
 
-            self.parent_gui._log_to_program_output(f"Payload Thread: Invoking payload hook 0x{hook_idx:02x}...")
+            self.parent_gui.app_logger.info(f"PayloadThread: Invoking payload hook 0x{hook_idx:02x}...")
             # For generic payloads, we usually want a response.
             # The invoke_add_hook has an await_response=True by default.
             response = self.client_instance.invoke_add_hook(hook_idx, payload_args_bytes)
 
             self.payload_execution_succeeded.emit(f"0x{hook_idx:02x}", response)
 
-        except FileNotFoundError:
+        except FileNotFoundError as fnf_err:
+            self.parent_gui.app_logger.error(f"PayloadThread: FileNotFoundError - {fnf_err}")
             self.payload_execution_failed.emit(f"Payload file not found: {self.payload_path}")
         except Exception as e:
-            self.parent_gui._log_to_program_output(f"Payload Thread: Exception: {e}")
-            # import traceback
-            # traceback.print_exc()
-        self.payload_execution_failed.emit(f"An error occurred during payload execution: {e}")
+            self.parent_gui.app_logger.error(f"PayloadThread: Exception - {e}", exc_info=True)
+            self.payload_execution_failed.emit(f"An error occurred during payload execution: {e}")
 
 
 class PowerControlThread(QThread):
