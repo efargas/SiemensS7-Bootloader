@@ -31,11 +31,18 @@ except Exception as e: # Catch other potential errors during import
 # --- Custom Logging Handler for Qt ---
 import logging
 import logging.handlers # For RotatingFileHandler
+from PyQt5.QtCore import QObject # Make sure QObject is imported here if not globally for the file
 
-class QtLogHandler(logging.Handler):
+class QtLogHandler(logging.Handler, QObject): # Inherit from QObject
     log_received = pyqtSignal(str)
-    def __init__(self, parent_signal_emitter): # parent_signal_emitter is not strictly used currently
-        super().__init__()
+
+    def __init__(self, parent_qobject=None): # Accept a QObject parent
+        #logging.Handler.__init__(self)
+        #QObject.__init__(self, parent_qobject)
+        # It's often recommended to call super() for all parent classes in MRO
+        super().__init__() # This will call logging.Handler.__init__
+        QObject.__init__(self, parent_qobject) # Explicitly call QObject.__init__
+
     def emit(self, record):
         msg = self.format(record)
         self.log_received.emit(msg)
