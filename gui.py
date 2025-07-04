@@ -59,8 +59,7 @@ class QtLogHandler(logging.Handler):
 
     def emit(self, record):
         msg = self.format(record)
-        # self.parent_gui.log_received.emit(msg) # If using a passed-in signal emitter
-        QtLogHandler.log_received.emit(msg) # Emitting its own class-level signal
+        self.log_received.emit(msg) # Emit the signal from the instance
 
 
 class CollapsibleGroupBox(QWidget):
@@ -490,8 +489,8 @@ class PLCExploitGUI(QMainWindow):
         # Add the handler to the logger
         self.app_logger.addHandler(self.qt_log_handler)
 
-        # Connect the handler's signal to the GUI's slot
-        QtLogHandler.log_received.connect(self._append_text_to_gui_log_terminal)
+        # Connect the handler's signal (from the instance) to the GUI's slot
+        self.qt_log_handler.log_received.connect(self._append_text_to_gui_log_terminal)
 
         # Initial log message
         self.app_logger.info("Logging system initialized and connected to GUI.")
