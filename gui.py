@@ -492,11 +492,156 @@ class PLCExploitGUI(QMainWindow):
         self._browse_save_file("Save Memory Dump As", "./", 
                                "Binary files (*.bin);;All files (*)", 
                                self.dump_output_path_input)
+        
+# --- Memory Dump Methods ---
+    def _start_dump(self):
+        if not self.client_instance or not self.client_instance.r:
+            self._show_message("Error", "Not connected to PLC. Cannot start dump.", "error")
+            return
 
+        try:
+            dump_addr_str = self.dump_addr_input.text()
+            dump_addr = int(dump_addr_str, 16)
+            dump_len = int(self.dump_len_input.text())
+            dump_payload_path = self.dump_payload_path_input.text()
+            output_file_path = self.dump_output_path_input.text()
+        except ValueError:
+            self._show_message("Input Error", "Dump address must be a valid hex number and length must be an integer.", "error")
+            return
+
+        if not dump_payload_path or not os.path.exists(dump_payload_path):
+            self._show_message("Input Error", f"Dump payload file not found: {dump_payload_path}", "error")
+            return
+
+        if not output_file_path:
+            self._show_message("Input Error", "Output file path for dump not specified.", "error")
+            return
+
+        # Disable button, reset progress
+        self.start_dump_button.setEnabled(False)
+        self.dump_progress_bar.setValue(0)
+        self.dump_speed_label.setText("Speed: N/A")
+        self.dump_elapsed_label.setText("Elapsed: 0s")
+        self.dump_remaining_label.setText("ETA: N/A")
+        self._log_to_program_output(f"Starting memory dump: Addr=0x{dump_addr:08x}, Len={dump_len}, Payload={dump_payload_path}, Output={output_file_path}")
+
+        # Create and start the dump thread
+        if hasattr(self, 'dump_thread') and self.dump_thread and self.dump_thread.isRunning():
+            self._log_to_program_output("Dump operation already in progress.")
+            # self.start_dump_button.setEnabled(True) # Re-enable if it was stuck
+            return
+
+        self.dump_thread = MemoryDumpThread(
+            self.client_instance,
+            dump_payload_path,
+            dump_addr,
+            dump_len,
+            output_file_path,
+            self # parent_gui for logging and client_instance access (though client_instance is passed directly)
+        )
+        self.dump_thread.dump_progress.connect(self._update_dump_progress)
+        self.dump_thread.dump_succeeded.connect(self._handle_dump_success)
+        self.dump_thread.dump_failed.connect(self._handle_dump_failure)
+        self.dump_thread.finished.connect(self._on_dump_thread_finished)
+
+        self.status_bar.showMessage(f"Memory dump started to {output_file_path}...")
+        self.dump_thread.start()
+
+    def _update_dump_progress(self, done, total, speed, elapsed, eta):
+        if total > 0:
+            percent = int((done / total) * 100)
+            self.dump_progress_bar.setValue(percent)
+        else:
+            self.dump_progress_bar.setValue(0) # Or indeterminate if possible
+
+        self.dump_speed_label.setText(f"Speed: {client._format_bytes(int(speed))}/s")
+        self.dump_elapsed_label.setText(f"Elapsed: {client._format_time(elapsed)}")
+        self.dump_remaining_label.setText(f"ETA: {client._format_time(eta)}")
+        self.status_bar.showMessage(f"Dumping... {client._format_bytes(done)} / {client._format_bytes(total)}")
+
+    def _handle_dump_success(self, output_path, bytes_written):
+        self._log_to_program_output(f"Memory dump successful. {client._format_bytes(bytes_written)} saved to {output_path}")
+        self._show_message("Dump Success", f"Memory dump completed.\n{client._format_bytes(bytes_written)} saved to:\n{output_path}", "info")
+        self.status_bar.showMessage(f"Dump successful: {output_path}")
+
+    def _handle_dump_failure(self, error_message):
+        self._log_to_program_output(f"Memory dump failed: {error_message}")
+        self._show_message("Dump Failed", f"Memory dump failed: {error_message}", "error")
+        self.dump_progress_bar.setValue(0) # Reset progress bar on failure
+        self.status_bar.showMessage("Dump failed.")
+
+    def _on_dump_thread_finished(self):
+        self._log_to_program_output("Memory dump thread has finished.")
+        self.start_dump_button.setEnabled(True) # Re-enable button
+        # Reset progress bar and stats if not already handled by success/failure
+        if self.dump_progress_bar.value() != 100 and self.dump_progress_bar.value() != 0 : # If not full or reset
+            self.dump_progress_bar.setValue(0)
+            self.dump_speed_label.setText("Speed: N/A")
+            self.dump_elapsed_label.setText("Elapsed: 0s")
+            self.dump_remaining_label.setText("ETA: N/A")
+
+# --- Generic Payload Execution Methods ---
+    def _execute_generic_payload(self):
+        if not self.client_instance or not self.client_instance.r:
+            self._show_message("Error", "Not connected to PLC. Cannot execute payload.", "error")
+            return
+
+        payload_path = self.gen_payload_path_input.text()
+        payload_args = self.gen_payload_args_input.text() # Keep as string, thread will encode
+
+        if not payload_path or not os.path.exists(payload_path):
+            self._show_message("Input Error", f"Payload file not found: {payload_path}", "error")
+            return
+
+        self.execute_payload_button.setEnabled(False)
+        self._log_to_program_output(f"Starting generic payload execution: Path={payload_path}, Args='{payload_args}'")
+        self.status_bar.showMessage("Executing payload...")
+
+        if hasattr(self, 'payload_thread') and self.payload_thread and self.payload_thread.isRunning():
+            self._log_to_program_output("Payload execution already in progress.")
+            # self.execute_payload_button.setEnabled(True) # Re-enable if stuck
+            return
+
+        self.payload_thread = ExecutePayloadThread(
+            self.client_instance,
+            payload_path,
+            payload_args,
+            self
+        )
+        self.payload_thread.payload_execution_succeeded.connect(self._handle_payload_success)
+        self.payload_thread.payload_execution_failed.connect(self._handle_payload_failure)
+        self.payload_thread.finished.connect(self._on_payload_thread_finished)
+
+        self.payload_thread.start()
     def _browse_generic_payload(self):
         self._browse_file("Select Generic Payload File", "./payloads/", 
                           "Binary files (*.bin);;All files (*)", 
                           self.gen_payload_path_input)
+    def _handle_payload_success(self, hook_idx_str, response):
+        decoded_response = ""
+        if response is not None:
+            try:
+                decoded_response = response.decode(errors='replace')
+                self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed successfully. Response (hex): {response.hex()}")
+                self._log_to_program_output(f"Payload (hook {hook_idx_str}) response (decoded): {decoded_response}")
+            except Exception as e:
+                self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed successfully. Response (hex): {response.hex()}")
+                self._log_to_program_output(f"Could not decode response: {e}")
+                decoded_response = f"[Binary data: {response.hex()}]"
+        else:
+            self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed. No response data returned.")
+
+        self._show_message("Payload Success", f"Payload from hook {hook_idx_str} executed.\nResponse:\n{decoded_response}", "info")
+        self.status_bar.showMessage(f"Payload executed (hook {hook_idx_str}).")
+
+    def _handle_payload_failure(self, error_message):
+        self._log_to_program_output(f"Generic payload execution failed: {error_message}")
+        self._show_message("Payload Failed", f"Generic payload execution failed: {error_message}", "error")
+        self.status_bar.showMessage("Payload execution failed.")
+
+    def _on_payload_thread_finished(self):
+        self._log_to_program_output("Generic payload execution thread has finished.")
+        self.execute_payload_button.setEnabled(True)
 
     # --- socat Process Handlers ---
     def _socat_ready_read_stdout(self):
@@ -908,162 +1053,6 @@ class ExecutePayloadThread(QThread):
             # import traceback
             # traceback.print_exc()
             self.payload_execution_failed.emit(f"An error occurred during payload execution: {e}")
-
-
-    # --- Memory Dump Methods ---
-
-    # --- Generic Payload Execution Methods ---
-    def _execute_generic_payload(self):
-        if not self.client_instance or not self.client_instance.r:
-            self._show_message("Error", "Not connected to PLC. Cannot execute payload.", "error")
-            return
-
-        payload_path = self.gen_payload_path_input.text()
-        payload_args = self.gen_payload_args_input.text() # Keep as string, thread will encode
-
-        if not payload_path or not os.path.exists(payload_path):
-            self._show_message("Input Error", f"Payload file not found: {payload_path}", "error")
-            return
-
-        self.execute_payload_button.setEnabled(False)
-        self._log_to_program_output(f"Starting generic payload execution: Path={payload_path}, Args='{payload_args}'")
-        self.status_bar.showMessage("Executing payload...")
-
-        if hasattr(self, 'payload_thread') and self.payload_thread and self.payload_thread.isRunning():
-            self._log_to_program_output("Payload execution already in progress.")
-            # self.execute_payload_button.setEnabled(True) # Re-enable if stuck
-            return
-
-        self.payload_thread = ExecutePayloadThread(
-            self.client_instance,
-            payload_path,
-            payload_args,
-            self
-        )
-        self.payload_thread.payload_execution_succeeded.connect(self._handle_payload_success)
-        self.payload_thread.payload_execution_failed.connect(self._handle_payload_failure)
-        self.payload_thread.finished.connect(self._on_payload_thread_finished)
-
-        self.payload_thread.start()
-
-    def _handle_payload_success(self, hook_idx_str, response):
-        decoded_response = ""
-        if response is not None:
-            try:
-                decoded_response = response.decode(errors='replace')
-                self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed successfully. Response (hex): {response.hex()}")
-                self._log_to_program_output(f"Payload (hook {hook_idx_str}) response (decoded): {decoded_response}")
-            except Exception as e:
-                self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed successfully. Response (hex): {response.hex()}")
-                self._log_to_program_output(f"Could not decode response: {e}")
-                decoded_response = f"[Binary data: {response.hex()}]"
-        else:
-            self._log_to_program_output(f"Payload (hook {hook_idx_str}) executed. No response data returned.")
-
-        self._show_message("Payload Success", f"Payload from hook {hook_idx_str} executed.\nResponse:\n{decoded_response}", "info")
-        self.status_bar.showMessage(f"Payload executed (hook {hook_idx_str}).")
-
-    def _handle_payload_failure(self, error_message):
-        self._log_to_program_output(f"Generic payload execution failed: {error_message}")
-        self._show_message("Payload Failed", f"Generic payload execution failed: {error_message}", "error")
-        self.status_bar.showMessage("Payload execution failed.")
-
-    def _on_payload_thread_finished(self):
-        self._log_to_program_output("Generic payload execution thread has finished.")
-        self.execute_payload_button.setEnabled(True)
-
-    # --- Memory Dump Methods ---
-    # Note: The following five methods (_start_dump, _update_dump_progress,
-    # _handle_dump_success, _handle_dump_failure, _on_dump_thread_finished)
-    # were identified as missing or misplaced, causing an AttributeError.
-    # They are being restored here to their correct place within the PLCExploitGUI class.
-
-    def _start_dump(self):
-        if not self.client_instance or not self.client_instance.r:
-            self._show_message("Error", "Not connected to PLC. Cannot start dump.", "error")
-            return
-
-        try:
-            dump_addr_str = self.dump_addr_input.text()
-            dump_addr = int(dump_addr_str, 16)
-            dump_len = int(self.dump_len_input.text())
-            dump_payload_path = self.dump_payload_path_input.text()
-            output_file_path = self.dump_output_path_input.text()
-        except ValueError:
-            self._show_message("Input Error", "Dump address must be a valid hex number and length must be an integer.", "error")
-            return
-
-        if not dump_payload_path or not os.path.exists(dump_payload_path):
-            self._show_message("Input Error", f"Dump payload file not found: {dump_payload_path}", "error")
-            return
-
-        if not output_file_path:
-            self._show_message("Input Error", "Output file path for dump not specified.", "error")
-            return
-
-        # Disable button, reset progress
-        self.start_dump_button.setEnabled(False)
-        self.dump_progress_bar.setValue(0)
-        self.dump_speed_label.setText("Speed: N/A")
-        self.dump_elapsed_label.setText("Elapsed: 0s")
-        self.dump_remaining_label.setText("ETA: N/A")
-        self._log_to_program_output(f"Starting memory dump: Addr=0x{dump_addr:08x}, Len={dump_len}, Payload={dump_payload_path}, Output={output_file_path}")
-
-        # Create and start the dump thread
-        if hasattr(self, 'dump_thread') and self.dump_thread and self.dump_thread.isRunning():
-            self._log_to_program_output("Dump operation already in progress.")
-            # self.start_dump_button.setEnabled(True) # Re-enable if it was stuck
-            return
-
-        self.dump_thread = MemoryDumpThread(
-            self.client_instance,
-            dump_payload_path,
-            dump_addr,
-            dump_len,
-            output_file_path,
-            self # parent_gui for logging and client_instance access (though client_instance is passed directly)
-        )
-        self.dump_thread.dump_progress.connect(self._update_dump_progress)
-        self.dump_thread.dump_succeeded.connect(self._handle_dump_success)
-        self.dump_thread.dump_failed.connect(self._handle_dump_failure)
-        self.dump_thread.finished.connect(self._on_dump_thread_finished)
-
-        self.status_bar.showMessage(f"Memory dump started to {output_file_path}...")
-        self.dump_thread.start()
-
-    def _update_dump_progress(self, done, total, speed, elapsed, eta):
-        if total > 0:
-            percent = int((done / total) * 100)
-            self.dump_progress_bar.setValue(percent)
-        else:
-            self.dump_progress_bar.setValue(0) # Or indeterminate if possible
-
-        self.dump_speed_label.setText(f"Speed: {client._format_bytes(int(speed))}/s")
-        self.dump_elapsed_label.setText(f"Elapsed: {client._format_time(elapsed)}")
-        self.dump_remaining_label.setText(f"ETA: {client._format_time(eta)}")
-        self.status_bar.showMessage(f"Dumping... {client._format_bytes(done)} / {client._format_bytes(total)}")
-
-    def _handle_dump_success(self, output_path, bytes_written):
-        self._log_to_program_output(f"Memory dump successful. {client._format_bytes(bytes_written)} saved to {output_path}")
-        self._show_message("Dump Success", f"Memory dump completed.\n{client._format_bytes(bytes_written)} saved to:\n{output_path}", "info")
-        self.status_bar.showMessage(f"Dump successful: {output_path}")
-
-    def _handle_dump_failure(self, error_message):
-        self._log_to_program_output(f"Memory dump failed: {error_message}")
-        self._show_message("Dump Failed", f"Memory dump failed: {error_message}", "error")
-        self.dump_progress_bar.setValue(0) # Reset progress bar on failure
-        self.status_bar.showMessage("Dump failed.")
-
-    def _on_dump_thread_finished(self):
-        self._log_to_program_output("Memory dump thread has finished.")
-        self.start_dump_button.setEnabled(True) # Re-enable button
-        # Reset progress bar and stats if not already handled by success/failure
-        if self.dump_progress_bar.value() != 100 and self.dump_progress_bar.value() != 0 : # If not full or reset
-            self.dump_progress_bar.setValue(0)
-            self.dump_speed_label.setText("Speed: N/A")
-            self.dump_elapsed_label.setText("Elapsed: 0s")
-            self.dump_remaining_label.setText("ETA: N/A")
-
 
     def _create_menu_bar(self):
         self.menu_bar = QMenuBar(self)
