@@ -37,9 +37,6 @@ class QtLogHandler(logging.Handler, QObject): # Inherit from QObject
     log_received = pyqtSignal(str)
 
     def __init__(self, parent_qobject=None): # Accept a QObject parent
-        #logging.Handler.__init__(self)
-        #QObject.__init__(self, parent_qobject)
-        # It's often recommended to call super() for all parent classes in MRO
         super().__init__() # This will call logging.Handler.__init__
         QObject.__init__(self, parent_qobject) # Explicitly call QObject.__init__
 
@@ -128,19 +125,39 @@ class PLCExploitGUI(QMainWindow):
         self.main_layout.addWidget(self.sections_widget)
         self._create_terminal_outputs_group() # This also calls _setup_logging
 
-        self._load_settings()
+        self._load_settings() # Load settings after UI is created and logging is set up
 
     # --- UI Creation Methods ---
     def _create_menu_bar(self):
         self.menu_bar = QMenuBar(self)
         self.setMenuBar(self.menu_bar)
+
+        # File menu
         file_menu = self.menu_bar.addMenu("&File")
+
+        save_config_action = QAction("&Save Configuration Now", self)
+        save_config_action.setToolTip("Save all current settings (Modbus, connection, paths, etc.) immediately.")
+        save_config_action.triggered.connect(self._save_settings) # Direct call to existing save method
+        file_menu.addAction(save_config_action)
+
+        load_config_action = QAction("&Load Configuration Now", self)
+        load_config_action.setToolTip("Load all settings from storage, overwriting current UI values.")
+        load_config_action.triggered.connect(self._confirm_load_settings)
+        file_menu.addAction(load_config_action)
+
+        file_menu.addSeparator()
+
         exit_action = QAction("&Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+
+        # Help menu
         help_menu = self.menu_bar.addMenu("&Help")
         about_action = QAction("&About", self)
+        # about_action.triggered.connect(self._show_about_dialog) # To be implemented
         help_menu.addAction(about_action)
+
+        # Settings Menu
         settings_menu = self.menu_bar.addMenu("&Settings")
         logging_menu = settings_menu.addMenu("Logging")
         self.log_to_file_action = QAction("Enable Log to File", self, checkable=True)
@@ -401,8 +418,10 @@ class PLCExploitGUI(QMainWindow):
         self.gen_payload_args_input.setText(settings.value("execute/args", ""))
         geometry = settings.value("window/geometry")
         if geometry: self.restoreGeometry(geometry)
-        log_to_file_enabled = settings.value("logging/log_to_file_enabled", False, type=bool)
-        self.log_to_file_action.setChecked(log_to_file_enabled)
+        # Check if log_to_file_action exists before trying to setChecked, as _load_settings is called in __init__ before menu is fully populated by some paths
+        if hasattr(self, 'log_to_file_action'):
+            log_to_file_enabled = settings.value("logging/log_to_file_enabled", False, type=bool)
+            self.log_to_file_action.setChecked(log_to_file_enabled)
         self.app_logger.info("Settings loaded.")
 
     def _save_settings(self):
@@ -421,14 +440,33 @@ class PLCExploitGUI(QMainWindow):
         settings.setValue("execute/payload_path", self.gen_payload_path_input.text())
         settings.setValue("execute/args", self.gen_payload_args_input.text())
         settings.setValue("window/geometry", self.saveGeometry())
+        if hasattr(self, 'log_to_file_action'): # Ensure action exists
+            settings.setValue("logging/log_to_file_enabled", self.log_to_file_action.isChecked())
         if hasattr(self, 'file_log_handler') and self.file_log_handler is not None:
-             settings.setValue("logging/log_to_file_enabled", True)
+             # These are saved based on current handler state if it exists
              settings.setValue("logging/log_file_path", self.file_log_handler.baseFilename)
              settings.setValue("logging/log_max_bytes", self.file_log_handler.maxBytes)
              settings.setValue("logging/log_backup_count", self.file_log_handler.backupCount)
-        else:
-             settings.setValue("logging/log_to_file_enabled", False)
+        elif not settings.contains("logging/log_file_path"): # Save defaults if never saved
+            settings.setValue("logging/log_file_path", "plc_exploit_tool.log")
+            settings.setValue("logging/log_max_bytes", 1024*1024*5)
+            settings.setValue("logging/log_backup_count", 3)
+
         self.app_logger.info("Settings saved.")
+
+    def _confirm_load_settings(self):
+        reply = QMessageBox.question(self, 'Confirm Load Configuration',
+                                   "Loading configuration will overwrite any unsaved changes in the UI. Are you sure you want to continue?",
+                                   QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.app_logger.info("User confirmed to load settings. Calling _load_settings().")
+            self._load_settings()
+            # Re-initialize logging based on potentially new settings from file
+            self._configure_file_logging()
+            self.app_logger.info("Settings have been reloaded from storage.")
+            self._show_message("Load Complete", "Settings have been reloaded from storage.", "info")
+        else:
+            self.app_logger.info("User cancelled loading settings.")
 
     # --- Core Action Methods & Associated Thread/Process Management ---
     def _run_power_control(self, mode):
@@ -456,7 +494,7 @@ class PLCExploitGUI(QMainWindow):
 
     def _start_socat(self):
         if self.socat_process and self.socat_process.state() == QProcess.Running:
-            self.app_logger.info("socat is already running.") # Changed from _log_to_program_output
+            self.app_logger.info("socat is already running.")
             return True
         self.socat_process = QProcess(self)
         self.socat_process.readyReadStandardOutput.connect(self._socat_ready_read_stdout)
@@ -504,7 +542,14 @@ class PLCExploitGUI(QMainWindow):
         target_host = "localhost"
         try: target_port = int(self.socat_port_input.text())
         except ValueError: self._show_message("Input Error", "Socat TCP Forward Port must be an integer.", "error"); self.connect_button.setEnabled(True); return
-        stager_payload_path = client.STAGER_PL_FILENAME
+
+        stager_payload_path = ""
+        if client and hasattr(client, 'STAGER_PL_FILENAME'):
+            stager_payload_path = client.STAGER_PL_FILENAME
+        else: # Fallback if client or attribute is missing
+             self.app_logger.warning("client.STAGER_PL_FILENAME not found, using default path for stager.")
+             stager_payload_path = "payloads/stager/stager.bin" # Default if client is not loaded
+
         if hasattr(self, 'connection_thread') and self.connection_thread and self.connection_thread.isRunning():
             self.app_logger.warning("Connection attempt already in progress."); return
         self.connection_thread = PLCConnectionThread(target_host, target_port, stager_payload_path, self)
@@ -889,3 +934,5 @@ if __name__ == '__main__':
     main_window = PLCExploitGUI()
     main_window.show()
     sys.exit(app.exec_())
+
+[end of gui.py]
