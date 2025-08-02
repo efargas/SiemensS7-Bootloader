@@ -1,5 +1,7 @@
 
 .DS_Store
-mem_dump_01e01040_01ef5280
-mem_dump_01e01040_01e01440
+mem_dump_*
+__pycache__/client.cpython-36.pyc
+__pycache__/client.cpython-36.pyc
+plc_exploit_tool.log
 __pycache__/client.cpython-36.pyc
