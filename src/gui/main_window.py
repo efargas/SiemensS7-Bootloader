@@ -3,7 +3,7 @@ import threading
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QLineEdit, QPushButton, QCheckBox, QSpinBox, QTabWidget, QTextEdit,
-    QFileDialog, QMessageBox
+    QFileDialog, QMessageBox, QComboBox, QStackedWidget
 )
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QWaitCondition, QMutex
 
@@ -103,21 +103,78 @@ class MainWindow(QMainWindow):
         self.connect_button.clicked.connect(self.toggle_connection)
         h_layout.addWidget(self.connect_button)
         layout.addLayout(h_layout)
+
         self.ps_checkbox = QCheckBox("Switch Power Supply")
+        self.ps_checkbox.toggled.connect(self._toggle_ps_widgets)
         layout.addWidget(self.ps_checkbox)
-        ps_layout = QHBoxLayout()
-        ps_layout.addWidget(QLabel("PS Host:"))
+
+        self._create_ps_group()
+        layout.addWidget(self.ps_group)
+
+        self.connection_group.setLayout(layout)
+
+    def _create_ps_group(self):
+        self.ps_group = QGroupBox("Power Supply Configuration")
+        layout = QVBoxLayout()
+
+        self.ps_type_combo = QComboBox()
+        self.ps_type_combo.addItems(["HTTP Switch", "Modbus TCP"])
+        self.ps_type_combo.currentIndexChanged.connect(self._update_ps_stack)
+        layout.addWidget(self.ps_type_combo)
+
+        self.ps_stack = QStackedWidget()
+
+        # HTTP Widget
+        http_widget = QWidget()
+        http_layout = QHBoxLayout()
+        http_layout.addWidget(QLabel("PS Host:"))
         self.ps_host_input = QLineEdit("powersupply")
-        ps_layout.addWidget(self.ps_host_input)
-        ps_layout.addWidget(QLabel("PS Port:"))
+        http_layout.addWidget(self.ps_host_input)
+        http_layout.addWidget(QLabel("PS Port:"))
         self.ps_port_input = QLineEdit("80")
-        ps_layout.addWidget(self.ps_port_input)
-        ps_layout.addWidget(QLabel("Delay (s):"))
+        http_layout.addWidget(self.ps_port_input)
+        http_widget.setLayout(http_layout)
+
+        # Modbus Widget
+        modbus_widget = QWidget()
+        modbus_layout = QHBoxLayout()
+        modbus_layout.addWidget(QLabel("Modbus Host:"))
+        self.modbus_host_input = QLineEdit("localhost")
+        modbus_layout.addWidget(self.modbus_host_input)
+        modbus_layout.addWidget(QLabel("Port:"))
+        self.modbus_port_input = QLineEdit("502")
+        modbus_layout.addWidget(self.modbus_port_input)
+        modbus_layout.addWidget(QLabel("Slave ID:"))
+        self.modbus_slave_id_spin = QSpinBox()
+        self.modbus_slave_id_spin.setValue(1)
+        modbus_layout.addWidget(self.modbus_slave_id_spin)
+        modbus_layout.addWidget(QLabel("Coil Addr:"))
+        self.modbus_coil_addr_spin = QSpinBox()
+        self.modbus_coil_addr_spin.setValue(0)
+        modbus_layout.addWidget(self.modbus_coil_addr_spin)
+        modbus_widget.setLayout(modbus_layout)
+
+        self.ps_stack.addWidget(http_widget)
+        self.ps_stack.addWidget(modbus_widget)
+
+        layout.addWidget(self.ps_stack)
+
+        delay_layout = QHBoxLayout()
+        delay_layout.addWidget(QLabel("Delay (s):"))
         self.ps_delay_spinbox = QSpinBox()
         self.ps_delay_spinbox.setValue(10)
-        ps_layout.addWidget(self.ps_delay_spinbox)
-        layout.addLayout(ps_layout)
-        self.connection_group.setLayout(layout)
+        delay_layout.addStretch()
+        delay_layout.addWidget(self.ps_delay_spinbox)
+        layout.addLayout(delay_layout)
+
+        self.ps_group.setLayout(layout)
+        self.ps_group.setVisible(False)
+
+    def _toggle_ps_widgets(self, checked):
+        self.ps_group.setVisible(checked)
+
+    def _update_ps_stack(self, index):
+        self.ps_stack.setCurrentIndex(index)
 
     def _create_actions_group(self):
         self.actions_group = QGroupBox("Actions")
@@ -223,7 +280,6 @@ class MainWindow(QMainWindow):
         self.worker.error.connect(self.on_error)
         self.worker.finished.connect(self.on_worker_finished)
 
-        # Action-specific connections
         self.worker.dump_finished.connect(self.save_dump_file)
         self.worker.tictactoe_output.connect(self.handle_tictactoe_output)
         self.tictactoe_input_ready.connect(self.worker.provide_input)
@@ -236,12 +292,21 @@ class MainWindow(QMainWindow):
         host = self.host_input.text()
         port = int(self.port_input.text())
         self.plc_client = PlcClient(host, port, log_callback=self.update_log)
-        kwargs = {
-            "switch_power": self.ps_checkbox.isChecked(),
-            "ps_host": self.ps_host_input.text(),
-            "ps_port": int(self.ps_port_input.text()),
-            "ps_delay": self.ps_delay_spinbox.value()
-        }
+
+        kwargs = {"switch_power": self.ps_checkbox.isChecked()}
+        if self.ps_checkbox.isChecked():
+            kwargs["ps_delay"] = self.ps_delay_spinbox.value()
+            ps_type = self.ps_type_combo.currentText()
+            kwargs["ps_type"] = ps_type
+            if ps_type == "HTTP Switch":
+                kwargs["ps_host"] = self.ps_host_input.text()
+                kwargs["ps_port"] = int(self.ps_port_input.text())
+            elif ps_type == "Modbus TCP":
+                kwargs["ps_host"] = self.modbus_host_input.text()
+                kwargs["ps_port"] = int(self.modbus_port_input.text())
+                kwargs["modbus_slave_id"] = self.modbus_slave_id_spin.value()
+                kwargs["modbus_coil_addr"] = self.modbus_coil_addr_spin.value()
+
         self._start_worker("connect", **kwargs)
 
     def disconnect_plc(self):
@@ -272,8 +337,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", str(e))
 
     def on_worker_finished(self):
-        if self.worker.action == "connect" and self.plc_client.r is None:
-             # Connection failed
+        if self.worker.action == "connect" and (not self.plc_client or self.plc_client.r is None):
              self.plc_client = None
         elif self.worker.action == "disconnect":
              self.plc_client = None
@@ -285,7 +349,7 @@ class MainWindow(QMainWindow):
     def on_error(self, message):
         QMessageBox.critical(self, "Error", message)
         if self.worker.action == "connect":
-            self.plc_client = None # Ensure client is cleared on connection error
+            self.plc_client = None
         self.update_ui_state(is_running=False)
 
 
