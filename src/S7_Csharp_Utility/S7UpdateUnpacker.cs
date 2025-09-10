@@ -23,65 +23,80 @@ namespace S7_Csharp_Utility
 
         public static byte[] Unpack(byte[] inputData)
         {
-            var hashTable = new uint[LzpChunkSize];
-            for (int i = 0; i < hashTable.Length; i++)
+            try
             {
-                hashTable[i] = ~0u;
-            }
-
-            using (var outputStream = new MemoryStream())
-            {
-                int read = 0;
-
-                // First 4 bytes are literals
-                outputStream.Write(inputData, 0, LzpOrder);
-                read += LzpOrder;
-
-                var cBytes = new byte[4];
-                outputStream.Seek(-LzpOrder, SeekOrigin.Current);
-                outputStream.Read(cBytes, 0, 4);
-                uint c = BitConverter.ToUInt32(cBytes, 0);
-                uint h = HashIndex(c);
-                hashTable[h] = (uint)outputStream.Position;
-                outputStream.Seek(0, SeekOrigin.End);
-
-                while (read < inputData.Length)
+                var hashTable = new uint[LzpChunkSize];
+                for (int i = 0; i < hashTable.Length; i++)
                 {
-                    byte mask = inputData[read++];
-                    for (int i = 0; i < 8; i++)
-                    {
-                        if (read >= inputData.Length) break;
-
-                        byte b = inputData[read++];
-
-                        if ((mask & 0x80u) == 0)
-                        {
-                            // Literal
-                            var buffer = outputStream.GetBuffer();
-                            c = BitConverter.ToUInt32(buffer, (int)outputStream.Position - LzpOrder);
-                            h = HashIndex(c);
-                            hashTable[h] = (uint)outputStream.Position;
-
-                            outputStream.WriteByte(b);
-                        }
-                        else
-                        {
-                            // Match
-                            var buffer = outputStream.GetBuffer();
-                            c = BitConverter.ToUInt32(buffer, (int)outputStream.Position - LzpOrder);
-                            h = HashIndex(c);
-                            int pos = (int)hashTable[h];
-                            hashTable[h] = (uint)outputStream.Position;
-
-                            for (int j = 0; j < b; j++)
-                            {
-                                outputStream.WriteByte(buffer[pos + j]);
-                            }
-                        }
-                        mask <<= 1;
-                    }
+                    hashTable[i] = ~0u;
                 }
-                return outputStream.ToArray();
+
+                using (var outputStream = new MemoryStream())
+                {
+                    int read = 0;
+                    if (inputData.Length < LzpOrder)
+                        throw new Exception($"Compressed chunk too short for initial LZPOrder ({inputData.Length} bytes)");
+                    // First 4 bytes are literals
+                    outputStream.Write(inputData, 0, LzpOrder);
+                    read += LzpOrder;
+
+                    var cBytes = new byte[4];
+                    outputStream.Seek(-LzpOrder, SeekOrigin.Current);
+                    outputStream.Read(cBytes, 0, 4);
+                    uint c = BitConverter.ToUInt32(cBytes, 0);
+                    uint h = HashIndex(c);
+                    hashTable[h] = (uint)outputStream.Position;
+                    outputStream.Seek(0, SeekOrigin.End);
+
+                    while (read < inputData.Length)
+                    {
+                        byte mask = inputData[read++];
+                        for (int i = 0; i < 8; i++)
+                        {
+                            if (read >= inputData.Length) break;
+
+                            byte b = inputData[read++];
+
+                            if ((mask & 0x80u) == 0)
+                            {
+                                // Literal
+                                var buffer = outputStream.GetBuffer();
+                                long posForLiteral = outputStream.Position - LzpOrder;
+                                if (posForLiteral < 0 || buffer.Length < posForLiteral + LzpOrder)
+                                    throw new Exception($"Decompression error: buffer underrun reading literal (pos={posForLiteral}, buffer length={buffer.Length})");
+                                c = BitConverter.ToUInt32(buffer, (int)posForLiteral);
+                                h = HashIndex(c);
+                                hashTable[h] = (uint)outputStream.Position;
+
+                                outputStream.WriteByte(b);
+                            }
+                            else
+                            {
+                                // Match
+                                var buffer = outputStream.GetBuffer();
+                                long posForMatch = outputStream.Position - LzpOrder;
+                                if (posForMatch < 0 || buffer.Length < posForMatch + LzpOrder)
+                                    throw new Exception($"Decompression error: buffer underrun reading match (pos={posForMatch}, buffer length={buffer.Length})");
+                                c = BitConverter.ToUInt32(buffer, (int)posForMatch);
+                                h = HashIndex(c);
+                                int pos = (int)hashTable[h];
+                                hashTable[h] = (uint)outputStream.Position;
+                                if (pos + b > buffer.Length)
+                                    throw new Exception($"Decompression error: match copy out of bounds (match pos={pos}, length={b}, buffer length={buffer.Length})");
+                                for (int j = 0; j < b; j++)
+                                {
+                                    outputStream.WriteByte(buffer[pos + j]);
+                                }
+                            }
+                            mask <<= 1;
+                        }
+                    }
+                    return outputStream.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"LZP decompression failed: {ex.Message}", ex);
             }
         }
     }
@@ -181,6 +196,10 @@ namespace S7_Csharp_Utility
                     uint compressedSize = br.ReadUInt32();
                     // The C code skips the first 2 bytes of the compressed chunk
                     var compressedChunk = br.ReadBytes((int)compressedSize);
+
+                    if (compressedChunk.Length < 2)
+                        throw new Exception($"Compressed chunk is too short ({compressedChunk.Length} bytes) at offset {fs.Position - compressedSize}.");
+
                     var decompressed = LzpDecompressor.Unpack(compressedChunk.Skip(2).ToArray());
 
                     outFile.Write(decompressed, 0, decompressed.Length);

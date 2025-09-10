@@ -25,43 +25,11 @@ namespace S7_Csharp_Utility
         private bool _stagerInstalled = false;
         private DeviceProfile _currentProfile;
         private ObservableCollection<MemoryRegion> _profileRegions;
-        private IStorageFile _selectedFirmwareFile;
-
-        
+        private IStorageFile? _selectedFirmwareFile;
 
         public MainWindow()
         {
             InitializeComponent();
-
-            // Find controls by name
-            PlcHostTextBox = this.FindControl<TextBox>("PlcHostTextBox");
-            PlcPortTextBox = this.FindControl<TextBox>("PlcPortTextBox");
-            ModbusHostTextBox = this.FindControl<TextBox>("ModbusHostTextBox");
-            ModbusPortTextBox = this.FindControl<TextBox>("ModbusPortTextBox");
-            ModbusCoilTextBox = this.FindControl<TextBox>("ModbusCoilTextBox");
-            DelayNumericUpDown = this.FindControl<NumericUpDown>("DelayNumericUpDown");
-            LogTextBox = this.FindControl<TextBox>("LogTextBox");
-            ClearLogButton = this.FindControl<Button>("ClearLogButton");
-            PowerOnButton = this.FindControl<Button>("PowerOnButton");
-            PowerOffButton = this.FindControl<Button>("PowerOffButton");
-            UploadStagerButton = this.FindControl<Button>("UploadStagerButton");
-            DumpAddressTextBox = this.FindControl<TextBox>("DumpAddressTextBox");
-            DumpLengthTextBox = this.FindControl<TextBox>("DumpLengthTextBox");
-            DumpMemoryButton = this.FindControl<Button>("DumpMemoryButton");
-            DumpProgressBar = this.FindControl<ProgressBar>("DumpProgressBar");
-            DumpPercentLabel = this.FindControl<TextBlock>("DumpPercentLabel");
-            DumpBytesLabel = this.FindControl<TextBlock>("DumpBytesLabel");
-            DumpTimeLabel = this.FindControl<TextBlock>("DumpTimeLabel");
-            ProfileModelNameTextBox = this.FindControl<TextBox>("ProfileModelNameTextBox");
-            LoadProfileButton = this.FindControl<Button>("LoadProfileButton");
-            SaveProfileButton = this.FindControl<Button>("SaveProfileButton");
-            RegionsDataGrid = this.FindControl<DataGrid>("RegionsDataGrid");
-            RegionComboBox = this.FindControl<ComboBox>("RegionComboBox");
-            CompareDumpsButton = this.FindControl<Button>("CompareDumpsButton");
-            ComparisonResultsListBox = this.FindControl<ListBox>("ComparisonResultsListBox");
-            SelectFirmwareButton = this.FindControl<Button>("SelectFirmwareButton");
-            FirmwareMetadataTextBlock = this.FindControl<TextBlock>("FirmwareMetadataTextBlock");
-            UnpackFirmwareButton = this.FindControl<Button>("UnpackFirmwareButton");
 
             _plc = new PlcCommunicator(Log);
             _unpacker = new S7UpdateUnpacker();
@@ -69,7 +37,6 @@ namespace S7_Csharp_Utility
             _profileRegions = new ObservableCollection<MemoryRegion>();
             RegionsDataGrid.ItemsSource = _profileRegions;
 
-            // Wire up event handlers
             PowerOnButton.Click += async (s, e) => await SetPower(true);
             PowerOffButton.Click += async (s, e) => await SetPower(false);
             UploadStagerButton.Click += UploadStagerButton_Click;
@@ -84,7 +51,7 @@ namespace S7_Csharp_Utility
         }
 
         #region Firmware Unpacker
-        private async void SelectFirmwareButton_Click(object sender, RoutedEventArgs e)
+        private async void SelectFirmwareButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -103,7 +70,7 @@ namespace S7_Csharp_Utility
 
                 try
                 {
-                    var metadata = _unpacker.ParseMetadata(_selectedFirmwareFile.Path.AbsolutePath);
+                    var metadata = _unpacker.ParseMetadata(_selectedFirmwareFile.Path.LocalPath);
                     var sb = new StringBuilder();
                     sb.AppendLine($"Found {metadata.Count} components:");
                     foreach (var entry in metadata)
@@ -121,7 +88,7 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private async void UnpackFirmwareButton_Click(object sender, RoutedEventArgs e)
+        private async void UnpackFirmwareButton_Click(object? sender, RoutedEventArgs e)
         {
             if (_selectedFirmwareFile == null) return;
 
@@ -140,7 +107,7 @@ namespace S7_Csharp_Utility
 
                 try
                 {
-                    await Task.Run(() => _unpacker.Unpack(_selectedFirmwareFile.Path.AbsolutePath, outputFilePath));
+                    await Task.Run(() => _unpacker.Unpack(_selectedFirmwareFile.Path.LocalPath, outputFilePath));
                     Log("Firmware unpacked successfully.");
                 }
                 catch (Exception ex)
@@ -156,7 +123,7 @@ namespace S7_Csharp_Utility
         #endregion
 
         #region Dump Comparison
-        private async void CompareDumpsButton_Click(object sender, RoutedEventArgs e)
+        private async void CompareDumpsButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
             var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
@@ -241,7 +208,7 @@ namespace S7_Csharp_Utility
         #endregion
 
         #region Profile Management
-        private async void LoadProfileButton_Click(object sender, RoutedEventArgs e)
+        private async void LoadProfileButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -276,7 +243,7 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private async void SaveProfileButton_Click(object sender, RoutedEventArgs e)
+        private async void SaveProfileButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
             var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
@@ -308,7 +275,7 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private void RegionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void RegionComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             if (RegionComboBox.SelectedItem is string selectedRegionName && _currentProfile != null)
             {
@@ -326,15 +293,14 @@ namespace S7_Csharp_Utility
         private const int LogLineLimit = 500; // Max log lines to keep
         private void Log(string message)
         {
+            if (LogTextBox == null) return;
             Dispatcher.UIThread.Post(() =>
             {
                 var timestamp = DateTime.Now.ToString("HH:mm:ss");
                 LogTextBox.Text += $"[{timestamp}] {message}{Environment.NewLine}";
-                // Limit log lines
                 var lines = LogTextBox.Text.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
                 if (lines.Length > LogLineLimit)
                     LogTextBox.Text = string.Join(Environment.NewLine, lines.Skip(lines.Length - LogLineLimit));
-                // Auto-scroll
                 LogTextBox.CaretIndex = LogTextBox.Text?.Length ?? 0;
             });
         }
@@ -382,7 +348,7 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private async void UploadStagerButton_Click(object sender, RoutedEventArgs e)
+        private async void UploadStagerButton_Click(object? sender, RoutedEventArgs e)
         {
             SetControlsEnabled(false);
             try
@@ -441,7 +407,7 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private async void DumpMemoryButton_Click(object sender, RoutedEventArgs e)
+        private async void DumpMemoryButton_Click(object? sender, RoutedEventArgs e)
         {
             if (!_stagerInstalled)
             {
@@ -537,10 +503,8 @@ namespace S7_Csharp_Utility
             Log($"Successfully dumped {dumpedData.Length} bytes to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.");
         }
 
-
         private void SetControlsEnabled(bool enabled)
         {
-            // Disable all interactive controls
             PlcHostTextBox.IsEnabled = enabled;
             PlcPortTextBox.IsEnabled = enabled;
             ModbusHostTextBox.IsEnabled = enabled;
