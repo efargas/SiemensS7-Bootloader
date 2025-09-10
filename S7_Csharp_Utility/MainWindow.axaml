@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="S7_Csharp_Utility.MainWindow"
         Title="S7 Bootloader Utility (Cross-Platform)"
-        Width="450" Height="900"
+        Width="450" Height="1050"
         CanResize="False">
 
   <Grid Margin="10" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto">
@@ -97,6 +97,16 @@
           <TextBlock Text="Dump Comparison" FontWeight="Bold"/>
           <Button Name="CompareDumpsButton" Content="Select Folder &amp; Compare Dumps" HorizontalAlignment="Center"/>
           <ListBox Name="ComparisonResultsListBox" Height="100" Margin="0,5"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Firmware Unpacker Section -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Firmware Unpacker" FontWeight="Bold"/>
+          <Button Name="SelectFirmwareButton" Content="Select Firmware (.upd) File" HorizontalAlignment="Center"/>
+          <TextBlock Name="FirmwareMetadataTextBlock" Margin="0,5" TextWrapping="Wrap"/>
+          <Button Name="UnpackFirmwareButton" Content="Unpack to..." HorizontalAlignment="Center" IsEnabled="False"/>
         </StackPanel>
       </Border>
 
