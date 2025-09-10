@@ -69,16 +69,20 @@ With the setup complete, you can run the main application:
 python3 main.py
 ```
 
-This will open the GUI, which allows you to:
+This will open the GUI, which includes the following features:
+
 - **Connect** to the PLC.
-- **Cycle Power**: The application supports power cycling the PLC before connecting. You can enable this with the "Switch Power Supply" checkbox. Two methods are supported:
+- **Power Cycling**: The application supports power cycling the PLC before connecting. You can enable this with the "Switch Power Supply" checkbox. Two methods are supported:
     - **HTTP Switch**: The original method, which uses a script to control a web-based power switch.
     - **Modbus TCP**: A new method that uses Modbus to control a power relay. You can configure the Modbus host, port, slave ID, and coil address in the GUI.
-- **Dump Memory**: Specify an address and length, and save the memory dump to a file.
-- **Run Test Payload**: Upload and execute a test payload.
-- **Play Tic-Tac-Toe**: Run the Tic-Tac-Toe payload and interact with it through the GUI.
+- **Actions**:
+    - **Dump Memory**: Specify an address and length, and save the memory dump to a file.
+    - **Run Test Payload**: Upload and execute a test payload.
+    - **Play Tic-Tac-Toe**: Run the Tic-Tac-Toe payload and interact with it through the GUI.
+- **Configuration Management**: The application automatically saves all your settings (file paths, connection details, window size) when you close it and reloads them on the next start.
+- **Robust Logging**: All actions are logged with timestamps and severity levels in the GUI. A detailed log is also saved to `app.log` for debugging. You can control the verbosity of the UI log using the dropdown menu in the "Log" section.
 
-All actions and logs are displayed in the application window.
+The application also includes input validation and better error handling to provide a smoother user experience.
 
 ## Public Talks
 
