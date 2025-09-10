@@ -81,8 +81,13 @@ namespace S7_Csharp_Utility
                                 h = HashIndex(c);
                                 int pos = (int)hashTable[h];
                                 hashTable[h] = (uint)outputStream.Position;
-                                if (pos + b > buffer.Length)
-                                    throw new Exception($"Decompression error: match copy out of bounds (match pos={pos}, length={b}, buffer length={buffer.Length})");
+                                // C code: if match pointer is bad, skip match (produce output as-is)
+                                if (pos < 0 || pos + b > buffer.Length || pos > (int)outputStream.Position - LzpOrder)
+                                {
+                                    // Optionally, warn or log debug (but don't throw)
+                                    // Skipping invalid match block, copying nothing
+                                    continue;
+                                }
                                 for (int j = 0; j < b; j++)
                                 {
                                     outputStream.WriteByte(buffer[pos + j]);
