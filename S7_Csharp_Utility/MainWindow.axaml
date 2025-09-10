@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="S7_Csharp_Utility.MainWindow"
         Title="S7 Bootloader Utility (Cross-Platform)"
-        Width="450" Height="550"
+        Width="450" Height="750"
         CanResize="False">
 
   <Grid Margin="10" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto">
@@ -43,24 +43,49 @@
         </StackPanel>
       </Border>
 
+      <!-- Profile Management Section -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Profile Management" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="5">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Device Model:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Name="ProfileModelNameTextBox"/>
+            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,5">
+              <Button Name="LoadProfileButton" Content="Load Profile"/>
+              <Button Name="SaveProfileButton" Content="Save Profile"/>
+            </StackPanel>
+            <DataGrid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Name="RegionsDataGrid" AutoGenerateColumns="False" Height="150">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </Grid>
+        </StackPanel>
+      </Border>
+
       <!-- Memory Dump Section -->
       <Border Classes="group-box">
         <StackPanel Spacing="5">
           <TextBlock Text="Memory Dump" FontWeight="Bold"/>
-          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="5">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Address (hex):" VerticalAlignment="Center"/>
-            <TextBox Grid.Row="0" Grid.Column="1" Name="DumpAddressTextBox" Text="0x10000000"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="5">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Select Region:" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="0" Grid.Column="1" Name="RegionComboBox" PlaceholderText="Select a predefined region"/>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Length (bytes):" VerticalAlignment="Center"/>
-            <TextBox Grid.Row="1" Grid.Column="1" Name="DumpLengthTextBox" Text="1024"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Address (hex):" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Name="DumpAddressTextBox" Text="0x10000000"/>
 
-            <ProgressBar Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpProgressBar" Margin="0,5"/>
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Length (bytes):" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="2" Grid.Column="1" Name="DumpLengthTextBox" Text="1024"/>
 
-            <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpPercentLabel" HorizontalAlignment="Center" Text="0%"/>
+            <ProgressBar Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpProgressBar" Margin="0,5"/>
 
-            <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpBytesLabel" HorizontalAlignment="Left" Text="Read: 0 / 0 bytes"/>
+            <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpPercentLabel" HorizontalAlignment="Center" Text="0%"/>
 
-            <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpTimeLabel" HorizontalAlignment="Left" Text="Elapsed: 0s | Remaining: 0s"/>
+            <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpBytesLabel" HorizontalAlignment="Left" Text="Read: 0 / 0 bytes"/>
+
+            <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpTimeLabel" HorizontalAlignment="Left" Text="Elapsed: 0s | Remaining: 0s"/>
           </Grid>
           <Button Name="DumpMemoryButton" Content="Dump Memory" HorizontalAlignment="Center"/>
         </StackPanel>

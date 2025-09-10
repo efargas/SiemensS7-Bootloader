@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using System;
 using System.IO;
@@ -7,6 +9,9 @@ using System.Threading.Tasks;
 using Modbus.Device;
 using System.Globalization;
 using System.Diagnostics;
+using System.Text.Json;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace S7_Csharp_Utility
 {
@@ -14,6 +19,8 @@ namespace S7_Csharp_Utility
     {
         private readonly PlcCommunicator _plc;
         private bool _stagerInstalled = false;
+        private DeviceProfile _currentProfile;
+        private ObservableCollection<MemoryRegion> _profileRegions;
 
         // Control references
         private TextBox PlcHostTextBox;
@@ -33,13 +40,18 @@ namespace S7_Csharp_Utility
         private TextBlock DumpPercentLabel;
         private TextBlock DumpBytesLabel;
         private TextBlock DumpTimeLabel;
+        private TextBox ProfileModelNameTextBox;
+        private Button LoadProfileButton;
+        private Button SaveProfileButton;
+        private DataGrid RegionsDataGrid;
+        private ComboBox RegionComboBox;
 
 
         public MainWindow()
         {
             InitializeComponent();
 
-            // Manually find controls by name
+            // Find controls by name
             PlcHostTextBox = this.FindControl<TextBox>("PlcHostTextBox");
             PlcPortTextBox = this.FindControl<TextBox>("PlcPortTextBox");
             ModbusHostTextBox = this.FindControl<TextBox>("ModbusHostTextBox");
@@ -57,15 +69,109 @@ namespace S7_Csharp_Utility
             DumpPercentLabel = this.FindControl<TextBlock>("DumpPercentLabel");
             DumpBytesLabel = this.FindControl<TextBlock>("DumpBytesLabel");
             DumpTimeLabel = this.FindControl<TextBlock>("DumpTimeLabel");
+            ProfileModelNameTextBox = this.FindControl<TextBox>("ProfileModelNameTextBox");
+            LoadProfileButton = this.FindControl<Button>("LoadProfileButton");
+            SaveProfileButton = this.FindControl<Button>("SaveProfileButton");
+            RegionsDataGrid = this.FindControl<DataGrid>("RegionsDataGrid");
+            RegionComboBox = this.FindControl<ComboBox>("RegionComboBox");
 
             _plc = new PlcCommunicator(Log);
+            _currentProfile = new DeviceProfile();
+            _profileRegions = new ObservableCollection<MemoryRegion>();
+            RegionsDataGrid.ItemsSource = _profileRegions;
 
             // Wire up event handlers
             PowerOnButton.Click += async (s, e) => await SetPower(true);
             PowerOffButton.Click += async (s, e) => await SetPower(false);
             UploadStagerButton.Click += UploadStagerButton_Click;
             DumpMemoryButton.Click += DumpMemoryButton_Click;
+            LoadProfileButton.Click += LoadProfileButton_Click;
+            SaveProfileButton.Click += SaveProfileButton_Click;
+            RegionComboBox.SelectionChanged += RegionComboBox_SelectionChanged;
         }
+
+        #region Profile Management
+        private async void LoadProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Open Profile File",
+                AllowMultiple = false,
+                FileTypeFilter = new[] { new FilePickerFileType("JSON Profiles") { Patterns = new[] { "*.json" } } }
+            });
+
+            if (files.Count >= 1)
+            {
+                try
+                {
+                    await using var stream = await files[0].OpenReadAsync();
+                    using var reader = new StreamReader(stream);
+                    string json = await reader.ReadToEndAsync();
+                    _currentProfile = JsonSerializer.Deserialize<DeviceProfile>(json);
+
+                    ProfileModelNameTextBox.Text = _currentProfile.ModelName;
+                    _profileRegions.Clear();
+                    foreach (var region in _currentProfile.Regions)
+                    {
+                        _profileRegions.Add(region);
+                    }
+                    RegionComboBox.ItemsSource = _currentProfile.Regions.Select(r => r.Name).ToList();
+                    Log($"Loaded profile: {_currentProfile.ModelName}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error loading profile: {ex.Message}");
+                }
+            }
+        }
+
+        private async void SaveProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Save Profile File",
+                DefaultExtension = "json",
+                FileTypeChoices = new[] { new FilePickerFileType("JSON Profiles") { Patterns = new[] { "*.json" } } }
+            });
+
+            if (file is not null)
+            {
+                var profileToSave = new DeviceProfile
+                {
+                    ModelName = ProfileModelNameTextBox.Text,
+                    Regions = _profileRegions.ToList()
+                };
+
+                try
+                {
+                    var options = new JsonSerializerOptions { WriteIndented = true };
+                    string json = JsonSerializer.Serialize(profileToSave, options);
+                    await File.WriteAllTextAsync(file.Path.AbsolutePath, json);
+                    Log($"Profile saved to {file.Name}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error saving profile: {ex.Message}");
+                }
+            }
+        }
+
+        private void RegionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (RegionComboBox.SelectedItem is string selectedRegionName && _currentProfile != null)
+            {
+                var selectedRegion = _currentProfile.Regions.FirstOrDefault(r => r.Name == selectedRegionName);
+                if (selectedRegion != null)
+                {
+                    DumpAddressTextBox.Text = selectedRegion.Address;
+                    DumpLengthTextBox.Text = selectedRegion.Size.ToString();
+                    Log($"Selected region: {selectedRegion.Name}");
+                }
+            }
+        }
+        #endregion
 
         private void Log(string message)
         {
@@ -120,7 +226,7 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private async void UploadStagerButton_Click(object sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void UploadStagerButton_Click(object sender, RoutedEventArgs e)
         {
             SetControlsEnabled(false);
             try
@@ -179,7 +285,7 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private async void DumpMemoryButton_Click(object sender, Avalonia.Interactivity.RoutedEventArgs e)
+        private async void DumpMemoryButton_Click(object sender, RoutedEventArgs e)
         {
             if (!_stagerInstalled)
             {
@@ -291,6 +397,11 @@ namespace S7_Csharp_Utility
             DumpAddressTextBox.IsEnabled = enabled;
             DumpLengthTextBox.IsEnabled = enabled;
             DumpMemoryButton.IsEnabled = enabled;
+            ProfileModelNameTextBox.IsEnabled = enabled;
+            LoadProfileButton.IsEnabled = enabled;
+            SaveProfileButton.IsEnabled = enabled;
+            RegionsDataGrid.IsEnabled = enabled;
+            RegionComboBox.IsEnabled = enabled;
         }
     }
 }
