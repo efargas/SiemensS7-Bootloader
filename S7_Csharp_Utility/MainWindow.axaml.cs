@@ -21,9 +21,11 @@ namespace S7_Csharp_Utility
     public partial class MainWindow : Window
     {
         private readonly PlcCommunicator _plc;
+        private readonly S7UpdateUnpacker _unpacker;
         private bool _stagerInstalled = false;
         private DeviceProfile _currentProfile;
         private ObservableCollection<MemoryRegion> _profileRegions;
+        private IStorageFile _selectedFirmwareFile;
 
         // Control references
         private TextBox PlcHostTextBox;
@@ -50,6 +52,9 @@ namespace S7_Csharp_Utility
         private ComboBox RegionComboBox;
         private Button CompareDumpsButton;
         private ListBox ComparisonResultsListBox;
+        private Button SelectFirmwareButton;
+        private TextBlock FirmwareMetadataTextBlock;
+        private Button UnpackFirmwareButton;
 
 
         public MainWindow()
@@ -81,8 +86,12 @@ namespace S7_Csharp_Utility
             RegionComboBox = this.FindControl<ComboBox>("RegionComboBox");
             CompareDumpsButton = this.FindControl<Button>("CompareDumpsButton");
             ComparisonResultsListBox = this.FindControl<ListBox>("ComparisonResultsListBox");
+            SelectFirmwareButton = this.FindControl<Button>("SelectFirmwareButton");
+            FirmwareMetadataTextBlock = this.FindControl<TextBlock>("FirmwareMetadataTextBlock");
+            UnpackFirmwareButton = this.FindControl<Button>("UnpackFirmwareButton");
 
             _plc = new PlcCommunicator(Log);
+            _unpacker = new S7UpdateUnpacker();
             _currentProfile = new DeviceProfile();
             _profileRegions = new ObservableCollection<MemoryRegion>();
             RegionsDataGrid.ItemsSource = _profileRegions;
@@ -96,7 +105,81 @@ namespace S7_Csharp_Utility
             SaveProfileButton.Click += SaveProfileButton_Click;
             RegionComboBox.SelectionChanged += RegionComboBox_SelectionChanged;
             CompareDumpsButton.Click += CompareDumpsButton_Click;
+            SelectFirmwareButton.Click += SelectFirmwareButton_Click;
+            UnpackFirmwareButton.Click += UnpackFirmwareButton_Click;
         }
+
+        #region Firmware Unpacker
+        private async void SelectFirmwareButton_Click(object sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Select Firmware File",
+                AllowMultiple = false,
+                FileTypeFilter = new[] { new FilePickerFileType("UPD Files") { Patterns = new[] { "*.upd" } } }
+            });
+
+            if (files.Count >= 1)
+            {
+                _selectedFirmwareFile = files[0];
+                Log($"Selected firmware: {_selectedFirmwareFile.Name}");
+                FirmwareMetadataTextBlock.Text = "Parsing metadata...";
+                UnpackFirmwareButton.IsEnabled = false;
+
+                try
+                {
+                    var metadata = _unpacker.ParseMetadata(_selectedFirmwareFile.Path.AbsolutePath);
+                    var sb = new StringBuilder();
+                    sb.AppendLine($"Found {metadata.Count} components:");
+                    foreach (var entry in metadata)
+                    {
+                        sb.AppendLine($" - Name: {entry.Name}, Size: {entry.Size}, CRC: {entry.Crc:X8}");
+                    }
+                    FirmwareMetadataTextBlock.Text = sb.ToString();
+                    UnpackFirmwareButton.IsEnabled = true;
+                }
+                catch (Exception ex)
+                {
+                    FirmwareMetadataTextBlock.Text = $"Error parsing metadata: {ex.Message}";
+                    Log($"Error parsing metadata: {ex.Message}");
+                }
+            }
+        }
+
+        private async void UnpackFirmwareButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedFirmwareFile == null) return;
+
+            var topLevel = TopLevel.GetTopLevel(this);
+            var folder = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Select Destination Folder"
+            });
+
+            if (folder.Count >= 1)
+            {
+                var destinationPath = folder[0].Path.AbsolutePath;
+                var outputFilePath = Path.Combine(destinationPath, $"{_selectedFirmwareFile.Name}.unpacked.bin");
+                Log($"Unpacking {_selectedFirmwareFile.Name} to {outputFilePath}...");
+                SetControlsEnabled(false);
+
+                try
+                {
+                    await Task.Run(() => _unpacker.Unpack(_selectedFirmwareFile.Path.AbsolutePath, outputFilePath));
+                    Log("Firmware unpacked successfully.");
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error unpacking firmware: {ex.Message}");
+                }
+                finally
+                {
+                    SetControlsEnabled(true);
+                }
+            }
+        }
+        #endregion
 
         #region Dump Comparison
         private async void CompareDumpsButton_Click(object sender, RoutedEventArgs e)
@@ -496,6 +579,8 @@ namespace S7_Csharp_Utility
             RegionComboBox.IsEnabled = enabled;
             CompareDumpsButton.IsEnabled = enabled;
             ComparisonResultsListBox.IsEnabled = enabled;
+            SelectFirmwareButton.IsEnabled = enabled;
+            UnpackFirmwareButton.IsEnabled = enabled;
         }
     }
 }
