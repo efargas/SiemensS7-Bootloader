@@ -16,7 +16,7 @@ namespace S7_Csharp_Utility
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
-                .WithInterFont()
+                // .WithInterFont()
                 .LogToTrace();
     }
 }

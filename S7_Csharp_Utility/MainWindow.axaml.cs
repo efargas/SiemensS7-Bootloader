@@ -6,7 +6,7 @@ using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using Modbus.Device;
+using NModbus;
 using System.Globalization;
 using System.Diagnostics;
 using System.Text.Json;
@@ -27,35 +27,7 @@ namespace S7_Csharp_Utility
         private ObservableCollection<MemoryRegion> _profileRegions;
         private IStorageFile _selectedFirmwareFile;
 
-        // Control references
-        private TextBox PlcHostTextBox;
-        private TextBox PlcPortTextBox;
-        private TextBox ModbusHostTextBox;
-        private TextBox ModbusPortTextBox;
-        private TextBox ModbusCoilTextBox;
-        private NumericUpDown DelayNumericUpDown;
-        private TextBlock LogTextBlock;
-        private Button PowerOnButton;
-        private Button PowerOffButton;
-        private Button UploadStagerButton;
-        private TextBox DumpAddressTextBox;
-        private TextBox DumpLengthTextBox;
-        private Button DumpMemoryButton;
-        private ProgressBar DumpProgressBar;
-        private TextBlock DumpPercentLabel;
-        private TextBlock DumpBytesLabel;
-        private TextBlock DumpTimeLabel;
-        private TextBox ProfileModelNameTextBox;
-        private Button LoadProfileButton;
-        private Button SaveProfileButton;
-        private DataGrid RegionsDataGrid;
-        private ComboBox RegionComboBox;
-        private Button CompareDumpsButton;
-        private ListBox ComparisonResultsListBox;
-        private Button SelectFirmwareButton;
-        private TextBlock FirmwareMetadataTextBlock;
-        private Button UnpackFirmwareButton;
-
+        
 
         public MainWindow()
         {
@@ -217,7 +189,8 @@ namespace S7_Csharp_Utility
                         ComparisonResultsListBox.Items.Clear();
                         if (results.Any())
                         {
-                            ComparisonResultsListBox.Items.AddRange(results);
+                            foreach(var item in results)
+                                ComparisonResultsListBox.Items.Add(item);
                             Log($"Comparison complete. Found {results.Count} groups of identical dumps.");
                         }
                         else
@@ -386,7 +359,7 @@ namespace S7_Csharp_Utility
                         return;
                     }
 
-                    var factory = new Modbus.Utility.ModbusFactory();
+                    var factory = new ModbusFactory();
                     IModbusMaster master = factory.CreateMaster(client);
 
                     ushort zeroBasedCoilAddress = (ushort)(coilAddress - 1);
