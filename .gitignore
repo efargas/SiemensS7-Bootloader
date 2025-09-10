@@ -1,2 +1,48 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
 
+# VSCode
+.vscode/
+
+# Build Output
+**/bin/
+**/obj/
+
+# Avalonia Designer/Preview
+**/.designer/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs/Temp
+*.log
+*.tmp
+
+# Python legacy artifacts
+Legacy/tools/__pycache__/
+Legacy/tools/*.pyc
+
+# Legacy scripts output
+Legacy/*.log
+Legacy/*.tmp
+
+# Payloads/project generated outputs
+payloads/**/*.bin
+payloads/**/*.exe
+payloads/**/*.tmp
+
+# Rider
+.idea/
+*.sln.iml
+
+# Other
+*.swp
+*.bak
+*.old
+
+# Ignore test results
+TestResults/
+

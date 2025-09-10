@@ -1,0 +1,142 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="S7_Csharp_Utility.MainWindow"
+        Title="S7 Bootloader Utility (Cross-Platform)"
+        Width="450" Height="1050"
+        CanResize="False">
+
+  <Grid Margin="10" RowDefinitions="Auto,*" ColumnDefinitions="*,Auto">
+
+    <!-- Settings Panels -->
+    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="10">
+
+      <!-- PLC Connection -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="PLC Connection (Serial-to-TCP)" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="5">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Host:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Name="PlcHostTextBox" Text="localhost"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Port:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Name="PlcPortTextBox" Text="10001"/>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Modbus Power Supply -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Modbus Power Supply" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="5">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="IP Address:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Name="ModbusHostTextBox" Text="192.168.1.123"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Port:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Name="ModbusPortTextBox" Text="502"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Coil Addr:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="2" Grid.Column="1" Name="ModbusCoilTextBox" Text="1"/>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Power-On Delay (s):" VerticalAlignment="Center"/>
+            <NumericUpDown Grid.Row="3" Grid.Column="1" Name="DelayNumericUpDown" Value="1" Minimum="0" Maximum="120"/>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Profile Management Section -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Profile Management" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="5">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Device Model:" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="0" Grid.Column="1" Name="ProfileModelNameTextBox"/>
+            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,5">
+              <Button Name="LoadProfileButton" Content="Load Profile"/>
+              <Button Name="SaveProfileButton" Content="Save Profile"/>
+            </StackPanel>
+            <DataGrid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Name="RegionsDataGrid" AutoGenerateColumns="False" Height="100">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*"/>
+                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Memory Dump Section -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Memory Dump" FontWeight="Bold"/>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="5">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Select Region:" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="0" Grid.Column="1" Name="RegionComboBox" PlaceholderText="Select a predefined region"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Address (hex):" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Name="DumpAddressTextBox" Text="0x10000000"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Length (bytes):" VerticalAlignment="Center"/>
+            <TextBox Grid.Row="2" Grid.Column="1" Name="DumpLengthTextBox" Text="1024"/>
+
+            <ProgressBar Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpProgressBar" Margin="0,5"/>
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpPercentLabel" HorizontalAlignment="Center" Text="0%"/>
+
+            <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpBytesLabel" HorizontalAlignment="Left" Text="Read: 0 / 0 bytes"/>
+
+            <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Name="DumpTimeLabel" HorizontalAlignment="Left" Text="Elapsed: 0s | Remaining: 0s"/>
+          </Grid>
+          <Button Name="DumpMemoryButton" Content="Dump Memory" HorizontalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Dump Comparison Section -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Dump Comparison" FontWeight="Bold"/>
+          <Button Name="CompareDumpsButton" Content="Select Folder &amp; Compare Dumps" HorizontalAlignment="Center"/>
+          <ListBox Name="ComparisonResultsListBox" Height="100" Margin="0,5"/>
+        </StackPanel>
+      </Border>
+
+      <!-- Firmware Unpacker Section -->
+      <Border Classes="group-box">
+        <StackPanel Spacing="5">
+          <TextBlock Text="Firmware Unpacker" FontWeight="Bold"/>
+          <Button Name="SelectFirmwareButton" Content="Select Firmware (.upd) File" HorizontalAlignment="Center"/>
+          <TextBlock Name="FirmwareMetadataTextBlock" Margin="0,5" TextWrapping="Wrap"/>
+          <Button Name="UnpackFirmwareButton" Content="Unpack to..." HorizontalAlignment="Center" IsEnabled="False"/>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+
+    <!-- Action Buttons -->
+    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="5" Margin="10,0,0,0">
+      <Button Name="PowerOnButton" Content="Power ON" Width="130"/>
+      <Button Name="PowerOffButton" Content="Power OFF" Width="130"/>
+      <Button Name="UploadStagerButton" Content="Upload Stager" FontWeight="Bold" Width="130" Height="150"/>
+    </StackPanel>
+
+    <!-- Log Viewer with Clear Button and style -->
+    <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,12,0,0" Padding="8" BorderBrush="#808080" BorderThickness="1" CornerRadius="6" Background="#F7F8FA">
+      <StackPanel>
+        <TextBlock Text="Console Log" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
+        <Button Name="ClearLogButton" Content="Clear Log" Width="100" HorizontalAlignment="Right" Margin="0,0,0,4"/>
+        <TextBox Name="LogTextBox"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 FontFamily="Consolas,Monospace"
+                 Height="170"
+                 Background="#171A1F"
+                 Foreground="#E3E6EB"
+                 BorderBrush="#233A53"
+                 BorderThickness="1"
+                 Padding="6"
+                 Margin="0,0,0,4"/>
+      </StackPanel>
+    </Border>
+
+  </Grid>
+</Window>

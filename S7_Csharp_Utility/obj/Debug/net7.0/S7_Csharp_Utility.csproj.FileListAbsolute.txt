@@ -1,8 +1,0 @@
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\S7_Csharp_Utility.csproj.AssemblyReference.cache
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\Avalonia\Resources.Inputs.cache
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\Avalonia\resources
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\S7_Csharp_Utility.GeneratedMSBuildEditorConfig.editorconfig
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\S7_Csharp_Utility.AssemblyInfoInputs.cache
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\S7_Csharp_Utility.AssemblyInfo.cs
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\S7_Csharp_Utility.csproj.CoreCompileInputs.cache
-c:\Users\efarg\Desktop\SiemensS7-Bootloader\S7_Csharp_Utility\obj\Debug\net7.0\S7_Csharp_Utility.sourcelink.json
