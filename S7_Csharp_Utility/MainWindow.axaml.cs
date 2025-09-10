@@ -12,6 +12,9 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace S7_Csharp_Utility
 {
@@ -45,6 +48,8 @@ namespace S7_Csharp_Utility
         private Button SaveProfileButton;
         private DataGrid RegionsDataGrid;
         private ComboBox RegionComboBox;
+        private Button CompareDumpsButton;
+        private ListBox ComparisonResultsListBox;
 
 
         public MainWindow()
@@ -74,6 +79,8 @@ namespace S7_Csharp_Utility
             SaveProfileButton = this.FindControl<Button>("SaveProfileButton");
             RegionsDataGrid = this.FindControl<DataGrid>("RegionsDataGrid");
             RegionComboBox = this.FindControl<ComboBox>("RegionComboBox");
+            CompareDumpsButton = this.FindControl<Button>("CompareDumpsButton");
+            ComparisonResultsListBox = this.FindControl<ListBox>("ComparisonResultsListBox");
 
             _plc = new PlcCommunicator(Log);
             _currentProfile = new DeviceProfile();
@@ -88,7 +95,92 @@ namespace S7_Csharp_Utility
             LoadProfileButton.Click += LoadProfileButton_Click;
             SaveProfileButton.Click += SaveProfileButton_Click;
             RegionComboBox.SelectionChanged += RegionComboBox_SelectionChanged;
+            CompareDumpsButton.Click += CompareDumpsButton_Click;
         }
+
+        #region Dump Comparison
+        private async void CompareDumpsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Select Folder with Dumps",
+                AllowMultiple = false
+            });
+
+            if (folders.Count >= 1)
+            {
+                var selectedFolder = folders[0];
+                Log($"Comparing dumps in: {selectedFolder.Path.AbsolutePath}...");
+                SetControlsEnabled(false);
+                ComparisonResultsListBox.Items.Clear();
+
+                try
+                {
+                    var fileHashes = await Task.Run(() => ComputeFileHashes(selectedFolder.Path.AbsolutePath));
+
+                    var results = new List<string>();
+                    int groupNum = 1;
+                    foreach (var entry in fileHashes.Where(kv => kv.Value.Count > 1))
+                    {
+                        var sb = new StringBuilder();
+                        sb.Append($"Group {groupNum++} (Hash: {entry.Key.Substring(0, 12)}...): ");
+                        sb.Append(string.Join(", ", entry.Value));
+                        results.Add(sb.ToString());
+                    }
+
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        ComparisonResultsListBox.Items.Clear();
+                        if (results.Any())
+                        {
+                            ComparisonResultsListBox.Items.AddRange(results);
+                            Log($"Comparison complete. Found {results.Count} groups of identical dumps.");
+                        }
+                        else
+                        {
+                            Log("Comparison complete. No identical dumps found.");
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error during dump comparison: {ex.Message}");
+                }
+                finally
+                {
+                    SetControlsEnabled(true);
+                }
+            }
+        }
+
+        private Dictionary<string, List<string>> ComputeFileHashes(string folderPath)
+        {
+            var hashes = new Dictionary<string, List<string>>();
+            var files = Directory.GetFiles(folderPath, "*.bin");
+
+            using (var md5 = MD5.Create())
+            {
+                foreach (var file in files)
+                {
+                    Dispatcher.UIThread.Post(() => Log($"Hashing {Path.GetFileName(file)}..."));
+                    using (var stream = File.OpenRead(file))
+                    {
+                        var hashBytes = md5.ComputeHash(stream);
+                        string hashString = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+
+                        if (!hashes.ContainsKey(hashString))
+                        {
+                            hashes[hashString] = new List<string>();
+                        }
+                        hashes[hashString].Add(Path.GetFileName(file));
+                    }
+                }
+            }
+            return hashes;
+        }
+
+        #endregion
 
         #region Profile Management
         private async void LoadProfileButton_Click(object sender, RoutedEventArgs e)
@@ -402,6 +494,8 @@ namespace S7_Csharp_Utility
             SaveProfileButton.IsEnabled = enabled;
             RegionsDataGrid.IsEnabled = enabled;
             RegionComboBox.IsEnabled = enabled;
+            CompareDumpsButton.IsEnabled = enabled;
+            ComparisonResultsListBox.IsEnabled = enabled;
         }
     }
 }
