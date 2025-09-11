@@ -188,6 +188,7 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand StartSocatCommand { get; }
         public ICommand StopSocatCommand { get; }
         public ICommand RefreshSerialPortsCommand { get; }
+        public ICommand ShowSocatLogCommand { get; }
 
 
         private string _compareFolder = string.Empty;
@@ -248,6 +249,7 @@ namespace S7_Csharp_Utility.ViewModels
             StartSocatCommand = new Commands.RelayCommand(_ => StartSocat(), _ => !IsBusy && !string.IsNullOrWhiteSpace(SelectedSerialPort));
             StopSocatCommand = new Commands.RelayCommand(_ => StopSocat(), _ => _socatService.IsRunning);
             RefreshSerialPortsCommand = new Commands.RelayCommand(_ => RefreshSerialPorts());
+            ShowSocatLogCommand = new Commands.RelayCommand(_ => _dialogService.ShowSocatLogWindow());
 
             RefreshSerialPorts();
         }

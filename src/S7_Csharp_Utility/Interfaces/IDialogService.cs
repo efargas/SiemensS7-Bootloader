@@ -7,5 +7,6 @@ namespace S7_Csharp_Utility.Interfaces
         Task<string?> OpenFolderPickerAsync(string title);
         Task<string?> OpenFilePickerAsync(string title);
         Task ShowMessageAsync(string title, string message);
+        void ShowSocatLogWindow();
     }
 }

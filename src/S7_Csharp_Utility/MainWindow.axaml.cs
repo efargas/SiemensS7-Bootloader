@@ -29,6 +29,7 @@ namespace S7_Csharp_Utility
         private readonly Services.PowerController _powerController;
 
         private readonly Services.LoggingService _loggingService;
+        private readonly Services.SocatLoggerService _socatLoggerService;
         private bool _autoScroll = true;
         private ScrollViewer? _logScrollViewer;
 
@@ -36,10 +37,11 @@ namespace S7_Csharp_Utility
         {
             InitializeComponent();
             _loggingService = new Services.LoggingService(Dispatcher.UIThread);
+            _socatLoggerService = new Services.SocatLoggerService(Dispatcher.UIThread);
             _powerController = new Services.PowerController((message, isError) => _loggingService.Log(message, isError ? Services.LogCategory.Error : Services.LogCategory.Info));
             var plcClient = new S7.Net.PlcClient(message => _loggingService.Log(message, Services.LogCategory.Info));
             var payloadManager = new S7.Net.PayloadManager(AppContext.BaseDirectory);
-            var socatService = new Services.SocatService();
+            var socatService = new Services.SocatService(_socatLoggerService);
             DataContext = new ViewModels.MainWindowViewModel(_loggingService, _powerController, plcClient, payloadManager, this, socatService);
             LogListBox.ItemsSource = _loggingService.LogMessages;
 
@@ -101,6 +103,21 @@ namespace S7_Csharp_Utility
             if (topLevel == null) return null;
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = false });
             return files.Count == 1 ? files[0].TryGetLocalPath() : null;
+        }
+
+        public void ShowSocatLogWindow()
+        {
+            var logWindow = new Window
+            {
+                Title = "Socat Log",
+                Width = 800,
+                Height = 600,
+                Content = new ListBox
+                {
+                    ItemsSource = _socatLoggerService.LogEntries
+                }
+            };
+            logWindow.Show();
         }
 
         public async Task ShowMessageAsync(string title, string message)
