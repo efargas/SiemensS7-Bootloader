@@ -189,6 +189,8 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand StopSocatCommand { get; }
         public ICommand RefreshSerialPortsCommand { get; }
         public ICommand ShowSocatLogCommand { get; }
+        public ICommand SaveConfigurationCommand { get; }
+        public ICommand LoadConfigurationCommand { get; }
 
 
         private string _compareFolder = string.Empty;
@@ -225,8 +227,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private readonly Interfaces.IDialogService _dialogService;
+        private readonly ConfigurationService _configService;
 
-        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PlcClient plcClient, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService)
+        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PlcClient plcClient, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService)
         {
             Logging = loggingService;
             _powerController = powerController;
@@ -234,6 +237,7 @@ namespace S7_Csharp_Utility.ViewModels
             _payloadManager = payloadManager;
             _dialogService = dialogService;
             _socatService = socatService;
+            _configService = configService;
 
             PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true));
             PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false));
@@ -250,6 +254,9 @@ namespace S7_Csharp_Utility.ViewModels
             StopSocatCommand = new Commands.RelayCommand(_ => StopSocat(), _ => _socatService.IsRunning);
             RefreshSerialPortsCommand = new Commands.RelayCommand(_ => RefreshSerialPorts());
             ShowSocatLogCommand = new Commands.RelayCommand(_ => _dialogService.ShowSocatLogWindow());
+
+            SaveConfigurationCommand = new Commands.RelayCommand(async _ => await SaveConfiguration());
+            LoadConfigurationCommand = new Commands.RelayCommand(async _ => await LoadConfiguration());
 
             RefreshSerialPorts();
         }
@@ -431,6 +438,56 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 Logging.Log($"Error stopping socat: {ex.Message}", LogCategory.Error);
                 SocatStatus = "Error";
+            }
+        }
+
+        private async Task SaveConfiguration()
+        {
+            var path = await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Files");
+            if (path != null)
+            {
+                var config = new Models.ApplicationConfiguration
+                {
+                    PlcHost = this.PlcHost,
+                    PlcPort = this.PlcPort,
+                    ModbusHost = this.ModbusHost,
+                    ModbusPort = this.ModbusPort,
+                    ModbusCoil = this.ModbusCoil,
+                    DelaySeconds = this.DelaySeconds,
+                    DumpAddress = this.DumpAddress,
+                    DumpLength = this.DumpLength,
+                    CompareFolder = this.CompareFolder,
+                    CompareFile1 = this.CompareFile1,
+                    CompareFile2 = this.CompareFile2,
+                    SelectedSerialPort = this.SelectedSerialPort,
+                    SocatTcpPort = this.SocatTcpPort
+                };
+                await _configService.SaveConfiguration(config, path);
+            }
+        }
+
+        private async Task LoadConfiguration()
+        {
+            var path = await _dialogService.ShowOpenFileDialogAsync("Load Configuration", "json", "JSON Files");
+            if (path != null)
+            {
+                var config = await _configService.LoadConfiguration(path);
+                if (config != null)
+                {
+                    PlcHost = config.PlcHost;
+                    PlcPort = config.PlcPort;
+                    ModbusHost = config.ModbusHost;
+                    ModbusPort = config.ModbusPort;
+                    ModbusCoil = config.ModbusCoil;
+                    DelaySeconds = config.DelaySeconds;
+                    DumpAddress = config.DumpAddress;
+                    DumpLength = config.DumpLength;
+                    CompareFolder = config.CompareFolder;
+                    CompareFile1 = config.CompareFile1;
+                    CompareFile2 = config.CompareFile2;
+                    SelectedSerialPort = config.SelectedSerialPort;
+                    SocatTcpPort = config.SocatTcpPort;
+                }
             }
         }
 

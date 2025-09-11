@@ -42,7 +42,8 @@ namespace S7_Csharp_Utility
             var plcClient = new S7.Net.PlcClient(message => _loggingService.Log(message, Services.LogCategory.Info));
             var payloadManager = new S7.Net.PayloadManager(AppContext.BaseDirectory);
             var socatService = new Services.SocatService(_socatLoggerService);
-            DataContext = new ViewModels.MainWindowViewModel(_loggingService, _powerController, plcClient, payloadManager, this, socatService);
+            var configService = new Services.ConfigurationService();
+            DataContext = new ViewModels.MainWindowViewModel(_loggingService, _powerController, plcClient, payloadManager, this, socatService, configService);
             LogListBox.ItemsSource = _loggingService.LogMessages;
 
             _logScrollViewer = LogListBox.FindDescendantOfType<ScrollViewer>();
@@ -118,6 +119,32 @@ namespace S7_Csharp_Utility
                 }
             };
             logWindow.Show();
+        }
+
+        public async Task<string?> ShowSaveFileDialogAsync(string title, string defaultExtension, string fileType)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return null;
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = title,
+                DefaultExtension = defaultExtension,
+                FileTypeChoices = new[] { new FilePickerFileType(fileType) { Patterns = new[] { $"*.{defaultExtension}" } } }
+            });
+            return file?.TryGetLocalPath();
+        }
+
+        public async Task<string?> ShowOpenFileDialogAsync(string title, string defaultExtension, string fileType)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return null;
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = title,
+                AllowMultiple = false,
+                FileTypeFilter = new[] { new FilePickerFileType(fileType) { Patterns = new[] { $"*.{defaultExtension}" } } }
+            });
+            return files.Count == 1 ? files[0].TryGetLocalPath() : null;
         }
 
         public async Task ShowMessageAsync(string title, string message)
