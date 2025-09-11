@@ -117,18 +117,76 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
 
-        private bool _isBusy;
-        public bool IsBusy
+        private bool _isUploadingStager;
+        public bool IsUploadingStager
         {
-            get => _isBusy;
+            get => _isUploadingStager;
             set
             {
-                _isBusy = value;
+                _isUploadingStager = value;
                 OnPropertyChanged();
                 (UploadStagerCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        private bool _isDumpingMemory;
+        public bool IsDumpingMemory
+        {
+            get => _isDumpingMemory;
+            set
+            {
+                _isDumpingMemory = value;
+                OnPropertyChanged();
                 (DumpMemoryCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
+
+        private bool _isComparing;
+        public bool IsComparing
+        {
+            get => _isComparing;
+            set
+            {
+                _isComparing = value;
+                OnPropertyChanged();
+                (CompareDumpsCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (CompareTwoFilesCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        private double _dumpProgressPercentage;
+        public double DumpProgressPercentage
+        {
+            get => _dumpProgressPercentage;
+            set
+            {
+                _dumpProgressPercentage = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _dumpProgressBytes = "Read: 0 / 0 bytes";
+        public string DumpProgressBytes
+        {
+            get => _dumpProgressBytes;
+            set
+            {
+                _dumpProgressBytes = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _dumpProgressTime = "Elapsed: 0s | Remaining: calculating...";
+        public string DumpProgressTime
+        {
+            get => _dumpProgressTime;
+            set
+            {
+                _dumpProgressTime = value;
+                OnPropertyChanged();
+            }
+        }
+
 
         private bool _stagerInstalled;
         public bool StagerInstalled
@@ -241,16 +299,16 @@ namespace S7_Csharp_Utility.ViewModels
 
             PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true));
             PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false));
-            UploadStagerCommand = new Commands.RelayCommand(async _ => await UploadStager(), _ => !IsBusy);
-            DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => !IsBusy && StagerInstalled);
+            UploadStagerCommand = new Commands.RelayCommand(async _ => await UploadStager(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && StagerInstalled);
 
-            BrowseCompareFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if(result != null) CompareFolder = result; });
-            BrowseCompareFile1Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if(result != null) CompareFile1 = result; });
-            BrowseCompareFile2Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if(result != null) CompareFile2 = result; });
-            CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFolder));
-            CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
+            BrowseCompareFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if(result != null) CompareFolder = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            BrowseCompareFile1Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if(result != null) CompareFile1 = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            BrowseCompareFile2Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if(result != null) CompareFile2 = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFolder));
+            CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
 
-            StartSocatCommand = new Commands.RelayCommand(_ => StartSocat(), _ => !IsBusy && !string.IsNullOrWhiteSpace(SelectedSerialPort));
+            StartSocatCommand = new Commands.RelayCommand(_ => StartSocat(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(SelectedSerialPort));
             StopSocatCommand = new Commands.RelayCommand(_ => StopSocat(), _ => _socatService.IsRunning);
             RefreshSerialPortsCommand = new Commands.RelayCommand(_ => RefreshSerialPorts());
             ShowSocatLogCommand = new Commands.RelayCommand(_ => _dialogService.ShowSocatLogWindow());
@@ -263,7 +321,7 @@ namespace S7_Csharp_Utility.ViewModels
 
         private async Task UploadStager()
         {
-            IsBusy = true;
+            IsUploadingStager = true;
             try
             {
                 await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false);
@@ -278,6 +336,7 @@ namespace S7_Csharp_Utility.ViewModels
             catch (Exception ex)
             {
                 Logging.Log($"An error occurred during the stager sequence: {ex.Message}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", $"An error occurred during the stager sequence: {ex.Message}");
             }
             finally
             {
@@ -285,7 +344,7 @@ namespace S7_Csharp_Utility.ViewModels
                 {
                     _plcClient.Disconnect();
                 }
-                IsBusy = false;
+                IsUploadingStager = false;
             }
         }
 
@@ -310,7 +369,7 @@ namespace S7_Csharp_Utility.ViewModels
 
         private async Task DumpMemory()
         {
-            IsBusy = true;
+            IsDumpingMemory = true;
             try
             {
                 if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.CurrentCulture, out uint address))
@@ -329,10 +388,11 @@ namespace S7_Csharp_Utility.ViewModels
             catch (Exception ex)
             {
                 Logging.Log($"An error occurred during the dump sequence: {ex.Message}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", $"An error occurred during the dump sequence: {ex.Message}");
             }
             finally
             {
-                IsBusy = false;
+                IsDumpingMemory = false;
             }
         }
 
@@ -358,7 +418,16 @@ namespace S7_Csharp_Utility.ViewModels
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var progress = new Progress<long>(bytesRead =>
             {
-                // UI update logic for progress should be here
+                double percentage = (double)bytesRead / length * 100;
+                stopwatch.Stop();
+                double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
+                double bytesPerSecond = bytesRead > 0 ? bytesRead / elapsedSeconds : 0;
+                double remainingSeconds = (bytesPerSecond > 0) ? (length - bytesRead) / bytesPerSecond : 0;
+                stopwatch.Start();
+
+                DumpProgressPercentage = percentage;
+                DumpProgressBytes = $"Read: {bytesRead} / {length} bytes";
+                DumpProgressTime = $"Elapsed: {elapsedSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
             });
 
             var dumpedData = await _plcClient.ReceiveMany(progress);
@@ -377,7 +446,7 @@ namespace S7_Csharp_Utility.ViewModels
                 return;
             }
 
-            IsBusy = true;
+            IsComparing = true;
             try
             {
                 var comparer = new S7.Utils.DumpComparer(message => Logging.Log(message));
@@ -396,7 +465,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             finally
             {
-                IsBusy = false;
+                IsComparing = false;
             }
         }
 
@@ -413,7 +482,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private void StartSocat()
+        private async void StartSocat()
         {
             try
             {
@@ -423,11 +492,12 @@ namespace S7_Csharp_Utility.ViewModels
             catch (Exception ex)
             {
                 Logging.Log($"Error starting socat: {ex.Message}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", $"Error starting socat: {ex.Message}");
                 SocatStatus = "Error";
             }
         }
 
-        private void StopSocat()
+        private async void StopSocat()
         {
             try
             {
@@ -437,7 +507,7 @@ namespace S7_Csharp_Utility.ViewModels
             catch (Exception ex)
             {
                 Logging.Log($"Error stopping socat: {ex.Message}", LogCategory.Error);
-                SocatStatus = "Error";
+                await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
             }
         }
 
@@ -491,6 +561,66 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        public void LoadConfigurationOnStartup()
+        {
+            try
+            {
+                var path = System.IO.Path.Combine(AppContext.BaseDirectory, "config.json");
+                var config = System.Text.Json.JsonSerializer.Deserialize<Models.ApplicationConfiguration>(System.IO.File.ReadAllText(path));
+                if (config != null)
+                {
+                    PlcHost = config.PlcHost;
+                    PlcPort = config.PlcPort;
+                    ModbusHost = config.ModbusHost;
+                    ModbusPort = config.ModbusPort;
+                    ModbusCoil = config.ModbusCoil;
+                    DelaySeconds = config.DelaySeconds;
+                    DumpAddress = config.DumpAddress;
+                    DumpLength = config.DumpLength;
+                    CompareFolder = config.CompareFolder;
+                    CompareFile1 = config.CompareFile1;
+                    CompareFile2 = config.CompareFile2;
+                    SelectedSerialPort = config.SelectedSerialPort;
+                    SocatTcpPort = config.SocatTcpPort;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"Could not load configuration: {ex.Message}", LogCategory.Warning);
+            }
+        }
+
+        public void SaveConfigurationOnExit()
+        {
+            try
+            {
+                var path = System.IO.Path.Combine(AppContext.BaseDirectory, "config.json");
+                var config = new Models.ApplicationConfiguration
+                {
+                    PlcHost = this.PlcHost,
+                    PlcPort = this.PlcPort,
+                    ModbusHost = this.ModbusHost,
+                    ModbusPort = this.ModbusPort,
+                    ModbusCoil = this.ModbusCoil,
+                    DelaySeconds = this.DelaySeconds,
+                    DumpAddress = this.DumpAddress,
+                    DumpLength = this.DumpLength,
+                    CompareFolder = this.CompareFolder,
+                    CompareFile1 = this.CompareFile1,
+                    CompareFile2 = this.CompareFile2,
+                    SelectedSerialPort = this.SelectedSerialPort,
+                    SocatTcpPort = this.SocatTcpPort
+                };
+                var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+                string json = System.Text.Json.JsonSerializer.Serialize(config, options);
+                System.IO.File.WriteAllText(path, json);
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"Could not save configuration: {ex.Message}", LogCategory.Error);
+            }
+        }
+
         private async Task CompareTwoFiles()
         {
             if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))
@@ -499,7 +629,7 @@ namespace S7_Csharp_Utility.ViewModels
                 return;
             }
 
-            IsBusy = true;
+            IsComparing = true;
             try
             {
                 var comparer = new S7.Utils.DumpComparer();
@@ -523,7 +653,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             finally
             {
-                IsBusy = false;
+                IsComparing = false;
             }
         }
     }

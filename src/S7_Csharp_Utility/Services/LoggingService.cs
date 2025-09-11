@@ -6,7 +6,7 @@ using Avalonia.Threading;
 
 namespace S7_Csharp_Utility.Services
 {
-    public enum LogCategory { Info, Error, Debug }
+    public enum LogCategory { Info, Warning, Error, Debug }
 
     public class LogMessage
     {

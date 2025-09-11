@@ -43,8 +43,12 @@ namespace S7_Csharp_Utility
             var payloadManager = new S7.Net.PayloadManager(AppContext.BaseDirectory);
             var socatService = new Services.SocatService(_socatLoggerService);
             var configService = new Services.ConfigurationService();
-            DataContext = new ViewModels.MainWindowViewModel(_loggingService, _powerController, plcClient, payloadManager, this, socatService, configService);
+            var viewModel = new ViewModels.MainWindowViewModel(_loggingService, _powerController, plcClient, payloadManager, this, socatService, configService);
+            DataContext = viewModel;
             LogListBox.ItemsSource = _loggingService.LogMessages;
+
+            viewModel.LoadConfigurationOnStartup();
+            Closing += (s, e) => viewModel.SaveConfigurationOnExit();
 
             _logScrollViewer = LogListBox.FindDescendantOfType<ScrollViewer>();
             if (_logScrollViewer != null)
