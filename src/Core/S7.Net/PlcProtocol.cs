@@ -60,7 +60,7 @@ namespace S7.Net
             return await _stream.ReadAsync(buffer, offset, count);
         }
 
-        public async Task<byte[]> ReceivePacketAsync(int timeoutMs = 2000)
+        public async Task<byte[]?> ReceivePacketAsync(int timeoutMs = 2000)
         {
             var cancellationTokenSource = new CancellationTokenSource(timeoutMs);
             var token = cancellationTokenSource.Token;

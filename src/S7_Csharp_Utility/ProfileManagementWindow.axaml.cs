@@ -12,7 +12,7 @@ namespace S7_Csharp_Utility
 {
     public partial class ProfileManagementWindow : Window
     {
-        private DeviceProfile _currentProfile = new DeviceProfile();
+        private DeviceProfile? _currentProfile = new DeviceProfile();
         private ObservableCollection<MemoryRegion> _profileRegions = new ObservableCollection<MemoryRegion>();
 
         public ProfileManagementWindow()
@@ -70,7 +70,7 @@ namespace S7_Csharp_Utility
 
             if (file is not null)
             {
-                var profileToSave = new DeviceProfile { ModelName = ProfileModelNameTextBox.Text, Regions = _profileRegions.ToList() };
+                var profileToSave = new DeviceProfile { ModelName = ProfileModelNameTextBox.Text ?? string.Empty, Regions = _profileRegions.ToList() };
                 try
                 {
                     var options = new JsonSerializerOptions { WriteIndented = true };

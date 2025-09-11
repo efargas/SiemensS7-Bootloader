@@ -10,6 +10,7 @@ namespace S7.Net
         public const uint ADD_HOOK_TABLE_START = 0x1003ABA0;
         public const int DEFAULT_STAGER_ADDHOOK_IND = 0x20;
         public const int DEFAULT_SECOND_ADD_HOOK_IND = 0x1a;
+        public const uint DUMPER_PAYLOAD_LOCATION = 0x10010100;
 
         // Protocol constants
         public static readonly byte[] ANSW_ENTER_SUBPROTO_SUCCESS = { 0x80, 0x00 };

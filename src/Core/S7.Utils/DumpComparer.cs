@@ -9,9 +9,9 @@ namespace S7.Utils
 {
     public class DumpComparer
     {
-        private readonly Action<string> _progressReporter;
+        private readonly Action<string>? _progressReporter;
 
-        public DumpComparer(Action<string> progressReporter = null)
+        public DumpComparer(Action<string>? progressReporter = null)
         {
             _progressReporter = progressReporter;
         }

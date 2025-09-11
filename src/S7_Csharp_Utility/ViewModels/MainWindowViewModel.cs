@@ -2,6 +2,7 @@ using S7_Csharp_Utility.Services;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using System;
+using S7.Net;
 
 namespace S7_Csharp_Utility.ViewModels
 {
@@ -121,18 +122,65 @@ namespace S7_Csharp_Utility.ViewModels
 
         public ICommand UploadStagerCommand { get; }
         public ICommand DumpMemoryCommand { get; }
+        public ICommand BrowseCompareFolderCommand { get; }
+        public ICommand BrowseCompareFile1Command { get; }
+        public ICommand BrowseCompareFile2Command { get; }
+        public ICommand CompareDumpsCommand { get; }
+        public ICommand CompareTwoFilesCommand { get; }
 
-        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PlcClient plcClient, S7.Net.PayloadManager payloadManager)
+        private string _compareFolder = string.Empty;
+        public string CompareFolder
+        {
+            get => _compareFolder;
+            set
+            {
+                _compareFolder = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _compareFile1 = string.Empty;
+        public string CompareFile1
+        {
+            get => _compareFile1;
+            set
+            {
+                _compareFile1 = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _compareFile2 = string.Empty;
+        public string CompareFile2
+        {
+            get => _compareFile2;
+            set
+            {
+                _compareFile2 = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private readonly Interfaces.IDialogService _dialogService;
+
+        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PlcClient plcClient, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService)
         {
             Logging = loggingService;
             _powerController = powerController;
             _plcClient = plcClient;
             _payloadManager = payloadManager;
+            _dialogService = dialogService;
 
             PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true));
             PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false));
             UploadStagerCommand = new Commands.RelayCommand(async _ => await UploadStager(), _ => !IsBusy);
             DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => !IsBusy && StagerInstalled);
+
+            BrowseCompareFolderCommand = new Commands.RelayCommand(async _ => CompareFolder = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"));
+            BrowseCompareFile1Command = new Commands.RelayCommand(async _ => CompareFile1 = await _dialogService.OpenFilePickerAsync("Select File 1"));
+            BrowseCompareFile2Command = new Commands.RelayCommand(async _ => CompareFile2 = await _dialogService.OpenFilePickerAsync("Select File 2"));
+            CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFolder));
+            CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
         }
 
         private async Task UploadStager()
@@ -219,8 +267,8 @@ namespace S7_Csharp_Utility.ViewModels
             byte[] dumperPayload = _payloadManager.GetMemoryDumperPayload();
             Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes).", LogCategory.Info);
 
-            int dumperHookIndex = 0x1a;
-            await _plcClient.InstallAddHookViaStager(0x10010100, dumperPayload, dumperHookIndex);
+            int dumperHookIndex = PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND;
+            await _plcClient.InstallAddHookViaStager(PlcConstants.DUMPER_PAYLOAD_LOCATION, dumperPayload, dumperHookIndex);
             Logging.Log("Memory dumper payload installed.", LogCategory.Info);
 
             var args = new byte[1 + 4 + 4];
@@ -243,6 +291,73 @@ namespace S7_Csharp_Utility.ViewModels
             string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";
             await System.IO.File.WriteAllBytesAsync(outFilename, dumpedData);
             Logging.Log($"Successfully dumped {dumpedData.Length} bytes to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
+        }
+
+        private async Task CompareDumps()
+        {
+            if (string.IsNullOrWhiteSpace(CompareFolder) || !System.IO.Directory.Exists(CompareFolder))
+            {
+                await _dialogService.ShowMessageAsync("Error", "Please select a valid folder.");
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                var comparer = new S7.Utils.DumpComparer(message => Logging.Log(message));
+                var fileHashes = await comparer.ComputeFileHashesAsync(CompareFolder);
+                string report = comparer.GenerateFolderCompareReport(fileHashes, CompareFolder);
+
+                // The results should be displayed in the UI. This requires more properties in the VM.
+                // For now, just showing a popup.
+                await _dialogService.ShowMessageAsync("Comparison Result", report);
+                Logging.Log("Comparison complete. See popup for detailed result.");
+            }
+            catch (Exception ex)
+            {
+                await _dialogService.ShowMessageAsync("Error", $"Error during folder compare: {ex.Message}");
+                Logging.Log($"Error during folder compare: {ex.Message}", LogCategory.Error);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async Task CompareTwoFiles()
+        {
+            if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))
+            {
+                await _dialogService.ShowMessageAsync("Error", "Please select two valid files.");
+                return;
+            }
+
+            IsBusy = true;
+            try
+            {
+                var comparer = new S7.Utils.DumpComparer();
+                string hashA = await comparer.ComputeFileHashAsync(CompareFile1);
+                string hashB = await comparer.ComputeFileHashAsync(CompareFile2);
+                bool match = hashA == hashB;
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"File 1: {System.IO.Path.GetFileName(CompareFile1)}");
+                sb.AppendLine($"MD5: {hashA}");
+                sb.AppendLine($"File 2: {System.IO.Path.GetFileName(CompareFile2)}");
+                sb.AppendLine($"MD5: {hashB}");
+                sb.AppendLine(match ? "=> MATCH" : "=> DIFFER");
+
+                await _dialogService.ShowMessageAsync("Comparison Result", sb.ToString());
+                Logging.Log("Comparison complete. See popup for detailed result.");
+            }
+            catch (Exception ex)
+            {
+                await _dialogService.ShowMessageAsync("Error", $"Error during file compare: {ex.Message}");
+                Logging.Log($"Error during file compare: {ex.Message}", LogCategory.Error);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
     }
 }

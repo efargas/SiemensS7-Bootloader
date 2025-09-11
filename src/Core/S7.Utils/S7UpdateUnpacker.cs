@@ -122,7 +122,7 @@ namespace S7.Utils
         public long Offset { get; set; }
         public uint Size { get; set; }
         public uint Crc { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 
     public class S7UpdateUnpacker
@@ -144,8 +144,11 @@ namespace S7.Utils
                     var handle = GCHandle.Alloc(entryBytes, GCHandleType.Pinned);
                     try
                     {
-                        var entry = (FwRawEntry)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(FwRawEntry));
-                        entries.Add(entry);
+                        var entry = Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(FwRawEntry));
+                        if (entry != null)
+                        {
+                            entries.Add((FwRawEntry)entry);
+                        }
                     }
                     finally
                     {
@@ -160,7 +163,7 @@ namespace S7.Utils
         {
             var metadata = ParseMetadata(inputPath);
             long currentOffset = FwHeaderSize + (FwNumEntries * Marshal.SizeOf(typeof(FwRawEntry)));
-            FwEntry targetEntry = null;
+            FwEntry? targetEntry = null;
 
             foreach(var rawEntry in metadata)
             {
