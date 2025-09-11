@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using System;
 using S7.Net;
 using System.ComponentModel.DataAnnotations;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace S7_Csharp_Utility.ViewModels
 {
@@ -148,6 +150,46 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand CompareDumpsCommand { get; }
         public ICommand CompareTwoFilesCommand { get; }
 
+        private readonly SocatService _socatService;
+        public ObservableCollection<string> AvailableSerialPorts { get; } = new ObservableCollection<string>();
+        private string _selectedSerialPort = string.Empty;
+        public string SelectedSerialPort
+        {
+            get => _selectedSerialPort;
+            set
+            {
+                _selectedSerialPort = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private int _socatTcpPort = 8888;
+        public int SocatTcpPort
+        {
+            get => _socatTcpPort;
+            set
+            {
+                _socatTcpPort = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _socatStatus = "Stopped";
+        public string SocatStatus
+        {
+            get => _socatStatus;
+            set
+            {
+                _socatStatus = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ICommand StartSocatCommand { get; }
+        public ICommand StopSocatCommand { get; }
+        public ICommand RefreshSerialPortsCommand { get; }
+
+
         private string _compareFolder = string.Empty;
         public string CompareFolder
         {
@@ -183,13 +225,14 @@ namespace S7_Csharp_Utility.ViewModels
 
         private readonly Interfaces.IDialogService _dialogService;
 
-        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PlcClient plcClient, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService)
+        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PlcClient plcClient, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService)
         {
             Logging = loggingService;
             _powerController = powerController;
             _plcClient = plcClient;
             _payloadManager = payloadManager;
             _dialogService = dialogService;
+            _socatService = socatService;
 
             PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true));
             PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false));
@@ -201,6 +244,12 @@ namespace S7_Csharp_Utility.ViewModels
             BrowseCompareFile2Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if(result != null) CompareFile2 = result; });
             CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFolder));
             CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
+
+            StartSocatCommand = new Commands.RelayCommand(_ => StartSocat(), _ => !IsBusy && !string.IsNullOrWhiteSpace(SelectedSerialPort));
+            StopSocatCommand = new Commands.RelayCommand(_ => StopSocat(), _ => _socatService.IsRunning);
+            RefreshSerialPortsCommand = new Commands.RelayCommand(_ => RefreshSerialPorts());
+
+            RefreshSerialPorts();
         }
 
         private async Task UploadStager()
@@ -339,6 +388,47 @@ namespace S7_Csharp_Utility.ViewModels
             finally
             {
                 IsBusy = false;
+            }
+        }
+
+        private void RefreshSerialPorts()
+        {
+            AvailableSerialPorts.Clear();
+            foreach (var port in System.IO.Ports.SerialPort.GetPortNames())
+            {
+                AvailableSerialPorts.Add(port);
+            }
+            if (AvailableSerialPorts.Any())
+            {
+                SelectedSerialPort = AvailableSerialPorts[0];
+            }
+        }
+
+        private void StartSocat()
+        {
+            try
+            {
+                _socatService.Start(SelectedSerialPort, SocatTcpPort);
+                SocatStatus = "Running";
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"Error starting socat: {ex.Message}", LogCategory.Error);
+                SocatStatus = "Error";
+            }
+        }
+
+        private void StopSocat()
+        {
+            try
+            {
+                _socatService.Stop();
+                SocatStatus = "Stopped";
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"Error stopping socat: {ex.Message}", LogCategory.Error);
+                SocatStatus = "Error";
             }
         }
 
