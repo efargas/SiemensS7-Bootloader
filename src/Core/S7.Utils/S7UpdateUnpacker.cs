@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
 
-namespace S7_Csharp_Utility
+namespace S7.Utils
 {
     // Port of the LZP decompression algorithm from lzp.c
     internal static class LzpDecompressor

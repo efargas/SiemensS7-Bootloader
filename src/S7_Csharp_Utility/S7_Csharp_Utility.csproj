@@ -23,4 +23,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core\S7.Net\S7.Net.csproj" />
+    <ProjectReference Include="..\Core\S7.Utils\S7.Utils.csproj" />
+  </ItemGroup>
 </Project>

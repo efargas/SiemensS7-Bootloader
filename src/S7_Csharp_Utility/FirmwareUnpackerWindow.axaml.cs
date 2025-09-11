@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using S7.Utils;
 
 namespace S7_Csharp_Utility
 {

