@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="S7_Csharp_Utility.ProfileManagementWindow"
+        Title="Profile Management"
+        Width="520" Height="400"
+        CanResize="True">
+  <StackPanel Margin="14" Spacing="10">
+    <TextBlock Text="Device Model:" />
+    <TextBox Name="ProfileModelNameTextBox" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Name="LoadProfileButton" Content="Load Profile" />
+      <Button Name="SaveProfileButton" Content="Save Profile" />
+    </StackPanel>
+    <DataGrid Name="RegionsDataGrid" Height="180" />
+  </StackPanel>
+</Window>

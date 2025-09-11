@@ -1,20 +1,23 @@
+
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System;
-using System.IO;
-using System.Net.Sockets;
-using System.Threading.Tasks;
-using NModbus;
-using System.Globalization;
-using System.Diagnostics;
-using System.Text.Json;
-using System.Collections.ObjectModel;
-using System.Linq;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using NModbus;
 
 namespace S7_Csharp_Utility
 {
@@ -23,167 +26,280 @@ namespace S7_Csharp_Utility
         private readonly PlcCommunicator _plc;
         private readonly S7UpdateUnpacker _unpacker;
         private bool _stagerInstalled = false;
-        private DeviceProfile _currentProfile;
-        private ObservableCollection<MemoryRegion> _profileRegions;
-        private IStorageFile? _selectedFirmwareFile;
+
+        private readonly ObservableCollection<LogMessage> _logMessages = new ObservableCollection<LogMessage>();
+        private readonly List<LogMessage> _allLogMessages = new List<LogMessage>();
+        private const int MaxLogLines = 2000;
+        private bool _autoScroll = true;
+        private ScrollViewer? _logScrollViewer;
+
+        private enum LogCategory { Info, Error, Debug }
+
+        private class LogMessage
+        {
+            public DateTime Timestamp { get; set; }
+            public LogCategory Category { get; set; }
+            public string Message { get; set; } = string.Empty;
+        }
 
         public MainWindow()
         {
             InitializeComponent();
+            LogListBox.ItemsSource = _logMessages;
 
-            _plc = new PlcCommunicator(Log);
+            _logScrollViewer = LogListBox.FindDescendantOfType<ScrollViewer>();
+            if (_logScrollViewer != null)
+            {
+                _autoScroll = true;
+                _logScrollViewer.ScrollChanged += (s, e) =>
+                {
+                    _autoScroll = IsAtBottom(_logScrollViewer);
+                };
+            }
+
+            LogListBox.PointerWheelChanged += (s, e) =>
+            {
+                if (_logScrollViewer != null)
+                {
+                    _autoScroll = IsAtBottom(_logScrollViewer);
+                }
+            };
+
+            ScrollToEndButton.Click += (s, e) =>
+            {
+                _autoScroll = true;
+                var scrollViewer = LogListBox.FindDescendantOfType<ScrollViewer>();
+                scrollViewer?.ScrollToEnd();
+            };
+
+            FilterInfoCheckBox.IsCheckedChanged += (s, e) => UpdateLogFilter();
+            FilterErrorCheckBox.IsCheckedChanged += (s, e) => UpdateLogFilter();
+            FilterDebugCheckBox.IsCheckedChanged += (s, e) => UpdateLogFilter();
+
+            MenuProfileManagement.Click += (s, e) => new ProfileManagementWindow().Show();
+            MenuFirmwareUnpacker.Click += (s, e) => new FirmwareUnpackerWindow().Show();
+
+            _plc = new PlcCommunicator((message) => Log(message, LogCategory.Info));
             _unpacker = new S7UpdateUnpacker();
-            _currentProfile = new DeviceProfile();
-            _profileRegions = new ObservableCollection<MemoryRegion>();
-            RegionsDataGrid.ItemsSource = _profileRegions;
 
             PowerOnButton.Click += async (s, e) => await SetPower(true);
             PowerOffButton.Click += async (s, e) => await SetPower(false);
             UploadStagerButton.Click += UploadStagerButton_Click;
             DumpMemoryButton.Click += DumpMemoryButton_Click;
-            LoadProfileButton.Click += LoadProfileButton_Click;
-            SaveProfileButton.Click += SaveProfileButton_Click;
-            RegionComboBox.SelectionChanged += RegionComboBox_SelectionChanged;
+
+            BrowseCompareFolderButton.Click += BrowseCompareFolderButton_Click;
+            BrowseCompareFile1Button.Click += BrowseCompareFile1Button_Click;
+            BrowseCompareFile2Button.Click += BrowseCompareFile2Button_Click;
             CompareDumpsButton.Click += CompareDumpsButton_Click;
-            SelectFirmwareButton.Click += SelectFirmwareButton_Click;
-            UnpackFirmwareButton.Click += UnpackFirmwareButton_Click;
-            ClearLogButton.Click += (s, e) => LogTextBox.Text = string.Empty;
+            CompareTwoFilesButton.Click += CompareTwoFilesButton_Click;
+
+            ClearLogButton.Click += (s, e) =>
+            {
+                _allLogMessages.Clear();
+                UpdateLogFilter();
+            };
+            ExportLogButton.Click += async (s, e) => await ExportLogFileAsync();
         }
 
-        #region Firmware Unpacker
-        private async void SelectFirmwareButton_Click(object? sender, RoutedEventArgs e)
+        private void UpdateLogFilter()
         {
-            var topLevel = TopLevel.GetTopLevel(this);
-            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Select Firmware File",
-                AllowMultiple = false,
-                FileTypeFilter = new[] { new FilePickerFileType("UPD Files") { Patterns = new[] { "*.upd" } } }
-            });
+            if (LogListBox == null) return;
 
-            if (files.Count >= 1)
+            _logScrollViewer ??= LogListBox.FindDescendantOfType<ScrollViewer>();
+            if (_logScrollViewer != null)
             {
-                _selectedFirmwareFile = files[0];
-                Log($"Selected firmware: {_selectedFirmwareFile.Name}");
-                FirmwareMetadataTextBlock.Text = "Parsing metadata...";
-                UnpackFirmwareButton.IsEnabled = false;
+                // Track whether the user is at bottom before we rebuild the filtered view
+                _autoScroll = IsAtBottom(_logScrollViewer);
+            }
 
-                try
+            bool filterInfo = FilterInfoCheckBox?.IsChecked ?? true;
+            bool filterError = FilterErrorCheckBox?.IsChecked ?? true;
+            bool filterDebug = FilterDebugCheckBox?.IsChecked ?? true;
+
+            _logMessages.Clear();
+            foreach (var entry in _allLogMessages)
+            {
+                if ((filterInfo && entry.Category == LogCategory.Info)
+                    || (filterError && entry.Category == LogCategory.Error)
+                    || (filterDebug && entry.Category == LogCategory.Debug))
                 {
-                    var metadata = _unpacker.ParseMetadata(_selectedFirmwareFile.Path.LocalPath);
-                    var sb = new StringBuilder();
-                    sb.AppendLine($"Found {metadata.Count} components:");
-                    foreach (var entry in metadata)
-                    {
-                        sb.AppendLine($" - Name: {entry.Name}, Size: {entry.Size}, CRC: {entry.Crc:X8}");
-                    }
-                    FirmwareMetadataTextBlock.Text = sb.ToString();
-                    UnpackFirmwareButton.IsEnabled = true;
+                    _logMessages.Add(entry);
                 }
-                catch (Exception ex)
-                {
-                    FirmwareMetadataTextBlock.Text = $"Error parsing metadata: {ex.Message}";
-                    Log($"Error parsing metadata: {ex.Message}");
-                }
+            }
+
+            if (_autoScroll)
+            {
+                var sv = _logScrollViewer;
+                Dispatcher.UIThread.Post(() => sv?.ScrollToEnd(), DispatcherPriority.Background);
             }
         }
 
-        private async void UnpackFirmwareButton_Click(object? sender, RoutedEventArgs e)
+        // Helpers for log filtering and autoscroll
+        private bool IsAtBottom(ScrollViewer sv)
         {
-            if (_selectedFirmwareFile == null) return;
+            // Consider we're at the bottom if the viewport is within 2px of the end
+            return sv.Offset.Y >= sv.Extent.Height - sv.Viewport.Height - 2;
+        }
 
-            var topLevel = TopLevel.GetTopLevel(this);
-            var folder = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        private bool PassesCurrentFilter(LogMessage m)
+        {
+            bool filterInfo = FilterInfoCheckBox?.IsChecked ?? true;
+            bool filterError = FilterErrorCheckBox?.IsChecked ?? true;
+            bool filterDebug = FilterDebugCheckBox?.IsChecked ?? true;
+
+            return (filterInfo && m.Category == LogCategory.Info)
+                || (filterError && m.Category == LogCategory.Error)
+                || (filterDebug && m.Category == LogCategory.Debug);
+        }
+
+        private void OnNewLogEntry(LogMessage entry, LogMessage? removed)
+        {
+            _logScrollViewer ??= LogListBox.FindDescendantOfType<ScrollViewer>();
+
+            // If an old message rolled off, remove it from the filtered view if present
+            if (removed != null)
             {
-                Title = "Select Destination Folder"
-            });
-
-            if (folder.Count >= 1)
-            {
-                var destinationPath = folder[0].Path.AbsolutePath;
-                var outputFilePath = Path.Combine(destinationPath, $"{_selectedFirmwareFile.Name}.unpacked.bin");
-                Log($"Unpacking {_selectedFirmwareFile.Name} to {outputFilePath}...");
-                SetControlsEnabled(false);
-
-                try
+                // Reference equality works: both lists contain the same LogMessage instances
+                var idx = _logMessages.IndexOf(removed);
+                if (idx >= 0)
                 {
-                    await Task.Run(() => _unpacker.Unpack(_selectedFirmwareFile.Path.LocalPath, outputFilePath));
-                    Log("Firmware unpacked successfully.");
-                }
-                catch (Exception ex)
-                {
-                    Log($"Error unpacking firmware: {ex.Message}");
-                }
-                finally
-                {
-                    SetControlsEnabled(true);
+                    _logMessages.RemoveAt(idx);
                 }
             }
+
+            // Determine autoscroll based on current position before adding anything
+            if (_logScrollViewer != null)
+            {
+                _autoScroll = IsAtBottom(_logScrollViewer);
+            }
+
+            // Append the new message if it passes current filters
+            if (PassesCurrentFilter(entry))
+            {
+                _logMessages.Add(entry);
+            }
+
+            // Only scroll if user is at the bottom
+            if (_autoScroll)
+            {
+                _logScrollViewer?.ScrollToEnd();
+            }
         }
-        #endregion
 
         #region Dump Comparison
-        private async void CompareDumpsButton_Click(object? sender, RoutedEventArgs e)
+        private async void BrowseCompareFolderButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
-            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            if (topLevel == null) return;
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Select Folder to Compare" });
+            if (folders.Count == 1)
             {
-                Title = "Select Folder with Dumps",
-                AllowMultiple = false
-            });
+                CompareFolderTextBox.Text = folders[0].Path.AbsolutePath;
+            }
+        }
 
-            if (folders.Count >= 1)
+        private async void BrowseCompareFile1Button_Click(object? sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Select File 1", AllowMultiple = false });
+            if (files.Count == 1)
             {
-                var selectedFolder = folders[0];
-                Log($"Comparing dumps in: {selectedFolder.Path.AbsolutePath}...");
-                SetControlsEnabled(false);
+                CompareFile1TextBox.Text = files[0].Path.AbsolutePath;
+            }
+        }
+
+        private async void BrowseCompareFile2Button_Click(object? sender, RoutedEventArgs e)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Select File 2", AllowMultiple = false });
+            if (files.Count == 1)
+            {
+                CompareFile2TextBox.Text = files[0].Path.AbsolutePath;
+            }
+        }
+
+        private async void CompareDumpsButton_Click(object? sender, RoutedEventArgs e)
+        {
+            string folder = CompareFolderTextBox.Text ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+            {
+                await ShowResultPopup("Please select a valid folder.");
+                return;
+            }
+            SetControlsEnabled(false);
+            ComparisonResultsListBox.Items.Clear();
+            try
+            {
+                var fileHashes = await Task.Run(() => ComputeFileHashes(folder));
+                string report = GenerateFolderCompareReport(fileHashes, folder);
                 ComparisonResultsListBox.Items.Clear();
-
-                try
+                foreach (var kv in fileHashes)
                 {
-                    var fileHashes = await Task.Run(() => ComputeFileHashes(selectedFolder.Path.AbsolutePath));
-
-                    var results = new List<string>();
-                    int groupNum = 1;
-                    foreach (var entry in fileHashes.Where(kv => kv.Value.Count > 1))
+                    string hash = kv.Key;
+                    var files = kv.Value;
+                    string prefix = files.Count == 1 ? "SINGLE" : "GROUP";
+                    foreach (var file in files)
                     {
-                        var sb = new StringBuilder();
-                        sb.Append($"Group {groupNum++} (Hash: {entry.Key.Substring(0, 12)}...): ");
-                        sb.Append(string.Join(", ", entry.Value));
-                        results.Add(sb.ToString());
+                        ComparisonResultsListBox.Items.Add($"{prefix} {Path.GetFileName(file)} [{hash.Substring(0, 8)}]");
                     }
+                }
+                await ShowResultPopup(report);
+                Log("Comparison complete. See popup for detailed result.");
+            }
+            catch (Exception ex)
+            {
+                await ShowResultPopup($"Error: {ex.Message}");
+                Log($"Error during folder compare: {ex.Message}", LogCategory.Error);
+            }
+            finally
+            {
+                SetControlsEnabled(true);
+            }
+        }
 
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        ComparisonResultsListBox.Items.Clear();
-                        if (results.Any())
-                        {
-                            foreach(var item in results)
-                                ComparisonResultsListBox.Items.Add(item);
-                            Log($"Comparison complete. Found {results.Count} groups of identical dumps.");
-                        }
-                        else
-                        {
-                            Log("Comparison complete. No identical dumps found.");
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Log($"Error during dump comparison: {ex.Message}");
-                }
-                finally
-                {
-                    SetControlsEnabled(true);
-                }
+        private async void CompareTwoFilesButton_Click(object? sender, RoutedEventArgs e)
+        {
+            string fileA = CompareFile1TextBox.Text ?? string.Empty;
+            string fileB = CompareFile2TextBox.Text ?? string.Empty;
+            if (!File.Exists(fileA) || !File.Exists(fileB))
+            {
+                await ShowResultPopup("Please select two valid files.");
+                return;
+            }
+            SetControlsEnabled(false);
+            FileCompareResultsListBox.Items.Clear();
+            try
+            {
+                string hashA = await Task.Run(() => ComputeFileHash(fileA));
+                string hashB = await Task.Run(() => ComputeFileHash(fileB));
+                bool match = hashA == hashB;
+                var sb = new StringBuilder();
+                sb.AppendLine($"File 1: {Path.GetFileName(fileA)}");
+                sb.AppendLine($"MD5: {hashA}");
+                sb.AppendLine($"File 2: {Path.GetFileName(fileB)}");
+                sb.AppendLine($"MD5: {hashB}");
+                sb.AppendLine(match ? "=> MATCH" : "=> DIFFER");
+                FileCompareResultsListBox.Items.Add(match ? "MATCH" : "DIFFER");
+                await ShowResultPopup(sb.ToString());
+                Log("Comparison complete. See popup for detailed result.");
+            }
+            catch (Exception ex)
+            {
+                await ShowResultPopup($"Error: {ex.Message}");
+                Log($"Error during file compare: {ex.Message}", LogCategory.Error);
+            }
+            finally
+            {
+                SetControlsEnabled(true);
             }
         }
 
         private Dictionary<string, List<string>> ComputeFileHashes(string folderPath)
         {
             var hashes = new Dictionary<string, List<string>>();
-            var files = Directory.GetFiles(folderPath, "*.bin");
-
+            var files = Directory.GetFiles(folderPath, "*");
             using (var md5 = MD5.Create())
             {
                 foreach (var file in files)
@@ -193,134 +309,141 @@ namespace S7_Csharp_Utility
                     {
                         var hashBytes = md5.ComputeHash(stream);
                         string hashString = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
-
                         if (!hashes.ContainsKey(hashString))
                         {
                             hashes[hashString] = new List<string>();
                         }
-                        hashes[hashString].Add(Path.GetFileName(file));
+                        hashes[hashString].Add(file);
                     }
                 }
             }
             return hashes;
         }
 
-        #endregion
-
-        #region Profile Management
-        private async void LoadProfileButton_Click(object? sender, RoutedEventArgs e)
+        private string GenerateFolderCompareReport(Dictionary<string, List<string>> hashes, string folderPath)
         {
-            var topLevel = TopLevel.GetTopLevel(this);
-            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            var allFiles = Directory.GetFiles(folderPath, "*");
+            var fileToHash = new Dictionary<string, string>();
+            foreach (var kv in hashes)
             {
-                Title = "Open Profile File",
-                AllowMultiple = false,
-                FileTypeFilter = new[] { new FilePickerFileType("JSON Profiles") { Patterns = new[] { "*.json" } } }
-            });
+                foreach (var f in kv.Value)
+                {
+                    fileToHash[Path.GetFileName(f)] = kv.Key;
+                }
+            }
 
-            if (files.Count >= 1)
+            var sb = new StringBuilder();
+            sb.AppendLine("Files and their MD5 hashes:");
+            foreach (var filePath in allFiles)
             {
-                try
+                var fileName = Path.GetFileName(filePath);
+                if (fileToHash.TryGetValue(fileName, out var hash))
                 {
-                    await using var stream = await files[0].OpenReadAsync();
-                    using var reader = new StreamReader(stream);
-                    string json = await reader.ReadToEndAsync();
-                    _currentProfile = JsonSerializer.Deserialize<DeviceProfile>(json);
+                    sb.AppendLine($"{fileName} : {hash}");
+                }
+                else
+                {
+                    sb.AppendLine($"{fileName} : [error computing hash]");
+                }
+            }
+            sb.AppendLine();
+            sb.AppendLine("Groups by identical hash:");
+            int groupNum = 1;
+            foreach (var kv in hashes)
+            {
+                var hash = kv.Key;
+                var flist = kv.Value;
+                sb.AppendLine($"Group {groupNum++} (Hash: {hash}):");
+                foreach (var fn in flist)
+                {
+                    sb.AppendLine($"  {fn}");
+                }
+            }
+            return sb.ToString();
+        }
 
-                    ProfileModelNameTextBox.Text = _currentProfile.ModelName;
-                    _profileRegions.Clear();
-                    foreach (var region in _currentProfile.Regions)
-                    {
-                        _profileRegions.Add(region);
-                    }
-                    RegionComboBox.ItemsSource = _currentProfile.Regions.Select(r => r.Name).ToList();
-                    Log($"Loaded profile: {_currentProfile.ModelName}");
-                }
-                catch (Exception ex)
-                {
-                    Log($"Error loading profile: {ex.Message}");
-                }
+        private string ComputeFileHash(string path)
+        {
+            using (var md5 = MD5.Create())
+            using (var stream = File.OpenRead(path))
+            {
+                var hashBytes = md5.ComputeHash(stream);
+                return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
             }
         }
 
-        private async void SaveProfileButton_Click(object? sender, RoutedEventArgs e)
+        private async Task ShowResultPopup(string text)
         {
-            var topLevel = TopLevel.GetTopLevel(this);
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var dialog = new Window
             {
-                Title = "Save Profile File",
-                DefaultExtension = "json",
-                FileTypeChoices = new[] { new FilePickerFileType("JSON Profiles") { Patterns = new[] { "*.json" } } }
-            });
-
-            if (file is not null)
-            {
-                var profileToSave = new DeviceProfile
+                Title = "Comparison Result",
+                Width = 520,
+                Height = 430,
+                Content = new ScrollViewer
                 {
-                    ModelName = ProfileModelNameTextBox.Text,
-                    Regions = _profileRegions.ToList()
-                };
-
-                try
-                {
-                    var options = new JsonSerializerOptions { WriteIndented = true };
-                    string json = JsonSerializer.Serialize(profileToSave, options);
-                    await File.WriteAllTextAsync(file.Path.AbsolutePath, json);
-                    Log($"Profile saved to {file.Name}");
+                    Content = new TextBox { Text = text, IsReadOnly = true, AcceptsReturn = true, FontFamily = "Consolas,Monospace", Watermark = "Comparison results..." }
                 }
-                catch (Exception ex)
-                {
-                    Log($"Error saving profile: {ex.Message}");
-                }
-            }
-        }
-
-        private void RegionComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-        {
-            if (RegionComboBox.SelectedItem is string selectedRegionName && _currentProfile != null)
-            {
-                var selectedRegion = _currentProfile.Regions.FirstOrDefault(r => r.Name == selectedRegionName);
-                if (selectedRegion != null)
-                {
-                    DumpAddressTextBox.Text = selectedRegion.Address;
-                    DumpLengthTextBox.Text = selectedRegion.Size.ToString();
-                    Log($"Selected region: {selectedRegion.Name}");
-                }
-            }
+            };
+            await dialog.ShowDialog(this);
         }
         #endregion
 
-        private const int LogLineLimit = 500; // Max log lines to keep
-        private void Log(string message)
+        private void Log(string message, LogCategory category = LogCategory.Info)
         {
-            if (LogTextBox == null) return;
-            Dispatcher.UIThread.Post(() =>
+            var entry = new LogMessage
             {
-                var timestamp = DateTime.Now.ToString("HH:mm:ss");
-                LogTextBox.Text += $"[{timestamp}] {message}{Environment.NewLine}";
-                var lines = LogTextBox.Text.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-                if (lines.Length > LogLineLimit)
-                    LogTextBox.Text = string.Join(Environment.NewLine, lines.Skip(lines.Length - LogLineLimit));
-                LogTextBox.CaretIndex = LogTextBox.Text?.Length ?? 0;
-            });
+                Timestamp = DateTime.Now,
+                Category = category,
+                Message = message
+            };
+            _allLogMessages.Add(entry);
+            LogMessage? removed = null;
+            if (_allLogMessages.Count > MaxLogLines)
+            {
+                removed = _allLogMessages[0];
+                _allLogMessages.RemoveAt(0);
+            }
+            Dispatcher.UIThread.Post(() => OnNewLogEntry(entry, removed));
+            HandleLogFile(entry);
+        }
+
+        private void HandleLogFile(LogMessage entry)
+        {
+            string logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+            Directory.CreateDirectory(logDir);
+            string logFile = Path.Combine(logDir, "log.txt");
+            long maxSize = 5 * 1024 * 1024; // 5 MB
+            if (File.Exists(logFile) && new FileInfo(logFile).Length > maxSize)
+            {
+                int idx = 1;
+                string newLogFile;
+                do
+                {
+                    newLogFile = Path.Combine(logDir, $"log_{idx}.txt");
+                    idx++;
+                }
+                while (File.Exists(newLogFile));
+                File.Move(logFile, newLogFile);
+            }
+            File.AppendAllText(logFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Category} {entry.Message}{Environment.NewLine}");
         }
 
         private async Task SetPower(bool on)
         {
             string state = on ? "ON" : "OFF";
-            Log($"Attempting to turn power {state}...");
+            Log($"Attempting to turn power {state}...", LogCategory.Info);
 
             try
             {
-                string host = ModbusHostTextBox.Text;
+                string host = ModbusHostTextBox.Text ?? string.Empty;
                 if (!int.TryParse(ModbusPortTextBox.Text, out int port))
                 {
-                    Log("Error: Invalid Modbus port.");
+                    Log("Error: Invalid Modbus port.", LogCategory.Error);
                     return;
                 }
                 if (!ushort.TryParse(ModbusCoilTextBox.Text, out ushort coilAddress))
                 {
-                    Log("Error: Invalid Modbus coil address.");
+                    Log("Error: Invalid Modbus coil address.", LogCategory.Error);
                     return;
                 }
 
@@ -329,7 +452,7 @@ namespace S7_Csharp_Utility
                     await client.ConnectAsync(host, port);
                     if (!client.Connected)
                     {
-                        Log($"Error: Could not connect to Modbus host {host}:{port}.");
+                        Log($"Error: Could not connect to Modbus host {host}:{port}.", LogCategory.Error);
                         return;
                     }
 
@@ -339,12 +462,12 @@ namespace S7_Csharp_Utility
                     ushort zeroBasedCoilAddress = (ushort)(coilAddress - 1);
 
                     await master.WriteSingleCoilAsync(0, zeroBasedCoilAddress, on);
-                    Log($"Successfully turned power {state}.");
+                    Log($"Successfully turned power {state}.", LogCategory.Info);
                 }
             }
             catch (Exception ex)
             {
-                Log($"Error controlling power: {ex.Message}");
+                Log($"Error controlling power: {ex.Message}", LogCategory.Error);
             }
         }
 
@@ -355,7 +478,7 @@ namespace S7_Csharp_Utility
             {
                 await SetPower(false);
                 int delaySeconds = (int)(DelayNumericUpDown.Value ?? 1);
-                Log($"Waiting for {delaySeconds} seconds before powering on...");
+                Log($"Waiting for {delaySeconds} seconds before powering on...", LogCategory.Info);
                 await Task.Delay(delaySeconds * 1000);
                 await SetPower(true);
 
@@ -365,7 +488,7 @@ namespace S7_Csharp_Utility
             }
             catch (Exception ex)
             {
-                Log($"An error occurred during the stager sequence: {ex.Message}");
+                Log($"An error occurred during the stager sequence: {ex.Message}", LogCategory.Error);
             }
             finally
             {
@@ -382,10 +505,10 @@ namespace S7_Csharp_Utility
             _stagerInstalled = false;
             if (!int.TryParse(PlcPortTextBox.Text, out int port))
             {
-                Log("Error: Invalid PLC port.");
+                Log("Error: Invalid PLC port.", LogCategory.Error);
                 return;
             }
-            await _plc.ConnectAsync(PlcHostTextBox.Text, port);
+            await _plc.ConnectAsync(PlcHostTextBox.Text ?? string.Empty, port);
             if (!_plc.IsConnected) return;
 
             if (await _plc.PerformHandshakeAsync())
@@ -395,15 +518,15 @@ namespace S7_Csharp_Utility
                 string stagerPath = Path.Combine(AppContext.BaseDirectory, "payloads", "stager", "stager.bin");
                 if (!File.Exists(stagerPath))
                 {
-                    Log($"Error: Stager payload not found at {stagerPath}");
+                    Log($"Error: Stager payload not found at {stagerPath}", LogCategory.Error);
                     return;
                 }
                 byte[] stagerPayload = await File.ReadAllBytesAsync(stagerPath);
-                Log($"Loaded stager payload ({stagerPayload.Length} bytes).");
+                Log($"Loaded stager payload ({stagerPayload.Length} bytes).", LogCategory.Info);
 
                 await _plc.InstallStager(stagerPayload);
                 _stagerInstalled = true;
-                Log("Stager is installed and ready.");
+                Log("Stager is installed and ready.", LogCategory.Info);
             }
         }
 
@@ -411,18 +534,18 @@ namespace S7_Csharp_Utility
         {
             if (!_stagerInstalled)
             {
-                Log("Error: Stager is not installed. Please run 'Upload Stager' first.");
+                Log("Error: Stager is not installed. Please run 'Upload Stager' first.", LogCategory.Error);
                 return;
             }
 
-            if (!uint.TryParse(DumpAddressTextBox.Text.Replace("0x", ""), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out uint address))
+            if (!uint.TryParse((DumpAddressTextBox.Text ?? string.Empty).Replace("0x", ""), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out uint address))
             {
-                Log("Error: Invalid dump address. Must be a valid hex number (e.g., 0x10000000).");
+                Log("Error: Invalid dump address. Must be a valid hex number (e.g., 0x10000000).", LogCategory.Error);
                 return;
             }
             if (!uint.TryParse(DumpLengthTextBox.Text, out uint length) || length == 0)
             {
-                Log("Error: Invalid dump length. Must be a positive number.");
+                Log("Error: Invalid dump length. Must be a positive number.", LogCategory.Error);
                 return;
             }
 
@@ -433,7 +556,7 @@ namespace S7_Csharp_Utility
             }
             catch (Exception ex)
             {
-                Log($"An error occurred during the dump sequence: {ex.Message}");
+                Log($"An error occurred during the dump sequence: {ex.Message}", LogCategory.Error);
             }
             finally
             {
@@ -443,9 +566,8 @@ namespace S7_Csharp_Utility
 
         private async Task RunDumpSequenceAsync(uint address, uint length)
         {
-            Log($"Starting memory dump of {length} bytes from 0x{address:X8}...");
+            Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
 
-            // Reset progress UI
             Dispatcher.UIThread.Post(() =>
             {
                 DumpProgressBar.Value = 0;
@@ -458,15 +580,15 @@ namespace S7_Csharp_Utility
             string dumperPath = Path.Combine(AppContext.BaseDirectory, "payloads", "dump_mem", "build", "dump_mem.bin");
             if (!File.Exists(dumperPath))
             {
-                Log($"Error: Dumper payload not found at {dumperPath}");
+                Log($"Error: Dumper payload not found at {dumperPath}", LogCategory.Error);
                 return;
             }
             byte[] dumperPayload = await File.ReadAllBytesAsync(dumperPath);
-            Log($"Loaded dumper payload ({dumperPayload.Length} bytes).");
+            Log($"Loaded dumper payload ({dumperPayload.Length} bytes).", LogCategory.Info);
 
             int dumperHookIndex = 0x1a;
             await _plc.InstallAddHookViaStager(0x10010100, dumperPayload, dumperHookIndex);
-            Log("Memory dumper payload installed.");
+            Log("Memory dumper payload installed.", LogCategory.Info);
 
             var args = new byte[1 + 4 + 4];
             args[0] = (byte)'A';
@@ -474,7 +596,7 @@ namespace S7_Csharp_Utility
             BitConverter.GetBytes(length).CopyTo(args, 5);
 
             await _plc.InvokeAddHook(dumperHookIndex, args);
-            Log("Dump command sent. Receiving data...");
+            Log("Dump command sent. Receiving data...", LogCategory.Info);
 
             var stopwatch = Stopwatch.StartNew();
             var progress = new Progress<long>(bytesRead =>
@@ -500,7 +622,7 @@ namespace S7_Csharp_Utility
 
             string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";
             await File.WriteAllBytesAsync(outFilename, dumpedData);
-            Log($"Successfully dumped {dumpedData.Length} bytes to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.");
+            Log($"Successfully dumped {dumpedData.Length} bytes to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
         }
 
         private void SetControlsEnabled(bool enabled)
@@ -517,15 +639,33 @@ namespace S7_Csharp_Utility
             DumpAddressTextBox.IsEnabled = enabled;
             DumpLengthTextBox.IsEnabled = enabled;
             DumpMemoryButton.IsEnabled = enabled;
-            ProfileModelNameTextBox.IsEnabled = enabled;
-            LoadProfileButton.IsEnabled = enabled;
-            SaveProfileButton.IsEnabled = enabled;
-            RegionsDataGrid.IsEnabled = enabled;
             RegionComboBox.IsEnabled = enabled;
             CompareDumpsButton.IsEnabled = enabled;
             ComparisonResultsListBox.IsEnabled = enabled;
-            SelectFirmwareButton.IsEnabled = enabled;
-            UnpackFirmwareButton.IsEnabled = enabled;
+        }
+        private async Task ExportLogFileAsync()
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Export Logs",
+                DefaultExtension = "txt",
+                FileTypeChoices = new[] { new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } } }
+            });
+
+            if (file is not null)
+            {
+                var filtered = _logMessages.ToList();
+                var sb = new StringBuilder();
+                foreach (var msg in filtered)
+                {
+                    sb.AppendLine($"[{msg.Timestamp:yyyy-MM-dd HH:mm:ss}] {msg.Category} {msg.Message}");
+                }
+                await using var stream = await file.OpenWriteAsync();
+                using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(sb.ToString());
+            }
         }
     }
 }
