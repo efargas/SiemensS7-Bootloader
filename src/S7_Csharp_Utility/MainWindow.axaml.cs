@@ -91,7 +91,7 @@ namespace S7_Csharp_Utility
             var topLevel = TopLevel.GetTopLevel(this);
             if (topLevel == null) return null;
             var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title });
-            return folders.Count == 1 ? folders[0].Path.AbsolutePath : null;
+            return folders.Count == 1 ? folders[0].TryGetLocalPath() : null;
         }
 
         public async Task<string?> OpenFilePickerAsync(string title)
@@ -99,7 +99,7 @@ namespace S7_Csharp_Utility
             var topLevel = TopLevel.GetTopLevel(this);
             if (topLevel == null) return null;
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = false });
-            return files.Count == 1 ? files[0].Path.AbsolutePath : null;
+            return files.Count == 1 ? files[0].TryGetLocalPath() : null;
         }
 
         public async Task ShowMessageAsync(string title, string message)

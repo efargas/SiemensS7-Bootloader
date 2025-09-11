@@ -102,18 +102,20 @@ namespace S7.Net
 
         private async Task EnterSubprotocol(int mode)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log($"Entering subprotocol mode {mode}...");
             ushort magic = PlcConstants.SUBPROT_80_MODE_MAGICS[mode];
             byte[] payload = BitConverter.GetBytes(magic);
             if (BitConverter.IsLittleEndian) Array.Reverse(payload); // Make big-endian
             var response = await InvokePrimaryHandler(0x80, payload);
-            if (!response.SequenceEqual(PlcConstants.ANSW_ENTER_SUBPROTO_SUCCESS))
+            if (response == null || !response.SequenceEqual(PlcConstants.ANSW_ENTER_SUBPROTO_SUCCESS))
                 throw new Exception("Failed to enter subprotocol.");
             _log("Entered subprotocol successfully.");
         }
 
         private async Task LeaveSubprotocol()
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Leaving subprotocol...");
             await _protocol.SendPacketAsync(new byte[] { 0x81, 0xD0, 0x67 });
             await _protocol.ReceivePacketAsync();
@@ -121,6 +123,7 @@ namespace S7.Net
 
         private async Task RawSubprotocolWrite(uint address, byte[] data)
         {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
             var payload = new byte[7 + data.Length];
             payload[0] = 0x84;
             payload[1] = 0x5a;

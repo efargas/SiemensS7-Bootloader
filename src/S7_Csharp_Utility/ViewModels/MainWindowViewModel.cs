@@ -3,12 +3,14 @@ using System.Windows.Input;
 using System.Threading.Tasks;
 using System;
 using S7.Net;
+using System.ComponentModel.DataAnnotations;
 
 namespace S7_Csharp_Utility.ViewModels
 {
     public class MainWindowViewModel : ViewModelBase
     {
         private string _plcHost = "localhost";
+        [Required]
         public string PlcHost
         {
             get => _plcHost;
@@ -19,7 +21,19 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        private int _delaySeconds = 1;
+        public int DelaySeconds
+        {
+            get => _delaySeconds;
+            set
+            {
+                _delaySeconds = value;
+                OnPropertyChanged();
+            }
+        }
+
         private int _plcPort = 102;
+        [Range(1, 65535)]
         public int PlcPort
         {
             get => _plcPort;
@@ -31,6 +45,7 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _modbusHost = "localhost";
+        [Required]
         public string ModbusHost
         {
             get => _modbusHost;
@@ -42,6 +57,7 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _modbusPort = 502;
+        [Range(1, 65535)]
         public int ModbusPort
         {
             get => _modbusPort;
@@ -53,6 +69,7 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private ushort _modbusCoil = 1;
+        [Range(1, 65535)]
         public ushort ModbusCoil
         {
             get => _modbusCoil;
@@ -73,6 +90,8 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly S7.Net.PayloadManager _payloadManager;
 
         private string _dumpAddress = "0x10000000";
+        [Required]
+        [RegularExpression(@"^0x[0-9a-fA-F]+$", ErrorMessage = "Must be a valid hex address (e.g., 0x10000000)")]
         public string DumpAddress
         {
             get => _dumpAddress;
@@ -84,6 +103,7 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private uint _dumpLength = 4096;
+        [Range(1, uint.MaxValue)]
         public uint DumpLength
         {
             get => _dumpLength;
@@ -176,9 +196,9 @@ namespace S7_Csharp_Utility.ViewModels
             UploadStagerCommand = new Commands.RelayCommand(async _ => await UploadStager(), _ => !IsBusy);
             DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => !IsBusy && StagerInstalled);
 
-            BrowseCompareFolderCommand = new Commands.RelayCommand(async _ => CompareFolder = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"));
-            BrowseCompareFile1Command = new Commands.RelayCommand(async _ => CompareFile1 = await _dialogService.OpenFilePickerAsync("Select File 1"));
-            BrowseCompareFile2Command = new Commands.RelayCommand(async _ => CompareFile2 = await _dialogService.OpenFilePickerAsync("Select File 2"));
+            BrowseCompareFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if(result != null) CompareFolder = result; });
+            BrowseCompareFile1Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if(result != null) CompareFile1 = result; });
+            BrowseCompareFile2Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if(result != null) CompareFile2 = result; });
             CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFolder));
             CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsBusy && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
         }
@@ -189,10 +209,8 @@ namespace S7_Csharp_Utility.ViewModels
             try
             {
                 await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false);
-                //int delaySeconds = (int)(DelayNumericUpDown.Value ?? 1); // This needs to be a property
-                int delaySeconds = 1;
-                Logging.Log($"Waiting for {delaySeconds} seconds before powering on...", LogCategory.Info);
-                await Task.Delay(delaySeconds * 1000);
+                Logging.Log($"Waiting for {DelaySeconds} seconds before powering on...", LogCategory.Info);
+                await Task.Delay(DelaySeconds * 1000);
                 await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true);
 
                 await Task.Delay(50);
