@@ -54,19 +54,19 @@ namespace S7_Csharp_Utility.Models
         /// <summary>
         /// The currently selected serial port.
         /// </summary>
-        public string SelectedSerialPort { get; set; } = string.Empty;
+        public string SelectedSerialPort { get; set; } = "/dev/ttyUSB0";
         /// <summary>
         /// The TCP port used by socat.
         /// </summary>
-        public int SocatTcpPort { get; set; } = 8888;
+        public int SocatTcpPort { get; set; } = 1238;
         /// <summary>
         /// The currently selected baud rate.
         /// </summary>
-        public int SelectedBaudRate { get; set; } = 115200;
+        public int SelectedBaudRate { get; set; } = 38400;
         /// <summary>
         /// The currently selected parity.
         /// </summary>
-        public Parity SelectedParity { get; set; } = Parity.None;
+        public Parity SelectedParity { get; set; } = Parity.Even;
         /// <summary>
         /// The currently selected stop bits.
         /// </summary>
@@ -75,5 +75,17 @@ namespace S7_Csharp_Utility.Models
         /// The currently selected flow control.
         /// </summary>
         public Handshake SelectedFlowControl { get; set; } = Handshake.None;
+        /// <summary>
+        /// Enables verbose output from socat (equivalent to -v).
+        /// </summary>
+        public bool SocatVerbose { get; set; } = true;
+        /// <summary>
+        /// Enables hexadecimal dump output from socat (equivalent to -x).
+        /// </summary>
+        public bool SocatHexDump { get; set; } = true;
+        /// <summary>
+        /// Sets the I/O block size for socat (equivalent to -b N).
+        /// </summary>
+        public int SocatBlockSize { get; set; } = 4;
     }
 }

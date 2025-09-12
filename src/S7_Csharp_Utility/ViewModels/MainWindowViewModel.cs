@@ -420,7 +420,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private int _socatTcpPort = 8888;
+        private int _socatTcpPort = 1238;
         /// <summary>
         /// The TCP port used by socat.
         /// </summary>
@@ -432,6 +432,36 @@ namespace S7_Csharp_Utility.ViewModels
                 _socatTcpPort = value;
                 OnPropertyChanged();
             }
+        }
+
+        private bool _socatVerbose = true;
+        /// <summary>
+        /// Enables verbose output for socat (-v).
+        /// </summary>
+        public bool SocatVerbose
+        {
+            get => _socatVerbose;
+            set { _socatVerbose = value; OnPropertyChanged(); }
+        }
+
+        private bool _socatHexDump = true;
+        /// <summary>
+        /// Enables hexadecimal dump output for socat (-x).
+        /// </summary>
+        public bool SocatHexDump
+        {
+            get => _socatHexDump;
+            set { _socatHexDump = value; OnPropertyChanged(); }
+        }
+
+        private int _socatBlockSize = 4;
+        /// <summary>
+        /// I/O block size for socat (-b N).
+        /// </summary>
+        public int SocatBlockSize
+        {
+            get => _socatBlockSize;
+            set { _socatBlockSize = value; OnPropertyChanged(); }
         }
 
         private string _socatStatus = "Stopped";
@@ -511,7 +541,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// A collection of available baud rates for serial communication.
         /// </summary>
         public ObservableCollection<int> AvailableBaudRates { get; } = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
-        private int _selectedBaudRate = 115200;
+        private int _selectedBaudRate = 38400;
         /// <summary>
         /// The currently selected baud rate.
         /// </summary>
@@ -529,7 +559,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// A collection of available parities for serial communication.
         /// </summary>
         public ObservableCollection<Parity> AvailableParities { get; } = new ObservableCollection<Parity>(Enum.GetValues(typeof(Parity)).Cast<Parity>());
-        private Parity _selectedParity = Parity.None;
+        private Parity _selectedParity = Parity.Even;
         /// <summary>
         /// The currently selected parity.
         /// </summary>
@@ -898,7 +928,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             try
             {
-                _socatService.Start(SelectedSerialPort, SocatTcpPort);
+                _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize);
                 SocatStatus = "Running";
             }
             catch (Exception ex)
@@ -973,7 +1003,10 @@ namespace S7_Csharp_Utility.ViewModels
                     SelectedBaudRate = this.SelectedBaudRate,
                     SelectedParity = this.SelectedParity,
                     SelectedStopBits = this.SelectedStopBits,
-                    SelectedFlowControl = this.SelectedFlowControl
+                    SelectedFlowControl = this.SelectedFlowControl,
+                    SocatVerbose = this.SocatVerbose,
+                    SocatHexDump = this.SocatHexDump,
+                    SocatBlockSize = this.SocatBlockSize
                 };
                 await _configService.SaveConfiguration(config, path);
             }
@@ -1007,6 +1040,9 @@ namespace S7_Csharp_Utility.ViewModels
                     SelectedParity = config.SelectedParity;
                     SelectedStopBits = config.SelectedStopBits;
                     SelectedFlowControl = config.SelectedFlowControl;
+                    SocatVerbose = config.SocatVerbose;
+                    SocatHexDump = config.SocatHexDump;
+                    SocatBlockSize = config.SocatBlockSize;
                 }
             }
         }
@@ -1039,6 +1075,9 @@ namespace S7_Csharp_Utility.ViewModels
                     SelectedParity = config.SelectedParity;
                     SelectedStopBits = config.SelectedStopBits;
                     SelectedFlowControl = config.SelectedFlowControl;
+                    SocatVerbose = config.SocatVerbose;
+                    SocatHexDump = config.SocatHexDump;
+                    SocatBlockSize = config.SocatBlockSize;
                 }
             }
             catch (Exception ex)
@@ -1073,7 +1112,10 @@ namespace S7_Csharp_Utility.ViewModels
                     SelectedBaudRate = this.SelectedBaudRate,
                     SelectedParity = this.SelectedParity,
                     SelectedStopBits = this.SelectedStopBits,
-                    SelectedFlowControl = this.SelectedFlowControl
+                    SelectedFlowControl = this.SelectedFlowControl,
+                    SocatVerbose = this.SocatVerbose,
+                    SocatHexDump = this.SocatHexDump,
+                    SocatBlockSize = this.SocatBlockSize
                 };
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
                 string json = System.Text.Json.JsonSerializer.Serialize(config, options);

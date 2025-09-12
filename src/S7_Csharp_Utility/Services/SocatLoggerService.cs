@@ -32,6 +32,11 @@ namespace S7_Csharp_Utility.Services
         private string _logText = string.Empty;
         private const int MaxLogLines = 2000;
 
+        public System.Windows.Input.ICommand ClearLogCommand { get; }
+        public System.Windows.Input.ICommand ExportLogCommand { get; }
+        public System.Windows.Input.ICommand ScrollToEndCommand { get; }
+        public event Action? ScrollToEnd;
+
         /// <summary>
         /// The formatted log text to be displayed in the UI.
         /// </summary>
@@ -57,6 +62,9 @@ namespace S7_Csharp_Utility.Services
         public SocatLoggerService(Dispatcher dispatcher)
         {
             _dispatcher = dispatcher;
+            ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
+            ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
+            ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
         }
 
         /// <summary>
@@ -105,6 +113,23 @@ namespace S7_Csharp_Utility.Services
                 _logEntries.Clear();
                 LogText = string.Empty;
             });
+        }
+
+        /// <summary>
+        /// Exports the socat log to a text file.
+        /// </summary>
+        private void ExportLogs()
+        {
+            string logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+            System.IO.Directory.CreateDirectory(logDir);
+            string logFile = System.IO.Path.Combine(logDir, $"socat_exported_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            using (var writer = new System.IO.StreamWriter(logFile, false))
+            {
+                foreach (var entry in _logEntries)
+                {
+                    writer.WriteLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}");
+                }
+            }
         }
 
         /// <summary>

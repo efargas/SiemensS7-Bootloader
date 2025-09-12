@@ -32,7 +32,7 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         /// <param name="serialPort">The serial port to connect to.</param>
         /// <param name="tcpPort">The TCP port to listen on.</param>
-        public void Start(string serialPort, int tcpPort)
+        public void Start(string serialPort, int tcpPort, bool verbose, bool hexDump, int blockSize)
         {
             if (IsRunning)
             {
@@ -42,7 +42,11 @@ namespace S7_Csharp_Utility.Services
             _logger.Clear();
             _logger.Log($"Starting socat: TCP-LISTEN:{tcpPort} <-> {serialPort}");
 
-            string arguments = $"TCP-LISTEN:{tcpPort},fork,reuseaddr FILE:{serialPort},raw,echo=0";
+            string flagArgs = string.Empty;
+            if (verbose) flagArgs += "-v ";
+            if (blockSize > 0) flagArgs += $"-b {blockSize} ";
+            if (hexDump) flagArgs += "-x ";
+            string arguments = $"{flagArgs}TCP-LISTEN:{tcpPort},fork,reuseaddr {serialPort}";
 
             var processStartInfo = new ProcessStartInfo
             {
