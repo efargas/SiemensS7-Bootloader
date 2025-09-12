@@ -43,7 +43,7 @@ namespace S7_Csharp_Utility
 
             if (files.Count >= 1)
             {
-                _firmwarePath = files[0].Path.AbsolutePath;
+                _firmwarePath = new Uri(files[0].Path.ToString()).LocalPath;
                 FirmwareMetadataTextBlock.Text = "Parsing...";
                 UnpackFirmwareButton.IsEnabled = false;
                 try
@@ -77,7 +77,7 @@ namespace S7_Csharp_Utility
 
             if (folder.Count >= 1)
             {
-                string output = Path.Combine(folder[0].Path.AbsolutePath, Path.GetFileName(_firmwarePath) + ".unpacked.bin");
+                string output = Path.Combine(new Uri(folder[0].Path.ToString()).LocalPath, Path.GetFileName(_firmwarePath) + ".unpacked.bin");
                 try
                 {
                     await Task.Run(() => _unpacker.Unpack(_firmwarePath, output));

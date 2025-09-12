@@ -128,6 +128,9 @@ namespace S7_Csharp_Utility.ViewModels
         /// The service responsible for logging socat messages.
         /// </summary>
         public SocatLoggerService SocatLogging { get; }
+        /// <summary>
+        /// The service responsible for controlling the PLC's power supply.
+        /// </summary>
         private readonly PowerController _powerController;
 
         /// <summary>
@@ -139,6 +142,9 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ICommand PowerOffCommand { get; }
 
+        /// <summary>
+        /// The service responsible for managing stager and dumper payloads.
+        /// </summary>
         private readonly S7.Net.PayloadManager _payloadManager;
 
         private string _dumpAddress = "0x10000000";
@@ -364,6 +370,9 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ICommand CompareTwoFilesCommand { get; }
 
+        /// <summary>
+        /// The service responsible for managing the socat process.
+        /// </summary>
         private readonly SocatService _socatService;
         /// <summary>
         /// A collection of available serial ports.
@@ -588,7 +597,13 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// The service responsible for showing dialogs to the user.
+        /// </summary>
         private readonly Interfaces.IDialogService _dialogService;
+        /// <summary>
+        /// The service responsible for saving and loading the application configuration.
+        /// </summary>
         private readonly ConfigurationService _configService;
 
         /// <summary>
@@ -971,7 +986,7 @@ namespace S7_Csharp_Utility.ViewModels
                     SelectedBaudRate = config.SelectedBaudRate;
                     SelectedParity = config.SelectedParity;
                     SelectedStopBits = config.SelectedStopBits;
-                    SelectedFlowControl = config.SelectedFlowcontrol;
+                    SelectedFlowControl = config.SelectedFlowControl;
                 }
             }
             catch (Exception ex)
