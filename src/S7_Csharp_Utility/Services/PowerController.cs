@@ -14,7 +14,7 @@ namespace S7_Csharp_Utility.Services
             _log = logger;
         }
 
-        public async Task SetPowerAsync(string host, int port, ushort coilAddress, bool on)
+        public async Task SetPowerAsync(string host, int port, ushort coilAddress, bool on, byte slaveId = 1)
         {
             string state = on ? "ON" : "OFF";
             _log($"Attempting to turn power {state}...", false);
@@ -35,7 +35,7 @@ namespace S7_Csharp_Utility.Services
 
                     ushort zeroBasedCoilAddress = (ushort)(coilAddress - 1);
 
-                    await master.WriteSingleCoilAsync(0, zeroBasedCoilAddress, on);
+                    await master.WriteSingleCoilAsync(slaveId, zeroBasedCoilAddress, on);
                     _log($"Successfully turned power {state}.", false);
                 }
             }

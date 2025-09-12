@@ -5,11 +5,12 @@ namespace S7_Csharp_Utility.ViewModels
 {
     public class SocatLogViewModel : ViewModelBase
     {
-        public ObservableCollection<SocatLogEntry> LogEntries { get; }
+        public string LogText => _socatLogger.LogText;
+        private readonly SocatLoggerService _socatLogger;
 
         public SocatLogViewModel(SocatLoggerService socatLogger)
         {
-            LogEntries = socatLogger.LogEntries;
+            _socatLogger = socatLogger;
         }
     }
 }

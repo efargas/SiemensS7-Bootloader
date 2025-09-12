@@ -83,7 +83,20 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        private byte _modbusSlaveId = 1;
+        [Range(0, 255)]
+        public byte ModbusSlaveId
+        {
+            get => _modbusSlaveId;
+            set
+            {
+                _modbusSlaveId = value;
+                OnPropertyChanged();
+            }
+        }
+
         public LoggingService Logging { get; }
+        public SocatLoggerService SocatLogging { get; }
         private readonly PowerController _powerController;
 
         public ICommand PowerOnCommand { get; }
@@ -270,6 +283,8 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _socatStatus = value;
                 OnPropertyChanged();
+                (StartSocatCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (StopSocatCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -357,6 +372,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _compareFolder = value;
                 OnPropertyChanged();
+                (CompareDumpsCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -368,6 +384,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _compareFile1 = value;
                 OnPropertyChanged();
+                (CompareTwoFilesCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -379,25 +396,32 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _compareFile2 = value;
                 OnPropertyChanged();
+                (CompareTwoFilesCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
         private readonly Interfaces.IDialogService _dialogService;
         private readonly ConfigurationService _configService;
 
-        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService)
+        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService, SocatLoggerService socatLoggerService)
         {
             Logging = loggingService;
+            SocatLogging = socatLoggerService;
             _powerController = powerController;
             _payloadManager = payloadManager;
             _dialogService = dialogService;
             _socatService = socatService;
             _configService = configService;
 
-            PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true));
-            PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false));
+            PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, true, ModbusSlaveId));
+            PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false, ModbusSlaveId));
             UploadStagerCommand = new Commands.RelayCommand(async _ => await UploadStager(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && StagerInstalled);
+
+            BrowsePayloadsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if(result != null) PayloadsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            BrowseDumpsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Dumps Folder"); if(result != null) DumpsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            BrowseLogsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Logs Folder"); if(result != null) LogsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            BrowseExtractionFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Extraction Folder"); if(result != null) ExtractionPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
 
             BrowseCompareFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if(result != null) CompareFolder = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             BrowseCompareFile1Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if(result != null) CompareFile1 = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
@@ -405,8 +429,8 @@ namespace S7_Csharp_Utility.ViewModels
             CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFolder));
             CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
 
-            StartSocatCommand = new Commands.RelayCommand(_ => StartSocat(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(SelectedSerialPort));
-            StopSocatCommand = new Commands.RelayCommand(_ => StopSocat(), _ => _socatService.IsRunning);
+            StartSocatCommand = new Commands.RelayCommand(_ => StartSocat(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && IsSocatModeSelected && SocatStatus != "Running");
+            StopSocatCommand = new Commands.RelayCommand(_ => StopSocat(), _ => IsSocatModeSelected && SocatStatus == "Running");
             RefreshSerialPortsCommand = new Commands.RelayCommand(_ => RefreshSerialPorts());
             ShowSocatLogCommand = new Commands.RelayCommand(_ => _dialogService.ShowSocatLogWindow());
 

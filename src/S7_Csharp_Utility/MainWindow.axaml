@@ -8,7 +8,12 @@
         WindowStartupLocation="CenterScreen">
     <DockPanel LastChildFill="True">
         <Menu DockPanel.Dock="Top">
-            <MenuItem Header="File" />
+            <MenuItem Header="File">
+                <MenuItem Header="Save Configuration" Name="MenuSaveConfig" />
+                <MenuItem Header="Load Configuration" Name="MenuLoadConfig" />
+                <Separator/>
+                <MenuItem Header="Exit" Name="MenuExit" />
+            </MenuItem>
             <MenuItem Header="Preferences" />
             <MenuItem Header="Tools">
                 <MenuItem Header="Profile Management" Name="MenuProfileManagement" />
@@ -36,27 +41,33 @@
                                         <StackPanel>
                                             <TextBlock Text="TCP (socat) Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
                                             <TextBlock Text="Host:" />
-                                            <TextBox Text="{Binding PlcHost, Mode=TwoWay}" />
+                                            <TextBox Name="PlcHostTextBox" Text="{Binding PlcHost, Mode=TwoWay}" />
                                             <TextBlock Text="Port:" />
-                                            <TextBox Text="{Binding PlcPort, Mode=TwoWay}" />
-                                            <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Margin="0,10,0,0"/>
+                                            <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding PlcPort, Mode=TwoWay}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                                                <Button Content="Start Socat" Command="{Binding StartSocatCommand}" Width="100"/>
+                                                <Button Content="Stop Socat" Command="{Binding StopSocatCommand}" Width="100"/>
+                                                <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Width="100"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
 
                                     <Border BorderBrush="Gray" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSerialModeSelected}">
                                         <StackPanel>
                                             <TextBlock Text="Serial Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
-                                            <TextBlock Text="Serial Port:" />
-                                            <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SelectedSerialPort, Mode=TwoWay}"/>
-                                            <Button Content="Refresh Ports" Command="{Binding RefreshSerialPortsCommand}" Margin="0,5,0,10"/>
-                                            <TextBlock Text="Baud Rate:" />
-                                            <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding SelectedBaudRate, Mode=TwoWay}"/>
-                                            <TextBlock Text="Parity:" />
-                                            <ComboBox ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding SelectedParity, Mode=TwoWay}"/>
-                                            <TextBlock Text="Stop Bits:" />
-                                            <ComboBox ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding SelectedStopBits, Mode=TwoWay}"/>
-                                            <TextBlock Text="Flow Control:" />
-                                            <ComboBox ItemsSource="{Binding AvailableFlowControls}" SelectedItem="{Binding SelectedFlowControl, Mode=TwoWay}"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                                                <TextBlock Text="Port:" VerticalAlignment="Center"/>
+                                                <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SelectedSerialPort, Mode=TwoWay}" Width="100"/>
+                                                <Button Content="Refresh" Command="{Binding RefreshSerialPortsCommand}" Margin="0,0,8,0" Width="70"/>
+                                                <TextBlock Text="Baud:" VerticalAlignment="Center"/>
+                                                <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding SelectedBaudRate, Mode=TwoWay}" Width="85"/>
+                                                <TextBlock Text="Parity:" VerticalAlignment="Center"/>
+                                                <ComboBox ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding SelectedParity, Mode=TwoWay}" Width="75"/>
+                                                <TextBlock Text="Stop:" VerticalAlignment="Center"/>
+                                                <ComboBox ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding SelectedStopBits, Mode=TwoWay}" Width="60"/>
+                                                <TextBlock Text="Flow:" VerticalAlignment="Center"/>
+                                                <ComboBox ItemsSource="{Binding AvailableFlowControls}" SelectedItem="{Binding SelectedFlowControl, Mode=TwoWay}" Width="90"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
@@ -65,13 +76,15 @@
                                 <StackPanel>
                                     <TextBlock Text="Modbus Power Supply" FontWeight="Bold" Margin="0,0,0,8" />
                                     <TextBlock Text="IP Address:" />
-                                    <TextBox Name="ModbusHostTextBox" HorizontalAlignment="Stretch" />
+                                    <TextBox Name="ModbusHostTextBox" Text="{Binding ModbusHost, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                                     <TextBlock Text="Port:" />
-                                    <TextBox Name="ModbusPortTextBox" HorizontalAlignment="Stretch" />
+                                    <NumericUpDown Name="ModbusPortNumeric" Minimum="1" Maximum="65535" Value="{Binding ModbusPort, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                                     <TextBlock Text="Coil Addr:" />
-                                    <TextBox Name="ModbusCoilTextBox" HorizontalAlignment="Stretch" />
+                                    <NumericUpDown Name="ModbusCoilNumeric" Minimum="1" Maximum="65535" Value="{Binding ModbusCoil, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                                    <TextBlock Text="Slave ID:" />
+                                    <NumericUpDown Name="ModbusSlaveIdNumeric" Minimum="0" Maximum="255" Value="{Binding ModbusSlaveId, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                                     <TextBlock Text="Power-On Delay (s):" />
-                                    <NumericUpDown Name="DelayNumericUpDown" Minimum="0" Maximum="120" HorizontalAlignment="Stretch" />
+                                    <NumericUpDown Name="DelayNumericUpDown" Minimum="0" Maximum="120" Value="{Binding DelaySeconds, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -199,71 +212,48 @@
                         <Button Name="ScrollToEndButton" Content="Scroll to End" Width="110" Command="{Binding Logging.ScrollToEndCommand}"/>
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Button Content="Export Socat Log..." Name="ExportSocatLogButton" Width="140"/>
-                        <Button Content="Clear Socat Log" Name="ClearSocatLogButton" Width="120"/>
+                        <Button Name="ClearSocatLogButton" Content="Clear Log" Width="110"/>
+                        <Button Name="ExportSocatLogButton" Content="Export..." Width="110"/>
+                        <Button Name="SocatScrollToEndButton" Content="Scroll to End" Width="110"/>
                     </StackPanel>
 
                     <!-- Log Viewers, Side by Side -->
-                    <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Vertical">
-                        <TextBlock Text="Main Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="LogListBox"
-                                 ItemsSource="{Binding Logging.LogMessages}"
-                                 HorizontalAlignment="Stretch"
-                                 VerticalAlignment="Stretch"
-                                 Margin="0,0,0,0"
-                                 Background="#171A1F"
-                                 Foreground="#E3E6EB"
-                                 BorderBrush="#233A53"
-                                 BorderThickness="1"
-                                 FontFamily="Consolas,Monospace"
-                                 MinHeight="120"
-                                 SelectionMode="Multiple">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="#6f94b2" />
-                                        <TextBlock Text="{Binding Category}" FontWeight="Bold" Margin="6,0,6,0"/>
-                                        <TextBlock Text="{Binding Message}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                            <ListBox.Styles>
-                                <Style Selector="ListBoxItem">
-                                    <Setter Property="Padding" Value="2,0"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                </Style>
-                            </ListBox.Styles>
-                        </ListBox>
-                    </StackPanel>
-                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Vertical">
-                        <TextBlock Text="Socat Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="SocatLogListBox"
-                                 HorizontalAlignment="Stretch"
-                                 VerticalAlignment="Stretch"
-                                 Margin="0,0,0,0"
-                                 Background="#272F1F"
-                                 Foreground="#F5ECD7"
-                                 BorderBrush="#235333"
-                                 BorderThickness="1"
-                                 FontFamily="Consolas,Monospace"
-                                 MinHeight="120"
-                                 SelectionMode="Multiple">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="#94b27a" />
-                                        <TextBlock Text="{Binding Message}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                            <ListBox.Styles>
-                                <Style Selector="ListBoxItem">
-                                    <Setter Property="Padding" Value="2,0"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                </Style>
-                            </ListBox.Styles>
-                        </ListBox>
-                    </StackPanel>
+                    <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <TextBlock Grid.Row="0" Text="Main Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
+                        <ScrollViewer Name="LogScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            <TextBox Name="LogTextBox"
+                                     Text="{Binding Logging.LogText}"
+                                     HorizontalAlignment="Stretch"
+                                     VerticalAlignment="Stretch"
+                                     Background="#171A1F"
+                                     Foreground="#E3E6EB"
+                                     BorderBrush="#233A53"
+                                     BorderThickness="1"
+                                     FontFamily="Consolas,Monospace"
+                                     MinHeight="120"
+                                     IsReadOnly="True"
+                                     AcceptsReturn="True"
+                                     TextWrapping="NoWrap" />
+                        </ScrollViewer>
+                    </Grid>
+                    <Grid Grid.Row="2" Grid.Column="1" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <TextBlock Grid.Row="0" Text="Socat Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
+                        <ScrollViewer Name="SocatLogScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            <TextBox Name="SocatLogTextBox"
+                                     Text="{Binding SocatLogging.LogText}"
+                                     HorizontalAlignment="Stretch"
+                                     VerticalAlignment="Stretch"
+                                     Background="#272F1F"
+                                     Foreground="#F5ECD7"
+                                     BorderBrush="#235333"
+                                     BorderThickness="1"
+                                     FontFamily="Consolas,Monospace"
+                                     MinHeight="120"
+                                     IsReadOnly="True"
+                                     AcceptsReturn="True"
+                                     TextWrapping="NoWrap" />
+                        </ScrollViewer>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>
