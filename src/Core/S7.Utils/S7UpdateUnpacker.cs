@@ -7,7 +7,9 @@ using System.Runtime.InteropServices;
 
 namespace S7.Utils
 {
-    // Port of the LZP decompression algorithm from lzp.c
+    /// <summary>
+    /// A port of the LZP decompression algorithm from lzp.c.
+    /// </summary>
     internal static class LzpDecompressor
     {
         private const int LzpOrder = 4;
@@ -21,6 +23,11 @@ namespace S7.Utils
             return h;
         }
 
+        /// <summary>
+        /// Unpacks the specified input data.
+        /// </summary>
+        /// <param name="inputData">The input data.</param>
+        /// <returns>The unpacked data.</returns>
         public static byte[] Unpack(byte[] inputData)
         {
             try
@@ -106,31 +113,69 @@ namespace S7.Utils
         }
     }
 
+    /// <summary>
+    /// Represents a raw firmware entry.
+    /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 10)]
     public struct FwRawEntry
     {
+        /// <summary>
+        /// The size of the entry.
+        /// </summary>
         public uint Size;
+        /// <summary>
+        /// The CRC of the entry.
+        /// </summary>
         public uint Crc;
+        /// <summary>
+        /// The name of the entry as a byte array.
+        /// </summary>
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
         public byte[] NameBytes;
 
+        /// <summary>
+        /// The name of the entry.
+        /// </summary>
         public string Name => Encoding.ASCII.GetString(NameBytes).TrimEnd('\0');
     }
 
+    /// <summary>
+    /// Represents a firmware entry.
+    /// </summary>
     public class FwEntry
     {
+        /// <summary>
+        /// The offset of the entry.
+        /// </summary>
         public long Offset { get; set; }
+        /// <summary>
+        /// The size of the entry.
+        /// </summary>
         public uint Size { get; set; }
+        /// <summary>
+        /// The CRC of the entry.
+        /// </summary>
         public uint Crc { get; set; }
+        /// <summary>
+        /// The name of the entry.
+        /// </summary>
         public string Name { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// A utility for unpacking S7 update files.
+    /// </summary>
     public class S7UpdateUnpacker
     {
         private const int FwHeaderSize = 0x2c;
         private const int FwNumEntries = 4;
         private const int FwEntryNameSize = 6;
 
+        /// <summary>
+        /// Parses the metadata of a firmware file.
+        /// </summary>
+        /// <param name="filePath">The path to the firmware file.</param>
+        /// <returns>A list of raw firmware entries.</returns>
         public List<FwRawEntry> ParseMetadata(string filePath)
         {
             var entries = new List<FwRawEntry>();
@@ -159,6 +204,11 @@ namespace S7.Utils
             return entries;
         }
 
+        /// <summary>
+        /// Unpacks a firmware file.
+        /// </summary>
+        /// <param name="inputPath">The path to the firmware file.</param>
+        /// <param name="outputPath">The path to write the unpacked file to.</param>
         public void Unpack(string inputPath, string outputPath)
         {
             var metadata = ParseMetadata(inputPath);

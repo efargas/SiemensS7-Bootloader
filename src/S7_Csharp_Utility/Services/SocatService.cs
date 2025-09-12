@@ -5,18 +5,33 @@ using System.Runtime.InteropServices;
 
 namespace S7_Csharp_Utility.Services
 {
+    /// <summary>
+    /// Service for managing the socat process.
+    /// </summary>
     public class SocatService
     {
         private Process? _socatProcess;
         private readonly SocatLoggerService _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SocatService"/> class.
+        /// </summary>
+        /// <param name="logger">The logger service for socat.</param>
         public SocatService(SocatLoggerService logger)
         {
             _logger = logger;
         }
 
+        /// <summary>
+        /// Indicates whether the socat process is currently running.
+        /// </summary>
         public bool IsRunning => _socatProcess != null && !_socatProcess.HasExited;
 
+        /// <summary>
+        /// Starts the socat process.
+        /// </summary>
+        /// <param name="serialPort">The serial port to connect to.</param>
+        /// <param name="tcpPort">The TCP port to listen on.</param>
         public void Start(string serialPort, int tcpPort)
         {
             if (IsRunning)
@@ -60,6 +75,9 @@ namespace S7_Csharp_Utility.Services
             }
         }
 
+        /// <summary>
+        /// Stops the socat process.
+        /// </summary>
         public void Stop()
         {
             if (_socatProcess != null && !_socatProcess.HasExited)

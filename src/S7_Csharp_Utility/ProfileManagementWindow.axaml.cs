@@ -10,11 +10,17 @@ using System.Threading.Tasks;
 
 namespace S7_Csharp_Utility
 {
+    /// <summary>
+    /// The profile management window.
+    /// </summary>
     public partial class ProfileManagementWindow : Window
     {
         private DeviceProfile? _currentProfile = new DeviceProfile();
         private ObservableCollection<MemoryRegion> _profileRegions = new ObservableCollection<MemoryRegion>();
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProfileManagementWindow"/> class.
+        /// </summary>
         public ProfileManagementWindow()
         {
             InitializeComponent();
@@ -23,6 +29,11 @@ namespace S7_Csharp_Utility
             SaveProfileButton.Click += SaveProfileButton_Click;
         }
 
+        /// <summary>
+        /// Handles the Click event of the LoadProfileButton control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private async void LoadProfileButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
@@ -57,6 +68,11 @@ namespace S7_Csharp_Utility
             }
         }
 
+        /// <summary>
+        /// Handles the Click event of the SaveProfileButton control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private async void SaveProfileButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
@@ -86,6 +102,10 @@ namespace S7_Csharp_Utility
             }
         }
 
+        /// <summary>
+        /// Shows a message dialog.
+        /// </summary>
+        /// <param name="msg">The message to show.</param>
         private async Task ShowMessage(string msg)
         {
             var dlg = new Window { Title = "Info", Content = new TextBlock { Text = msg, Margin = new Avalonia.Thickness(12) }, Width = 360, Height = 120 };

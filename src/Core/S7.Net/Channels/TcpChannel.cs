@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 
 namespace S7.Net.Channels
 {
+    /// <summary>
+    /// A communication channel that uses TCP.
+    /// </summary>
     public class TcpChannel : ICommunicationChannel
     {
         private readonly string _host;
@@ -11,15 +14,29 @@ namespace S7.Net.Channels
         private TcpClient? _client;
         private NetworkStream? _stream;
 
+        /// <summary>
+        /// Indicates whether the channel is connected.
+        /// </summary>
         public bool IsConnected => _client?.Connected ?? false;
+        /// <summary>
+        /// Indicates whether there is data available to be read.
+        /// </summary>
         public bool DataAvailable => _stream?.DataAvailable ?? false;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TcpChannel"/> class.
+        /// </summary>
+        /// <param name="host">The host to connect to.</param>
+        /// <param name="port">The port to connect to.</param>
         public TcpChannel(string host, int port)
         {
             _host = host;
             _port = port;
         }
 
+        /// <summary>
+        /// Connects to the TCP host.
+        /// </summary>
         public async Task ConnectAsync()
         {
             if (IsConnected) Disconnect();
@@ -28,6 +45,9 @@ namespace S7.Net.Channels
             _stream = _client.GetStream();
         }
 
+        /// <summary>
+        /// Disconnects from the TCP host.
+        /// </summary>
         public void Disconnect()
         {
             _stream?.Close();
@@ -36,12 +56,25 @@ namespace S7.Net.Channels
             _client = null;
         }
 
+        /// <summary>
+        /// Reads data from the TCP stream.
+        /// </summary>
+        /// <param name="buffer">The buffer to read data into.</param>
+        /// <param name="offset">The offset in the buffer to start writing to.</param>
+        /// <param name="count">The number of bytes to read.</param>
+        /// <returns>The number of bytes read.</returns>
         public async Task<int> ReadAsync(byte[] buffer, int offset, int count)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");
             return await _stream.ReadAsync(buffer, offset, count);
         }
 
+        /// <summary>
+        /// Writes data to the TCP stream.
+        /// </summary>
+        /// <param name="buffer">The buffer containing the data to write.</param>
+        /// <param name="offset">The offset in the buffer to start writing from.</param>
+        /// <param name="count">The number of bytes to write.</param>
         public async Task WriteAsync(byte[] buffer, int offset, int count)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");

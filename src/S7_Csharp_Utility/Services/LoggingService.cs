@@ -8,15 +8,33 @@ using Avalonia.Threading;
 
 namespace S7_Csharp_Utility.Services
 {
+    /// <summary>
+    /// Defines the category of a log message.
+    /// </summary>
     public enum LogCategory { Info, Warning, Error, Debug }
 
+    /// <summary>
+    /// Represents a single log message.
+    /// </summary>
     public class LogMessage
     {
+        /// <summary>
+        /// The timestamp of the log message.
+        /// </summary>
         public DateTime Timestamp { get; set; }
+        /// <summary>
+        /// The category of the log message.
+        /// </summary>
         public LogCategory Category { get; set; }
+        /// <summary>
+        /// The content of the log message.
+        /// </summary>
         public string Message { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// Service for handling application logging.
+    /// </summary>
     public class LoggingService : INotifyPropertyChanged
     {
         private readonly List<LogMessage> _allLogMessages = new List<LogMessage>();
@@ -24,10 +42,22 @@ namespace S7_Csharp_Utility.Services
         private readonly Dispatcher _dispatcher;
         private string _logText = string.Empty;
 
+        /// <summary>
+        /// Indicates whether to display informational messages.
+        /// </summary>
         public bool FilterInfo { get; set; } = true;
+        /// <summary>
+        /// Indicates whether to display error messages.
+        /// </summary>
         public bool FilterError { get; set; } = true;
+        /// <summary>
+        /// Indicates whether to display debug messages.
+        /// </summary>
         public bool FilterDebug { get; set; } = true;
 
+        /// <summary>
+        /// The formatted log text to be displayed in the UI.
+        /// </summary>
         public string LogText
         {
             get => _logText;
@@ -38,12 +68,31 @@ namespace S7_Csharp_Utility.Services
             }
         }
 
+        /// <summary>
+        /// Command to clear the log.
+        /// </summary>
         public System.Windows.Input.ICommand ClearLogCommand { get; }
+        /// <summary>
+        /// Command to export the log to a file.
+        /// </summary>
         public System.Windows.Input.ICommand ExportLogCommand { get; }
+        /// <summary>
+        /// Command to scroll to the end of the log.
+        /// </summary>
         public System.Windows.Input.ICommand ScrollToEndCommand { get; }
+        /// <summary>
+        /// Event triggered to scroll to the end of the log.
+        /// </summary>
         public event Action? ScrollToEnd;
+        /// <summary>
+        /// Event triggered when a property value changes.
+        /// </summary>
         public event PropertyChangedEventHandler? PropertyChanged;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LoggingService"/> class.
+        /// </summary>
+        /// <param name="dispatcher">The dispatcher to use for UI updates.</param>
         public LoggingService(Dispatcher dispatcher)
         {
             _dispatcher = dispatcher;
@@ -52,6 +101,9 @@ namespace S7_Csharp_Utility.Services
             ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
         }
 
+        /// <summary>
+        /// Exports the current log to a text file.
+        /// </summary>
         private void ExportLogs()
         {
             string logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
@@ -66,6 +118,11 @@ namespace S7_Csharp_Utility.Services
             }
         }
 
+        /// <summary>
+        /// Logs a message.
+        /// </summary>
+        /// <param name="message">The message to log.</param>
+        /// <param name="category">The category of the message.</param>
         public void Log(string message, LogCategory category = LogCategory.Info)
         {
             var entry = new LogMessage
@@ -89,6 +146,9 @@ namespace S7_Csharp_Utility.Services
             HandleLogFile(entry);
         }
 
+        /// <summary>
+        /// Updates the log text based on the current filter settings.
+        /// </summary>
         public void UpdateLogFilter()
         {
             var sb = new StringBuilder();
@@ -115,6 +175,10 @@ namespace S7_Csharp_Utility.Services
             LogText = sb.ToString();
         }
 
+        /// <summary>
+        /// Handles writing the log entry to a file, with rotation.
+        /// </summary>
+        /// <param name="entry">The log entry to write.</param>
         private void HandleLogFile(LogMessage entry)
         {
             string logDir = Path.Combine(AppContext.BaseDirectory, "logs");
@@ -136,12 +200,19 @@ namespace S7_Csharp_Utility.Services
             File.AppendAllText(logFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Category} {entry.Message}{Environment.NewLine}");
         }
 
+        /// <summary>
+        /// Clears the log.
+        /// </summary>
         public void Clear()
         {
             _allLogMessages.Clear();
             LogText = string.Empty;
         }
 
+        /// <summary>
+        /// Triggers the PropertyChanged event.
+        /// </summary>
+        /// <param name="propertyName">The name of the property that changed.</param>
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

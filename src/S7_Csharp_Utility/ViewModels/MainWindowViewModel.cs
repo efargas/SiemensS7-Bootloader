@@ -10,10 +10,16 @@ using System.IO.Ports;
 
 namespace S7_Csharp_Utility.ViewModels
 {
+    /// <summary>
+    /// The main window's view model, containing the application's state and logic.
+    /// </summary>
     public class MainWindowViewModel : ViewModelBase
     {
         private const string ConfigFileName = "config.json";
         private string _plcHost = "localhost";
+        /// <summary>
+        /// The IP address or hostname of the PLC.
+        /// </summary>
         [Required]
         public string PlcHost
         {
@@ -26,6 +32,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _delaySeconds = 1;
+        /// <summary>
+        /// The delay in seconds to wait before powering on the PLC.
+        /// </summary>
         public int DelaySeconds
         {
             get => _delaySeconds;
@@ -37,6 +46,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _plcPort = 102;
+        /// <summary>
+        /// The TCP port of the PLC.
+        /// </summary>
         [Range(1, 65535)]
         public int PlcPort
         {
@@ -49,6 +61,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _modbusHost = "localhost";
+        /// <summary>
+        /// The IP address or hostname of the Modbus-enabled power supply.
+        /// </summary>
         [Required]
         public string ModbusHost
         {
@@ -61,6 +76,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _modbusPort = 502;
+        /// <summary>
+        /// The TCP port of the Modbus-enabled power supply.
+        /// </summary>
         [Range(1, 65535)]
         public int ModbusPort
         {
@@ -73,6 +91,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private ushort _modbusCoil = 1;
+        /// <summary>
+        /// The Modbus coil to control the power supply.
+        /// </summary>
         [Range(1, 65535)]
         public ushort ModbusCoil
         {
@@ -85,6 +106,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private byte _modbusSlaveId = 1;
+        /// <summary>
+        /// The slave ID of the Modbus device.
+        /// </summary>
         [Range(0, 255)]
         public byte ModbusSlaveId
         {
@@ -96,16 +120,31 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// The service responsible for logging application messages.
+        /// </summary>
         public LoggingService Logging { get; }
+        /// <summary>
+        /// The service responsible for logging socat messages.
+        /// </summary>
         public SocatLoggerService SocatLogging { get; }
         private readonly PowerController _powerController;
 
+        /// <summary>
+        /// Command to power on the PLC.
+        /// </summary>
         public ICommand PowerOnCommand { get; }
+        /// <summary>
+        /// Command to power off the PLC.
+        /// </summary>
         public ICommand PowerOffCommand { get; }
 
         private readonly S7.Net.PayloadManager _payloadManager;
 
         private string _dumpAddress = "0x10000000";
+        /// <summary>
+        /// The starting memory address for the dump, in hexadecimal format.
+        /// </summary>
         [Required]
         [RegularExpression(@"^0x[0-9a-fA-F]+$", ErrorMessage = "Must be a valid hex address (e.g., 0x10000000)")]
         public string DumpAddress
@@ -119,6 +158,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private uint _dumpLength = 4096;
+        /// <summary>
+        /// The number of bytes to dump from the memory address.
+        /// </summary>
         [Range(1, uint.MaxValue)]
         public uint DumpLength
         {
@@ -132,6 +174,9 @@ namespace S7_Csharp_Utility.ViewModels
 
 
         private bool _isUploadingStager;
+        /// <summary>
+        /// Indicates whether a stager is currently being uploaded.
+        /// </summary>
         public bool IsUploadingStager
         {
             get => _isUploadingStager;
@@ -144,6 +189,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _isDumpingMemory;
+        /// <summary>
+        /// Indicates whether a memory dump is in progress.
+        /// </summary>
         public bool IsDumpingMemory
         {
             get => _isDumpingMemory;
@@ -156,6 +204,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _isComparing;
+        /// <summary>
+        /// Indicates whether a comparison is in progress.
+        /// </summary>
         public bool IsComparing
         {
             get => _isComparing;
@@ -169,6 +220,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private double _dumpProgressPercentage;
+        /// <summary>
+        /// The progress of the memory dump as a percentage.
+        /// </summary>
         public double DumpProgressPercentage
         {
             get => _dumpProgressPercentage;
@@ -180,6 +234,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _dumpProgressBytes = "Read: 0 / 0 bytes";
+        /// <summary>
+        /// The progress of the memory dump in bytes.
+        /// </summary>
         public string DumpProgressBytes
         {
             get => _dumpProgressBytes;
@@ -191,6 +248,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _dumpProgressTime = "Elapsed: 0s | Remaining: calculating...";
+        /// <summary>
+        /// The elapsed and remaining time for the memory dump.
+        /// </summary>
         public string DumpProgressTime
         {
             get => _dumpProgressTime;
@@ -203,6 +263,9 @@ namespace S7_Csharp_Utility.ViewModels
 
 
         private bool _stagerInstalled;
+        /// <summary>
+        /// Indicates whether the stager has been successfully installed on the PLC.
+        /// </summary>
         public bool StagerInstalled
         {
             get => _stagerInstalled;
@@ -214,24 +277,36 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// The path to the folder containing the stager payloads.
+        /// </summary>
         public string PayloadsPath
         {
             get => _payloadsPath;
             set { _payloadsPath = value; OnPropertyChanged(); }
         }
         private string _payloadsPath = string.Empty;
+        /// <summary>
+        /// The path to the folder where memory dumps will be saved.
+        /// </summary>
         public string DumpsPath
         {
             get => _dumpsPath;
             set { _dumpsPath = value; OnPropertyChanged(); }
         }
         private string _dumpsPath = string.Empty;
+        /// <summary>
+        /// The path to the folder where logs will be saved.
+        /// </summary>
         public string LogsPath
         {
             get => _logsPath;
             set { _logsPath = value; OnPropertyChanged(); }
         }
         private string _logsPath = string.Empty;
+        /// <summary>
+        /// The path to the folder where extracted files will be saved.
+        /// </summary>
         public string ExtractionPath
         {
             get => _extractionPath;
@@ -239,23 +314,65 @@ namespace S7_Csharp_Utility.ViewModels
         }
         private string _extractionPath = string.Empty;
 
+        /// <summary>
+        /// Command to browse for the payloads folder.
+        /// </summary>
         public ICommand BrowsePayloadsFolderCommand { get; }
+        /// <summary>
+        /// Command to browse for the dumps folder.
+        /// </summary>
         public ICommand BrowseDumpsFolderCommand { get; }
+        /// <summary>
+        /// Command to browse for the logs folder.
+        /// </summary>
         public ICommand BrowseLogsFolderCommand { get; }
+        /// <summary>
+        /// Command to browse for the extraction folder.
+        /// </summary>
         public ICommand BrowseExtractionFolderCommand { get; }
+        /// <summary>
+        /// Command to save the configured paths.
+        /// </summary>
         public ICommand SavePathsCommand { get; }
 
+        /// <summary>
+        /// Command to upload the stager to the PLC.
+        /// </summary>
         public ICommand UploadStagerCommand { get; }
+        /// <summary>
+        /// Command to dump memory from the PLC.
+        /// </summary>
         public ICommand DumpMemoryCommand { get; }
+        /// <summary>
+        /// Command to browse for a folder to compare dumps.
+        /// </summary>
         public ICommand BrowseCompareFolderCommand { get; }
+        /// <summary>
+        /// Command to browse for the first file to compare.
+        /// </summary>
         public ICommand BrowseCompareFile1Command { get; }
+        /// <summary>
+        /// Command to browse for the second file to compare.
+        /// </summary>
         public ICommand BrowseCompareFile2Command { get; }
+        /// <summary>
+        /// Command to compare all dumps in a folder.
+        /// </summary>
         public ICommand CompareDumpsCommand { get; }
+        /// <summary>
+        /// Command to compare two files.
+        /// </summary>
         public ICommand CompareTwoFilesCommand { get; }
 
         private readonly SocatService _socatService;
+        /// <summary>
+        /// A collection of available serial ports.
+        /// </summary>
         public ObservableCollection<string> AvailableSerialPorts { get; } = new ObservableCollection<string>();
         private string _selectedSerialPort = string.Empty;
+        /// <summary>
+        /// The currently selected serial port.
+        /// </summary>
         public string SelectedSerialPort
         {
             get => _selectedSerialPort;
@@ -267,6 +384,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _socatTcpPort = 8888;
+        /// <summary>
+        /// The TCP port used by socat.
+        /// </summary>
         public int SocatTcpPort
         {
             get => _socatTcpPort;
@@ -278,6 +398,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _socatStatus = "Stopped";
+        /// <summary>
+        /// The current status of the socat service.
+        /// </summary>
         public string SocatStatus
         {
             get => _socatStatus;
@@ -290,15 +413,39 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Command to start the socat service.
+        /// </summary>
         public ICommand StartSocatCommand { get; }
+        /// <summary>
+        /// Command to stop the socat service.
+        /// </summary>
         public ICommand StopSocatCommand { get; }
+        /// <summary>
+        /// Command to refresh the list of available serial ports.
+        /// </summary>
         public ICommand RefreshSerialPortsCommand { get; }
+        /// <summary>
+        /// Command to show the socat log window.
+        /// </summary>
         public ICommand ShowSocatLogCommand { get; }
+        /// <summary>
+        /// Command to save the current configuration to a file.
+        /// </summary>
         public ICommand SaveConfigurationCommand { get; }
+        /// <summary>
+        /// Command to load a configuration from a file.
+        /// </summary>
         public ICommand LoadConfigurationCommand { get; }
 
+        /// <summary>
+        /// A collection of available communication modes.
+        /// </summary>
         public ObservableCollection<string> CommunicationModes { get; } = new ObservableCollection<string> { "TCP (socat)", "Serial" };
         private string _selectedCommunicationMode = "TCP (socat)";
+        /// <summary>
+        /// The currently selected communication mode.
+        /// </summary>
         public string SelectedCommunicationMode
         {
             get => _selectedCommunicationMode;
@@ -314,11 +461,23 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Indicates whether the socat communication mode is selected.
+        /// </summary>
         public bool IsSocatModeSelected => _selectedCommunicationMode == "TCP (socat)";
+        /// <summary>
+        /// Indicates whether the serial communication mode is selected.
+        /// </summary>
         public bool IsSerialModeSelected => _selectedCommunicationMode == "Serial";
 
+        /// <summary>
+        /// A collection of available baud rates for serial communication.
+        /// </summary>
         public ObservableCollection<int> AvailableBaudRates { get; } = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
         private int _selectedBaudRate = 115200;
+        /// <summary>
+        /// The currently selected baud rate.
+        /// </summary>
         public int SelectedBaudRate
         {
             get => _selectedBaudRate;
@@ -329,8 +488,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// A collection of available parities for serial communication.
+        /// </summary>
         public ObservableCollection<Parity> AvailableParities { get; } = new ObservableCollection<Parity>(Enum.GetValues(typeof(Parity)).Cast<Parity>());
         private Parity _selectedParity = Parity.None;
+        /// <summary>
+        /// The currently selected parity.
+        /// </summary>
         public Parity SelectedParity
         {
             get => _selectedParity;
@@ -341,8 +506,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// A collection of available stop bits for serial communication.
+        /// </summary>
         public ObservableCollection<StopBits> AvailableStopBits { get; } = new ObservableCollection<StopBits>(Enum.GetValues(typeof(StopBits)).Cast<StopBits>());
         private StopBits _selectedStopBits = StopBits.One;
+        /// <summary>
+        /// The currently selected stop bits.
+        /// </.summary>
         public StopBits SelectedStopBits
         {
             get => _selectedStopBits;
@@ -353,8 +524,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// A collection of available flow controls for serial communication.
+        /// </summary>
         public ObservableCollection<Handshake> AvailableFlowControls { get; } = new ObservableCollection<Handshake>(Enum.GetValues(typeof(Handshake)).Cast<Handshake>());
         private Handshake _selectedFlowControl = Handshake.None;
+        /// <summary>
+        /// The currently selected flow control.
+        /// </summary>
         public Handshake SelectedFlowControl
         {
             get => _selectedFlowControl;
@@ -367,6 +544,9 @@ namespace S7_Csharp_Utility.ViewModels
 
 
         private string _compareFolder = string.Empty;
+        /// <summary>
+        /// The folder containing dumps to be compared.
+        /// </summary>
         public string CompareFolder
         {
             get => _compareFolder;
@@ -379,6 +559,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _compareFile1 = string.Empty;
+        /// <summary>
+        /// The first file to be compared.
+        /// </summary>
         public string CompareFile1
         {
             get => _compareFile1;
@@ -391,6 +574,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _compareFile2 = string.Empty;
+        /// <summary>
+        /// The second file to be compared.
+        /// </summary>
         public string CompareFile2
         {
             get => _compareFile2;
@@ -405,6 +591,16 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly Interfaces.IDialogService _dialogService;
         private readonly ConfigurationService _configService;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MainWindowViewModel"/> class.
+        /// </summary>
+        /// <param name="loggingService">The logging service.</param>
+        /// <param name="powerController">The power controller.</param>
+        /// <param name="payloadManager">The payload manager.</param>
+        /// <param name="dialogService">The dialog service.</param>
+        /// <param name="socatService">The socat service.</param>
+        /// <param name="configService">The configuration service.</param>
+        /// <param name="socatLoggerService">The socat logger service.</param>
         public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService, SocatLoggerService socatLoggerService)
         {
             Logging = loggingService;
@@ -443,6 +639,10 @@ namespace S7_Csharp_Utility.ViewModels
             RefreshSerialPorts();
         }
 
+        /// <summary>
+        /// Creates a communication channel based on the selected mode (TCP or Serial).
+        /// </summary>
+        /// <returns>An initialized communication channel.</returns>
         private S7.Net.Interfaces.ICommunicationChannel CreateCommunicationChannel()
         {
             if (SelectedCommunicationMode == "TCP (socat)")
@@ -455,6 +655,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Uploads the stager to the PLC after power cycling the device.
+        /// </summary>
         private async Task UploadStager()
         {
             IsUploadingStager = true;
@@ -485,6 +688,10 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Runs the stager installation sequence.
+        /// </summary>
+        /// <param name="plcClient">The PLC client.</param>
         private async Task RunStagerSequenceAsync(S7.Net.PlcClient plcClient)
         {
             StagerInstalled = false;
@@ -503,6 +710,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Dumps the memory from the PLC.
+        /// </summary>
         private async Task DumpMemory()
         {
             IsDumpingMemory = true;
@@ -537,6 +747,12 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Runs the memory dump sequence.
+        /// </summary>
+        /// <param name="plcClient">The PLC client.</param>
+        /// <param name="address">The starting memory address.</param>
+        /// <param name="length">The number of bytes to dump.</param>
         private async Task RunDumpSequenceAsync(S7.Net.PlcClient plcClient, uint address, uint length)
         {
             Logging.Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
@@ -579,6 +795,9 @@ namespace S7_Csharp_Utility.ViewModels
             Logging.Log($"Successfully dumped {dumpedData.Length} bytes to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
         }
 
+        /// <summary>
+        /// Compares all dump files in a specified folder.
+        /// </summary>
         private async Task CompareDumps()
         {
             if (string.IsNullOrWhiteSpace(CompareFolder) || !System.IO.Directory.Exists(CompareFolder))
@@ -610,6 +829,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Refreshes the list of available serial ports.
+        /// </summary>
         private void RefreshSerialPorts()
         {
             AvailableSerialPorts.Clear();
@@ -623,6 +845,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Starts the socat service.
+        /// </summary>
         private async Task StartSocatAsync()
         {
             try
@@ -638,6 +863,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Stops the socat service.
+        /// </summary>
         private async Task StopSocatAsync()
         {
             try
@@ -652,6 +880,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Saves the current configuration to a file.
+        /// </summary>
         private async Task SaveConfiguration()
         {
             var path = await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Files");
@@ -681,6 +912,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Loads the configuration from a file.
+        /// </summary>
         private async Task LoadConfiguration()
         {
             var path = await _dialogService.ShowOpenFileDialogAsync("Load Configuration", "json", "JSON Files");
@@ -710,6 +944,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Loads the configuration from the default file on startup.
+        /// </summary>
         public void LoadConfigurationOnStartup()
         {
             try
@@ -734,7 +971,7 @@ namespace S7_Csharp_Utility.ViewModels
                     SelectedBaudRate = config.SelectedBaudRate;
                     SelectedParity = config.SelectedParity;
                     SelectedStopBits = config.SelectedStopBits;
-                    SelectedFlowControl = config.SelectedFlowControl;
+                    SelectedFlowControl = config.SelectedFlowcontrol;
                 }
             }
             catch (Exception ex)
@@ -743,6 +980,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Saves the current configuration to the default file on exit.
+        /// </summary>
         public void SaveConfigurationOnExit()
         {
             try
@@ -778,6 +1018,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Compares two selected dump files.
+        /// </summary>
         private async Task CompareTwoFiles()
         {
             if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))

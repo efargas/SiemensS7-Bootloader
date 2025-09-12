@@ -7,15 +7,27 @@ using System.Threading.Tasks;
 
 namespace S7.Utils
 {
+    /// <summary>
+    /// A utility for comparing memory dumps.
+    /// </summary>
     public class DumpComparer
     {
         private readonly Action<string>? _progressReporter;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DumpComparer"/> class.
+        /// </summary>
+        /// <param name="progressReporter">An action to report progress to.</param>
         public DumpComparer(Action<string>? progressReporter = null)
         {
             _progressReporter = progressReporter;
         }
 
+        /// <summary>
+        /// Computes the MD5 hashes of all files in a folder.
+        /// </summary>
+        /// <param name="folderPath">The path to the folder.</param>
+        /// <returns>A dictionary mapping hashes to a list of file paths.</returns>
         public async Task<Dictionary<string, List<string>>> ComputeFileHashesAsync(string folderPath)
         {
             var hashes = new Dictionary<string, List<string>>();
@@ -40,6 +52,12 @@ namespace S7.Utils
             return hashes;
         }
 
+        /// <summary>
+        /// Generates a report comparing the files in a folder based on their hashes.
+        /// </summary>
+        /// <param name="hashes">The dictionary of hashes and file paths.</param>
+        /// <param name="folderPath">The path to the folder.</param>
+        /// <returns>A string containing the comparison report.</returns>
         public string GenerateFolderCompareReport(Dictionary<string, List<string>> hashes, string folderPath)
         {
             var allFiles = Directory.GetFiles(folderPath, "*");
@@ -82,6 +100,11 @@ namespace S7.Utils
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Computes the MD5 hash of a file.
+        /// </summary>
+        /// <param name="path">The path to the file.</param>
+        /// <returns>The MD5 hash of the file.</returns>
         public async Task<string> ComputeFileHashAsync(string path)
         {
             using (var md5 = MD5.Create())

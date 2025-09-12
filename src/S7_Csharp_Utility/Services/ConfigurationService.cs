@@ -5,8 +5,16 @@ using System.Threading.Tasks;
 
 namespace S7_Csharp_Utility.Services
 {
+    /// <summary>
+    /// Service for handling application configuration.
+    /// </summary>
     public class ConfigurationService
     {
+        /// <summary>
+        /// Saves the application configuration to a file.
+        /// </summary>
+        /// <param name="config">The configuration to save.</param>
+        /// <param name="filePath">The path to the configuration file.</param>
         public async Task SaveConfiguration(ApplicationConfiguration config, string filePath)
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
@@ -14,6 +22,11 @@ namespace S7_Csharp_Utility.Services
             await File.WriteAllTextAsync(filePath, json);
         }
 
+        /// <summary>
+        /// Loads the application configuration from a file.
+        /// </summary>
+        /// <param name="filePath">The path to the configuration file.</param>
+        /// <returns>The loaded configuration, or null if the file does not exist.</returns>
         public async Task<ApplicationConfiguration?> LoadConfiguration(string filePath)
         {
             if (!File.Exists(filePath))

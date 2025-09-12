@@ -9,16 +9,27 @@ using S7.Utils;
 
 namespace S7_Csharp_Utility
 {
+    /// <summary>
+    /// The firmware unpacker window.
+    /// </summary>
     public partial class FirmwareUnpackerWindow : Window
     {
         private S7UpdateUnpacker _unpacker = new S7UpdateUnpacker();
         private string _firmwarePath = "";
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FirmwareUnpackerWindow"/> class.
+        /// </summary>
         public FirmwareUnpackerWindow()
         {
             InitializeComponent();
             SelectFirmwareButton.Click += SelectFirmwareButton_Click;
             UnpackFirmwareButton.Click += UnpackFirmwareButton_Click;
         }
+        /// <summary>
+        /// Handles the Click event of the SelectFirmwareButton control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private async void SelectFirmwareButton_Click(object? sender, RoutedEventArgs e)
         {
             var topLevel = TopLevel.GetTopLevel(this);
@@ -49,6 +60,11 @@ namespace S7_Csharp_Utility
                 }
             }
         }
+        /// <summary>
+        /// Handles the Click event of the UnpackFirmwareButton control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private async void UnpackFirmwareButton_Click(object? sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(_firmwarePath)) return;
@@ -69,6 +85,10 @@ namespace S7_Csharp_Utility
                 } catch (Exception ex) { await ShowMessage($"Error: {ex.Message}"); }
             }
         }
+        /// <summary>
+        /// Shows a message dialog.
+        /// </summary>
+        /// <param name="msg">The message to show.</param>
         private async Task ShowMessage(string msg)
         {
             var dlg = new Window { Title = "Info", Content = new TextBlock { Text = msg, Margin = new Avalonia.Thickness(12) }, Width = 360, Height = 120 };

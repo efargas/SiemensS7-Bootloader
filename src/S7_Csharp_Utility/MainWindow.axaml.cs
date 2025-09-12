@@ -13,6 +13,9 @@ using S7_Csharp_Utility.Interfaces;
 
 namespace S7_Csharp_Utility
 {
+    /// <summary>
+    /// The main window of the application.
+    /// </summary>
     public partial class MainWindow : Window, IDialogService
     {
         private readonly Services.PowerController _powerController;
@@ -20,6 +23,9 @@ namespace S7_Csharp_Utility
         private readonly Services.LoggingService _loggingService;
         private readonly Services.SocatLoggerService _socatLoggerService;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MainWindow"/> class.
+        /// </summary>
         public MainWindow()
         {
             InitializeComponent();
@@ -106,12 +112,22 @@ namespace S7_Csharp_Utility
             }
         }
 
+        /// <summary>
+        /// Checks if a ScrollViewer is scrolled to the bottom.
+        /// </summary>
+        /// <param name="sv">The ScrollViewer to check.</param>
+        /// <returns>True if the ScrollViewer is at the bottom, false otherwise.</returns>
         private bool IsAtBottom(ScrollViewer sv)
         {
             const double tolerance = 1.0;
             return sv.Extent.Height - sv.Viewport.Height - sv.Offset.Y < tolerance;
         }
 
+        /// <summary>
+        /// Opens a folder picker dialog.
+        /// </summary>
+        /// <param name="title">The title of the dialog.</param>
+        /// <returns>The selected folder path, or null if no folder was selected.</returns>
         public async Task<string?> OpenFolderPickerAsync(string title)
         {
             var topLevel = TopLevel.GetTopLevel(this);
@@ -120,6 +136,11 @@ namespace S7_Csharp_Utility
             return folders.Count == 1 ? folders[0].TryGetLocalPath() : null;
         }
 
+        /// <summary>
+        /// Opens a file picker dialog.
+        /// </summary>
+        /// <param name="title">The title of the dialog.</param>
+        /// <returns>The selected file path, or null if no file was selected.</returns>
         public async Task<string?> OpenFilePickerAsync(string title)
         {
             var topLevel = TopLevel.GetTopLevel(this);
@@ -128,6 +149,9 @@ namespace S7_Csharp_Utility
             return files.Count == 1 ? files[0].TryGetLocalPath() : null;
         }
 
+        /// <summary>
+        /// Shows the socat log window.
+        /// </summary>
         public void ShowSocatLogWindow()
         {
             var textBox = new TextBox
@@ -149,6 +173,13 @@ namespace S7_Csharp_Utility
             logWindow.Show();
         }
 
+        /// <summary>
+        /// Shows a save file dialog.
+        /// </summary>
+        /// <param name="title">The title of the dialog.</param>
+        /// <param name="defaultExtension">The default file extension.</param>
+        /// <param name="fileType">The file type description.</param>
+        /// <returns>The selected file path, or null if no file was selected.</returns>
         public async Task<string?> ShowSaveFileDialogAsync(string title, string defaultExtension, string fileType)
         {
             var topLevel = TopLevel.GetTopLevel(this);
@@ -162,6 +193,13 @@ namespace S7_Csharp_Utility
             return file?.TryGetLocalPath();
         }
 
+        /// <summary>
+        /// Shows an open file dialog.
+        /// </summary>
+        /// <param name="title">The title of the dialog.</param>
+        /// <param name="defaultExtension">The default file extension.</param>
+        /// <param name="fileType">The file type description.</param>
+        /// <returns>The selected file path, or null if no file was selected.</returns>
         public async Task<string?> ShowOpenFileDialogAsync(string title, string defaultExtension, string fileType)
         {
             var topLevel = TopLevel.GetTopLevel(this);
@@ -175,6 +213,11 @@ namespace S7_Csharp_Utility
             return files.Count == 1 ? files[0].TryGetLocalPath() : null;
         }
 
+        /// <summary>
+        /// Shows a message dialog.
+        /// </summary>
+        /// <param name="title">The title of the dialog.</param>
+        /// <param name="message">The message to display.</param>
         public async Task ShowMessageAsync(string title, string message)
         {
             var dialog = new Window
@@ -189,6 +232,12 @@ namespace S7_Csharp_Utility
             };
             await dialog.ShowDialog(this);
         }
+
+        /// <summary>
+        /// Exports the log content to a file.
+        /// </summary>
+        /// <param name="logContent">The content to export.</param>
+        /// <param name="dialogTitle">The title of the save file dialog.</param>
         private async Task ExportLogToFileAsync(string logContent, string dialogTitle)
         {
             var topLevel = TopLevel.GetTopLevel(this);

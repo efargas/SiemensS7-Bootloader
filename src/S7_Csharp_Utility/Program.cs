@@ -3,6 +3,9 @@ using System;
 
 namespace S7_Csharp_Utility
 {
+    /// <summary>
+    /// The main program class.
+    /// </summary>
     class Program
     {
         // Initialization code. Don't use any Avalonia, third-party APIs or any
@@ -13,6 +16,10 @@ namespace S7_Csharp_Utility
             .StartWithClassicDesktopLifetime(args);
 
         // Avalonia configuration, don't remove; also used by visual designer.
+        /// <summary>
+        /// Builds the Avalonia application.
+        /// </summary>
+        /// <returns>The app builder.</returns>
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
