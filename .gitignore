@@ -7,7 +7,7 @@
 .vscode/
 
 # Build Output
-**/bin/
+src/**/bin/
 **/obj/
 
 # Avalonia Designer/Preview
@@ -30,9 +30,14 @@ Legacy/*.log
 Legacy/*.tmp
 
 # Payloads/project generated outputs
-payloads/**/*.bin
 payloads/**/*.exe
 payloads/**/*.tmp
+payloads/**/*.d
+payloads/**/*.ihex
+payloads/**/*.o
+payloads/**/*.sym
+payloads/**/build/*
+!payloads/**/build/*.bin
 
 # Rider
 .idea/
