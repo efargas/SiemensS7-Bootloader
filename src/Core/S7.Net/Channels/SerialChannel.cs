@@ -8,21 +8,30 @@ namespace S7.Net.Channels
     {
         private readonly string _portName;
         private readonly int _baudRate;
+        private readonly Parity _parity;
+        private readonly StopBits _stopBits;
+        private readonly Handshake _handshake;
         private SerialPort? _serialPort;
 
         public bool IsConnected => _serialPort?.IsOpen ?? false;
         public bool DataAvailable => (_serialPort?.BytesToRead ?? 0) > 0;
 
-        public SerialChannel(string portName, int baudRate = 115200)
+        public SerialChannel(string portName, int baudRate, Parity parity, StopBits stopBits, Handshake handshake)
         {
             _portName = portName;
             _baudRate = baudRate;
+            _parity = parity;
+            _stopBits = stopBits;
+            _handshake = handshake;
         }
 
         public Task ConnectAsync()
         {
             if (IsConnected) Disconnect();
-            _serialPort = new SerialPort(_portName, _baudRate);
+            _serialPort = new SerialPort(_portName, _baudRate, _parity, 8, _stopBits)
+            {
+                Handshake = _handshake
+            };
             _serialPort.Open();
             return Task.CompletedTask;
         }

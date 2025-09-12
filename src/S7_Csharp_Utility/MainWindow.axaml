@@ -35,6 +35,14 @@
                                 <TextBox Name="PlcHostTextBox" HorizontalAlignment="Stretch" />
                                 <TextBlock Text="Port:" />
                                 <TextBox Name="PlcPortTextBox" HorizontalAlignment="Stretch" />
+                                <TextBlock Text="Baud Rate:" />
+                                <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding SelectedBaudRate, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="Parity:" />
+                                <ComboBox ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding SelectedParity, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="Stop Bits:" />
+                                <ComboBox ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding SelectedStopBits, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="Flow Control:" />
+                                <ComboBox ItemsSource="{Binding AvailableFlowControls}" SelectedItem="{Binding SelectedFlowControl, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
                                 <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Margin="0,10,0,0"/>
                                 </StackPanel>
                             </Border>

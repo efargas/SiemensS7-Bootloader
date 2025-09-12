@@ -1,3 +1,5 @@
+using System.IO.Ports;
+
 namespace S7_Csharp_Utility.Models
 {
     public class ApplicationConfiguration
@@ -15,5 +17,9 @@ namespace S7_Csharp_Utility.Models
         public string CompareFile2 { get; set; } = string.Empty;
         public string SelectedSerialPort { get; set; } = string.Empty;
         public int SocatTcpPort { get; set; } = 8888;
+        public int SelectedBaudRate { get; set; } = 115200;
+        public Parity SelectedParity { get; set; } = Parity.None;
+        public StopBits SelectedStopBits { get; set; } = StopBits.One;
+        public Handshake SelectedFlowControl { get; set; } = Handshake.None;
     }
 }

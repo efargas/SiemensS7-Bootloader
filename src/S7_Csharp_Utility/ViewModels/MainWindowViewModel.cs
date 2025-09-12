@@ -6,6 +6,7 @@ using S7.Net;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.IO.Ports;
 
 namespace S7_Csharp_Utility.ViewModels
 {
@@ -303,6 +304,42 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        public ObservableCollection<Parity> AvailableParities { get; } = new ObservableCollection<Parity>(Enum.GetValues(typeof(Parity)).Cast<Parity>());
+        private Parity _selectedParity = Parity.None;
+        public Parity SelectedParity
+        {
+            get => _selectedParity;
+            set
+            {
+                _selectedParity = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<StopBits> AvailableStopBits { get; } = new ObservableCollection<StopBits>(Enum.GetValues(typeof(StopBits)).Cast<StopBits>());
+        private StopBits _selectedStopBits = StopBits.One;
+        public StopBits SelectedStopBits
+        {
+            get => _selectedStopBits;
+            set
+            {
+                _selectedStopBits = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<Handshake> AvailableFlowControls { get; } = new ObservableCollection<Handshake>(Enum.GetValues(typeof(Handshake)).Cast<Handshake>());
+        private Handshake _selectedFlowControl = Handshake.None;
+        public Handshake SelectedFlowControl
+        {
+            get => _selectedFlowControl;
+            set
+            {
+                _selectedFlowControl = value;
+                OnPropertyChanged();
+            }
+        }
+
 
         private string _compareFolder = string.Empty;
         public string CompareFolder
@@ -379,7 +416,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             else
             {
-                return new S7.Net.Channels.SerialChannel(SelectedSerialPort, SelectedBaudRate);
+                return new S7.Net.Channels.SerialChannel(SelectedSerialPort, SelectedBaudRate, SelectedParity, SelectedStopBits, SelectedFlowControl);
             }
         }
 
@@ -599,7 +636,11 @@ namespace S7_Csharp_Utility.ViewModels
                     CompareFile1 = this.CompareFile1,
                     CompareFile2 = this.CompareFile2,
                     SelectedSerialPort = this.SelectedSerialPort,
-                    SocatTcpPort = this.SocatTcpPort
+                    SocatTcpPort = this.SocatTcpPort,
+                    SelectedBaudRate = this.SelectedBaudRate,
+                    SelectedParity = this.SelectedParity,
+                    SelectedStopBits = this.SelectedStopBits,
+                    SelectedFlowControl = this.SelectedFlowControl
                 };
                 await _configService.SaveConfiguration(config, path);
             }
@@ -626,6 +667,10 @@ namespace S7_Csharp_Utility.ViewModels
                     CompareFile2 = config.CompareFile2;
                     SelectedSerialPort = config.SelectedSerialPort;
                     SocatTcpPort = config.SocatTcpPort;
+                    SelectedBaudRate = config.SelectedBaudRate;
+                    SelectedParity = config.SelectedParity;
+                    SelectedStopBits = config.SelectedStopBits;
+                    SelectedFlowControl = config.SelectedFlowControl;
                 }
             }
         }
@@ -651,6 +696,10 @@ namespace S7_Csharp_Utility.ViewModels
                     CompareFile2 = config.CompareFile2;
                     SelectedSerialPort = config.SelectedSerialPort;
                     SocatTcpPort = config.SocatTcpPort;
+                    SelectedBaudRate = config.SelectedBaudRate;
+                    SelectedParity = config.SelectedParity;
+                    SelectedStopBits = config.SelectedStopBits;
+                    SelectedFlowControl = config.SelectedFlowControl;
                 }
             }
             catch (Exception ex)
@@ -678,7 +727,11 @@ namespace S7_Csharp_Utility.ViewModels
                     CompareFile1 = this.CompareFile1,
                     CompareFile2 = this.CompareFile2,
                     SelectedSerialPort = this.SelectedSerialPort,
-                    SocatTcpPort = this.SocatTcpPort
+                    SocatTcpPort = this.SocatTcpPort,
+                    SelectedBaudRate = this.SelectedBaudRate,
+                    SelectedParity = this.SelectedParity,
+                    SelectedStopBits = this.SelectedStopBits,
+                    SelectedFlowControl = this.SelectedFlowControl
                 };
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
                 string json = System.Text.Json.JsonSerializer.Serialize(config, options);
