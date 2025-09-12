@@ -319,7 +319,7 @@ namespace S7_Csharp_Utility.ViewModels
             get => _payloadsPath;
             set { _payloadsPath = value; OnPropertyChanged(); }
         }
-        private string _payloadsPath = string.Empty;
+        private string _payloadsPath = "Resources/payloads";
         /// <summary>
         /// The path to the folder where memory dumps will be saved.
         /// </summary>
