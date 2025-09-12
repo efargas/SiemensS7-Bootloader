@@ -12,6 +12,7 @@ namespace S7_Csharp_Utility.ViewModels
 {
     public class MainWindowViewModel : ViewModelBase
     {
+        private const string ConfigFileName = "config.json";
         private string _plcHost = "localhost";
         [Required]
         public string PlcHost
@@ -242,6 +243,7 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand BrowseDumpsFolderCommand { get; }
         public ICommand BrowseLogsFolderCommand { get; }
         public ICommand BrowseExtractionFolderCommand { get; }
+        public ICommand SavePathsCommand { get; }
 
         public ICommand UploadStagerCommand { get; }
         public ICommand DumpMemoryCommand { get; }
@@ -429,13 +431,14 @@ namespace S7_Csharp_Utility.ViewModels
             CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFolder));
             CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
 
-            StartSocatCommand = new Commands.RelayCommand(_ => StartSocat(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && IsSocatModeSelected && SocatStatus != "Running");
-            StopSocatCommand = new Commands.RelayCommand(_ => StopSocat(), _ => IsSocatModeSelected && SocatStatus == "Running");
+            StartSocatCommand = new Commands.RelayCommand(async _ => await StartSocatAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && IsSocatModeSelected && SocatStatus != "Running");
+            StopSocatCommand = new Commands.RelayCommand(async _ => await StopSocatAsync(), _ => IsSocatModeSelected && SocatStatus == "Running");
             RefreshSerialPortsCommand = new Commands.RelayCommand(_ => RefreshSerialPorts());
             ShowSocatLogCommand = new Commands.RelayCommand(_ => _dialogService.ShowSocatLogWindow());
 
             SaveConfigurationCommand = new Commands.RelayCommand(async _ => await SaveConfiguration());
             LoadConfigurationCommand = new Commands.RelayCommand(async _ => await LoadConfiguration());
+            SavePathsCommand = new Commands.RelayCommand(async _ => await SaveConfiguration(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
 
             RefreshSerialPorts();
         }
@@ -620,7 +623,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async void StartSocat()
+        private async Task StartSocatAsync()
         {
             try
             {
@@ -635,7 +638,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async void StopSocat()
+        private async Task StopSocatAsync()
         {
             try
             {
@@ -711,7 +714,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             try
             {
-                var path = System.IO.Path.Combine(AppContext.BaseDirectory, "config.json");
+                var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
                 var config = System.Text.Json.JsonSerializer.Deserialize<Models.ApplicationConfiguration>(System.IO.File.ReadAllText(path));
                 if (config != null)
                 {
@@ -744,7 +747,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             try
             {
-                var path = System.IO.Path.Combine(AppContext.BaseDirectory, "config.json");
+                var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
                 var config = new Models.ApplicationConfiguration
                 {
                     PlcHost = this.PlcHost,

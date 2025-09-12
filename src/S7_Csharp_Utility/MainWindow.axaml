@@ -21,10 +21,7 @@
             </MenuItem>
             <MenuItem Header="Help" />
         </Menu>
-        <!-- LOGGING AREA AT VERY BOTTOM REMOVED; kept only the anchoring Grid version. -->
-
-        <!-- BUTTON ROW (Only the in-Grid instance below is kept for correct layout) -->
-
+        
         <!-- MAIN CONTENT ANCHORED GRID -->
         <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="*">
             <Expander x:Name="ConfigExpander" Header="Configuration" IsExpanded="True" HorizontalAlignment="Stretch" VerticalAlignment="Top" Grid.Row="0">
@@ -93,31 +90,30 @@
                         <StackPanel Spacing="8" HorizontalAlignment="Stretch">
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Payloads Folder:" Width="120" />
-                                <TextBox Name="PayloadsPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding PayloadsPath, Mode=TwoWay}" />
+                                <TextBox Name="PayloadsPathTextBox" HorizontalAlignment="Stretch" Text="{Binding PayloadsPath, Mode=TwoWay}" />
                                 <Button Content="Browse" Name="BrowsePayloadsFolderButton" Command="{Binding BrowsePayloadsFolderCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Dumps Folder:" Width="120" />
-                                <TextBox Name="DumpsPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding DumpsPath, Mode=TwoWay}" />
+                                <TextBox Name="DumpsPathTextBox" HorizontalAlignment="Stretch" Text="{Binding DumpsPath, Mode=TwoWay}" />
                                 <Button Content="Browse" Name="BrowseDumpsFolderButton" Command="{Binding BrowseDumpsFolderCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Logs Folder:" Width="120" />
-                                <TextBox Name="LogsPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding LogsPath, Mode=TwoWay}" />
+                                <TextBox Name="LogsPathTextBox" HorizontalAlignment="Stretch" Text="{Binding LogsPath, Mode=TwoWay}" />
                                 <Button Content="Browse" Name="BrowseLogsFolderButton" Command="{Binding BrowseLogsFolderCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Extraction Folder:" Width="120" />
-                                <TextBox Name="ExtractionPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding ExtractionPath, Mode=TwoWay}" />
+                                <TextBox Name="ExtractionPathTextBox" HorizontalAlignment="Stretch" Text="{Binding ExtractionPath, Mode=TwoWay}" />
                                 <Button Content="Browse" Name="BrowseExtractionFolderButton" Command="{Binding BrowseExtractionFolderCommand}" />
                             </StackPanel>
-                            <Button Content="Save Settings" Name="SavePathsButton" Width="130" />
+                            <Button Content="Save Settings" Name="SavePathsButton" Command="{Binding SavePathsCommand}" HorizontalAlignment="Left" />
                         </StackPanel>
                     </TabItem>
                 </TabControl>
             </Expander>
-            <!-- Profile Management moved to its own window -->
-            <Expander Header="Memory &amp; Compare" IsExpanded="True" Name="MemCompareExpander" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                        <Expander Header="Memory &amp; Compare" IsExpanded="True" Name="MemCompareExpander" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
                 <TabControl Margin="0,8,0,0">
                     <TabItem Header="Memory Dump">
                         <StackPanel Margin="12">
@@ -164,8 +160,7 @@
                     </TabItem>
                 </TabControl>
             </Expander>
-            <!-- Firmware Unpacker moved to its own window -->
-            <Grid Grid.Row="2" Margin="0,8,0,0" Height="54" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+                        <Grid Grid.Row="2" Margin="0,8,0,0" Height="54" VerticalAlignment="Top" HorizontalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -212,9 +207,9 @@
                         <Button Name="ScrollToEndButton" Content="Scroll to End" Width="110" Command="{Binding Logging.ScrollToEndCommand}"/>
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Button Name="ClearSocatLogButton" Content="Clear Log" Width="110"/>
-                        <Button Name="ExportSocatLogButton" Content="Export..." Width="110"/>
-                        <Button Name="SocatScrollToEndButton" Content="Scroll to End" Width="110"/>
+                        <Button Name="ClearSocatLogButton" Content="Clear Log" Command="{Binding SocatLogging.ClearLogCommand}"/>
+                        <Button Name="ExportSocatLogButton" Content="Export..." Command="{Binding SocatLogging.ExportLogCommand}"/>
+                        <Button Name="SocatScrollToEndButton" Content="Scroll to End" Command="{Binding SocatLogging.ScrollToEndCommand}"/>
                     </StackPanel>
 
                     <!-- Log Viewers, Side by Side -->

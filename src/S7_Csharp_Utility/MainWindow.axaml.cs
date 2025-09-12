@@ -15,7 +15,6 @@ namespace S7_Csharp_Utility
 {
     public partial class MainWindow : Window, IDialogService
     {
-        private readonly S7UpdateUnpacker _unpacker;
         private readonly Services.PowerController _powerController;
 
         private readonly Services.LoggingService _loggingService;
@@ -40,9 +39,6 @@ namespace S7_Csharp_Utility
             FilterErrorCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterError = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
             FilterDebugCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterDebug = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
 
-            ClearSocatLogButton.Click += (s, e) => _socatLoggerService.Clear();
-            ExportSocatLogButton.Click += async (s, e) => await ExportSocatLogFileAsync();
-
             MenuProfileManagement.Click += (s, e) => new ProfileManagementWindow().Show();
             MenuFirmwareUnpacker.Click += (s, e) => new FirmwareUnpackerWindow().Show();
             
@@ -50,10 +46,8 @@ namespace S7_Csharp_Utility
             MenuLoadConfig.Click += (s, e) => viewModel.LoadConfigurationCommand.Execute(null);
             MenuExit.Click += (s, e) => Close();
 
-            _unpacker = new S7UpdateUnpacker();
-
             ClearLogButton.Click += (s, e) => _loggingService.Clear();
-            ExportLogButton.Click += async (s, e) => await ExportLogFileAsync();
+            ExportLogButton.Click += async (s, e) => await ExportLogToFileAsync(_loggingService.LogText, "Export Main Log");
 
             // --- Autoscroll Implementation ---
             var logScrollViewer = this.FindControl<ScrollViewer>("LogScrollViewer");
@@ -63,12 +57,20 @@ namespace S7_Csharp_Utility
 
             if (logScrollViewer != null)
             {
-                logScrollViewer.ScrollChanged += (s, e) => { isAutoScroll = IsAtBottom(logScrollViewer); };
+                logScrollViewer.ScrollChanged += (s, e) =>
+                {
+                    // Only update auto-scroll state if the user manually scrolled
+                    if (e.OffsetDelta.Y != 0) isAutoScroll = IsAtBottom(logScrollViewer);
+                };
             }
 
             if (socatLogScrollViewer != null)
             {
-                socatLogScrollViewer.ScrollChanged += (s, e) => { isSocatAutoScroll = IsAtBottom(socatLogScrollViewer); };
+                socatLogScrollViewer.ScrollChanged += (s, e) =>
+                {
+                    // Only update auto-scroll state if the user manually scrolled
+                    if (e.OffsetDelta.Y != 0) isSocatAutoScroll = IsAtBottom(socatLogScrollViewer);
+                };
             }
 
             _loggingService.PropertyChanged += (s, e) =>
@@ -187,13 +189,13 @@ namespace S7_Csharp_Utility
             };
             await dialog.ShowDialog(this);
         }
-        private async Task ExportLogFileAsync()
+        private async Task ExportLogToFileAsync(string logContent, string dialogTitle)
         {
             var topLevel = TopLevel.GetTopLevel(this);
             if (topLevel == null) return;
             var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Export Logs",
+                Title = dialogTitle,
                 DefaultExtension = "txt",
                 FileTypeChoices = new[] { new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } } }
             });
@@ -202,24 +204,7 @@ namespace S7_Csharp_Utility
             {
                 await using var stream = await file.OpenWriteAsync();
                 using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(_loggingService.LogText);
-            }
-        }
-    private async Task ExportSocatLogFileAsync()
-        {
-            var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel == null) return;
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-            {
-                Title = "Export Socat Log",
-                DefaultExtension = "txt",
-                FileTypeChoices = new[] { new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } } }
-            });
-            if (file is not null)
-            {
-                await using var stream = await file.OpenWriteAsync();
-                using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(_socatLoggerService.LogText);
+                await writer.WriteAsync(logContent);
             }
         }
     }
