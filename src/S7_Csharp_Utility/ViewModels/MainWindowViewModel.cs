@@ -723,7 +723,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             if (SelectedCommunicationMode == "TCP (socat)")
             {
-                return new S7.Net.Channels.TcpChannel(PlcHost, PlcPort);
+                return new S7.Net.Channels.TcpChannel(PlcHost, SocatTcpPort);
             }
             else
             {
@@ -1055,34 +1055,69 @@ namespace S7_Csharp_Utility.ViewModels
             try
             {
                 var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-                var config = System.Text.Json.JsonSerializer.Deserialize<Models.ApplicationConfiguration>(System.IO.File.ReadAllText(path));
-                if (config != null)
+                if (System.IO.File.Exists(path))
                 {
-                    PlcHost = config.PlcHost;
-                    PlcPort = config.PlcPort;
-                    ModbusHost = config.ModbusHost;
-                    ModbusPort = config.ModbusPort;
-                    ModbusCoil = config.ModbusCoil;
-                    DelaySeconds = config.DelaySeconds;
-                    DumpAddress = config.DumpAddress;
-                    DumpLength = config.DumpLength;
-                    CompareFolder = config.CompareFolder;
-                    CompareFile1 = config.CompareFile1;
-                    CompareFile2 = config.CompareFile2;
-                    SelectedSerialPort = config.SelectedSerialPort;
-                    SocatTcpPort = config.SocatTcpPort;
-                    SelectedBaudRate = config.SelectedBaudRate;
-                    SelectedParity = config.SelectedParity;
-                    SelectedStopBits = config.SelectedStopBits;
-                    SelectedFlowControl = config.SelectedFlowControl;
-                    SocatVerbose = config.SocatVerbose;
-                    SocatHexDump = config.SocatHexDump;
-                    SocatBlockSize = config.SocatBlockSize;
+                    var config = System.Text.Json.JsonSerializer.Deserialize<Models.ApplicationConfiguration>(System.IO.File.ReadAllText(path));
+                    if (config != null)
+                    {
+                        PlcHost = config.PlcHost;
+                        PlcPort = config.PlcPort;
+                        ModbusHost = config.ModbusHost;
+                        ModbusPort = config.ModbusPort;
+                        ModbusCoil = config.ModbusCoil;
+                        DelaySeconds = config.DelaySeconds;
+                        DumpAddress = config.DumpAddress;
+                        DumpLength = config.DumpLength;
+                        CompareFolder = config.CompareFolder;
+                        CompareFile1 = config.CompareFile1;
+                        CompareFile2 = config.CompareFile2;
+                        SelectedSerialPort = config.SelectedSerialPort;
+                        SocatTcpPort = config.SocatTcpPort;
+                        SelectedBaudRate = config.SelectedBaudRate;
+                        SelectedParity = config.SelectedParity;
+                        SelectedStopBits = config.SelectedStopBits;
+                        SelectedFlowControl = config.SelectedFlowControl;
+                        SocatVerbose = config.SocatVerbose;
+                        SocatHexDump = config.SocatHexDump;
+                        SocatBlockSize = config.SocatBlockSize;
+                    }
+                }
+                else
+                {
+                    // No existing configuration file; persist current defaults as the permanent configuration
+                    var defaultConfig = new Models.ApplicationConfiguration
+                    {
+                        PlcHost = this.PlcHost,
+                        PlcPort = this.PlcPort,
+                        ModbusHost = this.ModbusHost,
+                        ModbusPort = this.ModbusPort,
+                        ModbusCoil = this.ModbusCoil,
+                        DelaySeconds = this.DelaySeconds,
+                        DumpAddress = this.DumpAddress,
+                        DumpLength = this.DumpLength,
+                        CompareFolder = this.CompareFolder,
+                        CompareFile1 = this.CompareFile1,
+                        CompareFile2 = this.CompareFile2,
+                        SelectedSerialPort = this.SelectedSerialPort,
+                        SocatTcpPort = this.SocatTcpPort,
+                        SelectedBaudRate = this.SelectedBaudRate,
+                        SelectedParity = this.SelectedParity,
+                        SelectedStopBits = this.SelectedStopBits,
+                        SelectedFlowControl = this.SelectedFlowControl,
+                        SocatVerbose = this.SocatVerbose,
+                        SocatHexDump = this.SocatHexDump,
+                        SocatBlockSize = this.SocatBlockSize
+                    };
+
+                    var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+                    string json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, options);
+                    System.IO.File.WriteAllText(path, json);
+                    Logging.Log($"No configuration found. Created default configuration at {path}.", LogCategory.Info);
                 }
             }
             catch (Exception ex)
             {
-                Logging.Log($"Could not load configuration: {ex.Message}", LogCategory.Warning);
+                Logging.Log($"Could not load or create configuration: {ex.Message}", LogCategory.Warning);
             }
         }
 

@@ -29,6 +29,7 @@ namespace S7_Csharp_Utility.Services
     {
         private readonly Dispatcher _dispatcher;
         private readonly List<SocatLogEntry> _logEntries = new List<SocatLogEntry>();
+        private readonly object _sync = new object();
         private string _logText = string.Empty;
         private const int MaxLogLines = 2000;
 
@@ -73,21 +74,19 @@ namespace S7_Csharp_Utility.Services
         /// <param name="data">The message to log.</param>
         public void Log(string? data)
         {
-            if (data != null)
+            if (data == null) return;
+
+            lock (_sync)
             {
                 var entry = new SocatLogEntry { Timestamp = DateTime.Now, Message = data };
-                
                 _logEntries.Add(entry);
                 if (_logEntries.Count > MaxLogLines)
                 {
                     _logEntries.RemoveAt(0);
                 }
-
-                _dispatcher.Post(() => 
-                {
-                    UpdateLogText();
-                });
             }
+
+            _dispatcher.Post(UpdateLogText);
         }
 
         /// <summary>
@@ -95,8 +94,14 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         private void UpdateLogText()
         {
+            List<SocatLogEntry> snapshot;
+            lock (_sync)
+            {
+                snapshot = new List<SocatLogEntry>(_logEntries);
+            }
+
             var sb = new StringBuilder();
-            foreach (var entry in _logEntries)
+            foreach (var entry in snapshot)
             {
                 sb.AppendLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}");
             }
@@ -108,9 +113,12 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         public void Clear()
         {
-            _dispatcher.Post(() => 
+            _dispatcher.Post(() =>
             {
-                _logEntries.Clear();
+                lock (_sync)
+                {
+                    _logEntries.Clear();
+                }
                 LogText = string.Empty;
             });
         }
@@ -123,9 +131,14 @@ namespace S7_Csharp_Utility.Services
             string logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
             System.IO.Directory.CreateDirectory(logDir);
             string logFile = System.IO.Path.Combine(logDir, $"socat_exported_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            List<SocatLogEntry> snapshot;
+            lock (_sync)
+            {
+                snapshot = new List<SocatLogEntry>(_logEntries);
+            }
             using (var writer = new System.IO.StreamWriter(logFile, false))
             {
-                foreach (var entry in _logEntries)
+                foreach (var entry in snapshot)
                 {
                     writer.WriteLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}");
                 }

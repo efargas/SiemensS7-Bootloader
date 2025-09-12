@@ -42,11 +42,26 @@ namespace S7_Csharp_Utility.Services
             _logger.Clear();
             _logger.Log($"Starting socat: TCP-LISTEN:{tcpPort} <-> {serialPort}");
 
+            // Validate and normalize serial device path
+            var device = serialPort?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(device))
+            {
+                _logger.Log("ERROR: No serial port selected. Please select a serial device before starting socat.");
+                throw new ArgumentException("Serial port is required");
+            }
+            if (!device.StartsWith("/dev/", StringComparison.Ordinal))
+            {
+                device = "/dev/" + device;
+            }
+
             string flagArgs = string.Empty;
-            if (verbose) flagArgs += "-v ";
+            if (verbose) flagArgs += "-d -d -v ";
             if (blockSize > 0) flagArgs += $"-b {blockSize} ";
             if (hexDump) flagArgs += "-x ";
-            string arguments = $"{flagArgs}TCP-LISTEN:{tcpPort},fork,reuseaddr {serialPort}";
+            // Ensure raw serial and no echo to faithfully pass bytes
+            string rhs = $"{device},raw,echo=0";
+            string arguments = $"{flagArgs}TCP-LISTEN:{tcpPort},fork,reuseaddr {rhs}";
+            _logger.Log($"Executing: socat {arguments}");
 
             var processStartInfo = new ProcessStartInfo
             {
@@ -66,8 +81,11 @@ namespace S7_Csharp_Utility.Services
                     throw new Exception("Failed to start socat process.");
                 }
 
-                _socatProcess.OutputDataReceived += (sender, args) => _logger.Log(args.Data);
-                _socatProcess.ErrorDataReceived += (sender, args) => _logger.Log($"ERROR: {args.Data}");
+                _socatProcess.EnableRaisingEvents = true;
+                _socatProcess.Exited += (s, e) => _logger.Log($"socat exited with code {_socatProcess.ExitCode}");
+
+                _socatProcess.OutputDataReceived += (sender, args) => { if (args.Data != null) _logger.Log(args.Data); };
+                _socatProcess.ErrorDataReceived += (sender, args) => { if (args.Data != null) _logger.Log(args.Data); };
                 _socatProcess.BeginOutputReadLine();
                 _socatProcess.BeginErrorReadLine();
             }
