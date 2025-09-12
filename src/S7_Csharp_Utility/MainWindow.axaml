@@ -28,22 +28,37 @@
                         <Grid ColumnDefinitions="2*,2*" HorizontalAlignment="Stretch">
                             <Border Grid.Column="0" Margin="0,0,8,0" BorderBrush="#B0B0B0" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
                                 <StackPanel>
-                                <TextBlock Text="PLC Connection (Serial-to-TCP)" FontWeight="Bold" Margin="0,0,0,8" />
-                                <TextBlock Text="Connection Mode:" />
-                                <ComboBox ItemsSource="{Binding CommunicationModes}" SelectedItem="{Binding SelectedCommunicationMode, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
-                                <TextBlock Text="Host:" />
-                                <TextBox Name="PlcHostTextBox" HorizontalAlignment="Stretch" />
-                                <TextBlock Text="Port:" />
-                                <TextBox Name="PlcPortTextBox" HorizontalAlignment="Stretch" />
-                                <TextBlock Text="Baud Rate:" />
-                                <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding SelectedBaudRate, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
-                                <TextBlock Text="Parity:" />
-                                <ComboBox ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding SelectedParity, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
-                                <TextBlock Text="Stop Bits:" />
-                                <ComboBox ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding SelectedStopBits, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
-                                <TextBlock Text="Flow Control:" />
-                                <ComboBox ItemsSource="{Binding AvailableFlowControls}" SelectedItem="{Binding SelectedFlowControl, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
-                                <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Margin="0,10,0,0"/>
+                                    <TextBlock Text="PLC Connection" FontWeight="Bold" Margin="0,0,0,8" />
+                                    <TextBlock Text="Connection Mode:" />
+                                    <ComboBox ItemsSource="{Binding CommunicationModes}" SelectedItem="{Binding SelectedCommunicationMode, Mode=TwoWay}"/>
+
+                                    <Border BorderBrush="Gray" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSocatModeSelected}">
+                                        <StackPanel>
+                                            <TextBlock Text="TCP (socat) Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
+                                            <TextBlock Text="Host:" />
+                                            <TextBox Text="{Binding PlcHost, Mode=TwoWay}" />
+                                            <TextBlock Text="Port:" />
+                                            <TextBox Text="{Binding PlcPort, Mode=TwoWay}" />
+                                            <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Margin="0,10,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border BorderBrush="Gray" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSerialModeSelected}">
+                                        <StackPanel>
+                                            <TextBlock Text="Serial Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
+                                            <TextBlock Text="Serial Port:" />
+                                            <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SelectedSerialPort, Mode=TwoWay}"/>
+                                            <Button Content="Refresh Ports" Command="{Binding RefreshSerialPortsCommand}" Margin="0,5,0,10"/>
+                                            <TextBlock Text="Baud Rate:" />
+                                            <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding SelectedBaudRate, Mode=TwoWay}"/>
+                                            <TextBlock Text="Parity:" />
+                                            <ComboBox ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding SelectedParity, Mode=TwoWay}"/>
+                                            <TextBlock Text="Stop Bits:" />
+                                            <ComboBox ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding SelectedStopBits, Mode=TwoWay}"/>
+                                            <TextBlock Text="Flow Control:" />
+                                            <ComboBox ItemsSource="{Binding AvailableFlowControls}" SelectedItem="{Binding SelectedFlowControl, Mode=TwoWay}"/>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="1" Margin="8,0,0,0" BorderBrush="#B0B0B0" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">

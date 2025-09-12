@@ -287,10 +287,18 @@ namespace S7_Csharp_Utility.ViewModels
             get => _selectedCommunicationMode;
             set
             {
-                _selectedCommunicationMode = value;
-                OnPropertyChanged();
+                if (_selectedCommunicationMode != value)
+                {
+                    _selectedCommunicationMode = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsSocatModeSelected));
+                    OnPropertyChanged(nameof(IsSerialModeSelected));
+                }
             }
         }
+
+        public bool IsSocatModeSelected => _selectedCommunicationMode == "TCP (socat)";
+        public bool IsSerialModeSelected => _selectedCommunicationMode == "Serial";
 
         public ObservableCollection<int> AvailableBaudRates { get; } = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
         private int _selectedBaudRate = 115200;
