@@ -4,10 +4,16 @@ using Avalonia.Threading;
 
 namespace S7_Csharp_Utility.Services
 {
+    public class SocatLogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
     public class SocatLoggerService
     {
         private readonly Dispatcher _dispatcher;
-        public ObservableCollection<string> LogEntries { get; } = new ObservableCollection<string>();
+        public ObservableCollection<SocatLogEntry> LogEntries { get; } = new ObservableCollection<SocatLogEntry>();
 
         public SocatLoggerService(Dispatcher dispatcher)
         {
@@ -18,7 +24,8 @@ namespace S7_Csharp_Utility.Services
         {
             if (data != null)
             {
-                _dispatcher.Post(() => LogEntries.Add(data));
+                var entry = new SocatLogEntry { Timestamp = DateTime.Now, Message = data };
+                _dispatcher.Post(() => LogEntries.Add(entry));
             }
         }
 

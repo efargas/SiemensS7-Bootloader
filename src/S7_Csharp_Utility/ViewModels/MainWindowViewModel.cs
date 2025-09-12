@@ -199,6 +199,36 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        public string PayloadsPath
+        {
+            get => _payloadsPath;
+            set { _payloadsPath = value; OnPropertyChanged(); }
+        }
+        private string _payloadsPath = string.Empty;
+        public string DumpsPath
+        {
+            get => _dumpsPath;
+            set { _dumpsPath = value; OnPropertyChanged(); }
+        }
+        private string _dumpsPath = string.Empty;
+        public string LogsPath
+        {
+            get => _logsPath;
+            set { _logsPath = value; OnPropertyChanged(); }
+        }
+        private string _logsPath = string.Empty;
+        public string ExtractionPath
+        {
+            get => _extractionPath;
+            set { _extractionPath = value; OnPropertyChanged(); }
+        }
+        private string _extractionPath = string.Empty;
+
+        public ICommand BrowsePayloadsFolderCommand { get; }
+        public ICommand BrowseDumpsFolderCommand { get; }
+        public ICommand BrowseLogsFolderCommand { get; }
+        public ICommand BrowseExtractionFolderCommand { get; }
+
         public ICommand UploadStagerCommand { get; }
         public ICommand DumpMemoryCommand { get; }
         public ICommand BrowseCompareFolderCommand { get; }

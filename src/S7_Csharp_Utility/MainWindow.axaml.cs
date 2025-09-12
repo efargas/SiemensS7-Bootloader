@@ -45,6 +45,8 @@ namespace S7_Csharp_Utility
             var viewModel = new ViewModels.MainWindowViewModel(_loggingService, _powerController, payloadManager, this, socatService, configService);
             DataContext = viewModel;
             LogListBox.ItemsSource = _loggingService.LogMessages;
+            // Bind the socat logger to the new SocatLogListBox
+            SocatLogListBox.ItemsSource = _socatLoggerService.LogEntries;
 
             viewModel.LoadConfigurationOnStartup();
             Closing += (s, e) => viewModel.SaveConfigurationOnExit();
@@ -77,6 +79,10 @@ namespace S7_Csharp_Utility
             FilterInfoCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterInfo = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
             FilterErrorCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterError = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
             FilterDebugCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterDebug = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
+
+            // Socat logger actions
+            ClearSocatLogButton.Click += (s, e) => _socatLoggerService.Clear();
+            ExportSocatLogButton.Click += async (s, e) => await ExportSocatLogFileAsync();
 
             MenuProfileManagement.Click += (s, e) => new ProfileManagementWindow().Show();
             MenuFirmwareUnpacker.Click += (s, e) => new FirmwareUnpackerWindow().Show();
@@ -182,6 +188,29 @@ namespace S7_Csharp_Utility
                 foreach (var msg in filtered)
                 {
                     sb.AppendLine($"[{msg.Timestamp:yyyy-MM-dd HH:mm:ss}] {msg.Category} {msg.Message}");
+                }
+                await using var stream = await file.OpenWriteAsync();
+                using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(sb.ToString());
+            }
+        }
+    private async Task ExportSocatLogFileAsync()
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return;
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Export Socat Log",
+                DefaultExtension = "txt",
+                FileTypeChoices = new[] { new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } } }
+            });
+            if (file is not null)
+            {
+                var entries = _socatLoggerService.LogEntries.ToList();
+                var sb = new StringBuilder();
+                foreach (var msg in entries)
+                {
+                    sb.AppendLine($"[{msg.Timestamp:yyyy-MM-dd HH:mm:ss}] {msg.Message}");
                 }
                 await using var stream = await file.OpenWriteAsync();
                 using var writer = new StreamWriter(stream);

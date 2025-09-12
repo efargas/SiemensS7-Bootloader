@@ -28,11 +28,14 @@
                         <Grid ColumnDefinitions="2*,2*" HorizontalAlignment="Stretch">
                             <Border Grid.Column="0" Margin="0,0,8,0" BorderBrush="#B0B0B0" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
                                 <StackPanel>
-                                    <TextBlock Text="PLC Connection (Serial-to-TCP)" FontWeight="Bold" Margin="0,0,0,8" />
-                                    <TextBlock Text="Host:" />
-                                    <TextBox Name="PlcHostTextBox" HorizontalAlignment="Stretch" />
-                                    <TextBlock Text="Port:" />
-                                    <TextBox Name="PlcPortTextBox" HorizontalAlignment="Stretch" />
+                                <TextBlock Text="PLC Connection (Serial-to-TCP)" FontWeight="Bold" Margin="0,0,0,8" />
+                                <TextBlock Text="Connection Mode:" />
+                                <ComboBox ItemsSource="{Binding CommunicationModes}" SelectedItem="{Binding SelectedCommunicationMode, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="Host:" />
+                                <TextBox Name="PlcHostTextBox" HorizontalAlignment="Stretch" />
+                                <TextBlock Text="Port:" />
+                                <TextBox Name="PlcPortTextBox" HorizontalAlignment="Stretch" />
+                                <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Margin="0,10,0,0"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="1" Margin="8,0,0,0" BorderBrush="#B0B0B0" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
@@ -54,23 +57,23 @@
                         <StackPanel Spacing="8" HorizontalAlignment="Stretch">
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Payloads Folder:" Width="120" />
-                                <TextBox Name="PayloadsPathTextBox" Width="210" HorizontalAlignment="Stretch" />
-                                <Button Content="Browse" Name="BrowsePayloadsFolderButton" />
+                                <TextBox Name="PayloadsPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding PayloadsPath, Mode=TwoWay}" />
+                                <Button Content="Browse" Name="BrowsePayloadsFolderButton" Command="{Binding BrowsePayloadsFolderCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Dumps Folder:" Width="120" />
-                                <TextBox Name="DumpsPathTextBox" Width="210" HorizontalAlignment="Stretch" />
-                                <Button Content="Browse" Name="BrowseDumpsFolderButton" />
+                                <TextBox Name="DumpsPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding DumpsPath, Mode=TwoWay}" />
+                                <Button Content="Browse" Name="BrowseDumpsFolderButton" Command="{Binding BrowseDumpsFolderCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Logs Folder:" Width="120" />
-                                <TextBox Name="LogsPathTextBox" Width="210" HorizontalAlignment="Stretch" />
-                                <Button Content="Browse" Name="BrowseLogsFolderButton" />
+                                <TextBox Name="LogsPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding LogsPath, Mode=TwoWay}" />
+                                <Button Content="Browse" Name="BrowseLogsFolderButton" Command="{Binding BrowseLogsFolderCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock Text="Extraction Folder:" Width="120" />
-                                <TextBox Name="ExtractionPathTextBox" Width="210" HorizontalAlignment="Stretch" />
-                                <Button Content="Browse" Name="BrowseExtractionFolderButton" />
+                                <TextBox Name="ExtractionPathTextBox" Width="210" HorizontalAlignment="Stretch" Text="{Binding ExtractionPath, Mode=TwoWay}" />
+                                <Button Content="Browse" Name="BrowseExtractionFolderButton" Command="{Binding BrowseExtractionFolderCommand}" />
                             </StackPanel>
                             <Button Content="Save Settings" Name="SavePathsButton" Width="130" />
                         </StackPanel>
@@ -92,7 +95,7 @@
                             <TextBlock Name="DumpPercentLabel" Text="0%" />
                             <TextBlock Name="DumpBytesLabel" Text="Read: 0 / 0 bytes" />
                             <TextBlock Name="DumpTimeLabel" Text="Elapsed: 0s | Remaining: 0s" />
-                            <Button Name="DumpMemoryButton" Content="Dump Memory" />
+                            <Button Name="DumpMemoryButton" Content="Dump Memory" Command="{Binding DumpMemoryCommand}" />
                         </StackPanel>
                     </TabItem>
                     <TabItem Header="Dump Comparison">
@@ -100,24 +103,24 @@
                             <TabItem Header="Compare Folder">
                                 <StackPanel Spacing="8">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBox Name="CompareFolderTextBox" Watermark="Select folder to compare..." HorizontalAlignment="Stretch" />
-                                        <Button Name="BrowseCompareFolderButton" Content="Browse" />
+                                        <TextBox Name="CompareFolderTextBox" Watermark="Select folder to compare..." HorizontalAlignment="Stretch" Text="{Binding CompareFolder, Mode=TwoWay}" />
+                                        <Button Name="BrowseCompareFolderButton" Content="Browse" Command="{Binding BrowseCompareFolderCommand}" />
                                     </StackPanel>
-                                    <Button Name="CompareDumpsButton" Content="Start Comparison" HorizontalAlignment="Stretch" />
+                                    <Button Name="CompareDumpsButton" Content="Start Comparison" HorizontalAlignment="Stretch" Command="{Binding CompareDumpsCommand}" />
                                     <ListBox Name="ComparisonResultsListBox" Height="100" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                             </TabItem>
                             <TabItem Header="Compare Files">
                                 <StackPanel Spacing="8">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBox Name="CompareFile1TextBox" Watermark="Select file 1..." HorizontalAlignment="Stretch" />
-                                        <Button Name="BrowseCompareFile1Button" Content="Browse" />
+                                        <TextBox Name="CompareFile1TextBox" Watermark="Select file 1..." HorizontalAlignment="Stretch" Text="{Binding CompareFile1, Mode=TwoWay}" />
+                                        <Button Name="BrowseCompareFile1Button" Content="Browse" Command="{Binding BrowseCompareFile1Command}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBox Name="CompareFile2TextBox" Watermark="Select file 2..." HorizontalAlignment="Stretch" />
-                                        <Button Name="BrowseCompareFile2Button" Content="Browse" />
+                                        <TextBox Name="CompareFile2TextBox" Watermark="Select file 2..." HorizontalAlignment="Stretch" Text="{Binding CompareFile2, Mode=TwoWay}" />
+                                        <Button Name="BrowseCompareFile2Button" Content="Browse" Command="{Binding BrowseCompareFile2Command}" />
                                     </StackPanel>
-                                    <Button Name="CompareTwoFilesButton" Content="Compare These Files" HorizontalAlignment="Stretch" />
+                                    <Button Name="CompareTwoFilesButton" Content="Compare These Files" HorizontalAlignment="Stretch" Command="{Binding CompareTwoFilesCommand}" />
                                     <ListBox Name="FileCompareResultsListBox" Height="100" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                             </TabItem>
@@ -132,66 +135,112 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button Name="PowerOnButton" Content="Power ON" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" />
-                <Button Name="PowerOffButton" Content="Power OFF" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" />
-                <Button Name="UploadStagerButton" Content="Upload Stager" Grid.Column="2" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" />
+                <Button Name="PowerOnButton" Content="Power ON" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding PowerOnCommand}" />
+                <Button Name="PowerOffButton" Content="Power OFF" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding PowerOffCommand}" />
+                <Button Name="UploadStagerButton" Content="Upload Stager" Grid.Column="2" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding UploadStagerCommand}" />
             </Grid>
             <Border Grid.Row="3" Margin="0,12,0,0" Padding="8" BorderBrush="#808080" BorderThickness="1" CornerRadius="6" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-                <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="*">
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <!-- Responsive log area - side by side loggers for Main and Socat logs -->
+                <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="*,*">
+                    <!-- Log Categories Main / Socat Side by Side -->
+                    <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <TextBlock Text="Log Categories:" FontWeight="Bold" FontSize="13" Margin="0,0,8,0" />
-                        <CheckBox Name="FilterInfoCheckBox" IsChecked="True">
+                        <CheckBox Name="FilterInfoCheckBox" IsChecked="{Binding Logging.FilterInfo, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[i]" Margin="0,0,5,0" />
                                 <TextBlock Text="Info" />
                             </StackPanel>
                         </CheckBox>
-                        <CheckBox Name="FilterErrorCheckBox" IsChecked="True">
+                        <CheckBox Name="FilterErrorCheckBox" IsChecked="{Binding Logging.FilterError, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[!]" Margin="0,0,5,0" />
                                 <TextBlock Text="Error" />
                             </StackPanel>
                         </CheckBox>
-                        <CheckBox Name="FilterDebugCheckBox" IsChecked="True">
+                        <CheckBox Name="FilterDebugCheckBox" IsChecked="{Binding Logging.FilterDebug, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[d]" Margin="0,0,5,0" />
                                 <TextBlock Text="Debug" />
                             </StackPanel>
                         </CheckBox>
                     </StackPanel>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
-                        <Button Name="ClearLogButton" Content="Clear Log" Width="110"/>
-                        <Button Name="ExportLogButton" Content="Export..." Width="110"/>
-                        <Button Name="ScrollToEndButton" Content="Scroll to End" Width="110"/>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="Socat Log" FontWeight="Bold" FontSize="13" Margin="0,0,8,0" />
+                        <!-- Add relevant socat log controls if needed -->
                     </StackPanel>
-                    <ListBox Name="LogListBox"
-                             Grid.Row="2"
-                             HorizontalAlignment="Stretch"
-                             VerticalAlignment="Stretch"
-                             Margin="0,8,0,0"
-                             Background="#171A1F"
-                             Foreground="#E3E6EB"
-                             BorderBrush="#233A53"
-                             BorderThickness="1"
-                             FontFamily="Consolas,Monospace"
-                             MinHeight="120"
-                             SelectionMode="Multiple">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="#6f94b2" />
-                                    <TextBlock Text="{Binding Category}" FontWeight="Bold" Margin="6,0,6,0"/>
-                                    <TextBlock Text="{Binding Message}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                        <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="Padding" Value="2,0"/>
-                                <Setter Property="Margin" Value="0"/>
-                            </Style>
-                        </ListBox.Styles>
-                    </ListBox>
+
+                    <!-- Action Buttons Main / Socat (only main has currently) -->
+                    <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <Button Name="ClearLogButton" Content="Clear Log" Width="110" Command="{Binding Logging.ClearLogCommand}"/>
+                        <Button Name="ExportLogButton" Content="Export..." Width="110" Command="{Binding Logging.ExportLogCommand}"/>
+                        <Button Name="ScrollToEndButton" Content="Scroll to End" Width="110" Command="{Binding Logging.ScrollToEndCommand}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Export Socat Log..." Name="ExportSocatLogButton" Width="140"/>
+                        <Button Content="Clear Socat Log" Name="ClearSocatLogButton" Width="120"/>
+                    </StackPanel>
+
+                    <!-- Log Viewers, Side by Side -->
+                    <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Vertical">
+                        <TextBlock Text="Main Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
+                        <ListBox Name="LogListBox"
+                                 ItemsSource="{Binding Logging.LogMessages}"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Stretch"
+                                 Margin="0,0,0,0"
+                                 Background="#171A1F"
+                                 Foreground="#E3E6EB"
+                                 BorderBrush="#233A53"
+                                 BorderThickness="1"
+                                 FontFamily="Consolas,Monospace"
+                                 MinHeight="120"
+                                 SelectionMode="Multiple">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="#6f94b2" />
+                                        <TextBlock Text="{Binding Category}" FontWeight="Bold" Margin="6,0,6,0"/>
+                                        <TextBlock Text="{Binding Message}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="2,0"/>
+                                    <Setter Property="Margin" Value="0"/>
+                                </Style>
+                            </ListBox.Styles>
+                        </ListBox>
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Vertical">
+                        <TextBlock Text="Socat Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
+                        <ListBox Name="SocatLogListBox"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Stretch"
+                                 Margin="0,0,0,0"
+                                 Background="#272F1F"
+                                 Foreground="#F5ECD7"
+                                 BorderBrush="#235333"
+                                 BorderThickness="1"
+                                 FontFamily="Consolas,Monospace"
+                                 MinHeight="120"
+                                 SelectionMode="Multiple">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="#94b27a" />
+                                        <TextBlock Text="{Binding Message}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="2,0"/>
+                                    <Setter Property="Margin" Value="0"/>
+                                </Style>
+                            </ListBox.Styles>
+                        </ListBox>
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>
