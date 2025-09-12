@@ -39,11 +39,10 @@ namespace S7_Csharp_Utility
             _loggingService = new Services.LoggingService(Dispatcher.UIThread);
             _socatLoggerService = new Services.SocatLoggerService(Dispatcher.UIThread);
             _powerController = new Services.PowerController((message, isError) => _loggingService.Log(message, isError ? Services.LogCategory.Error : Services.LogCategory.Info));
-            var plcClient = new S7.Net.PlcClient(message => _loggingService.Log(message, Services.LogCategory.Info));
             var payloadManager = new S7.Net.PayloadManager(AppContext.BaseDirectory);
             var socatService = new Services.SocatService(_socatLoggerService);
             var configService = new Services.ConfigurationService();
-            var viewModel = new ViewModels.MainWindowViewModel(_loggingService, _powerController, plcClient, payloadManager, this, socatService, configService);
+            var viewModel = new ViewModels.MainWindowViewModel(_loggingService, _powerController, payloadManager, this, socatService, configService);
             DataContext = viewModel;
             LogListBox.ItemsSource = _loggingService.LogMessages;
 

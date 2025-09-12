@@ -4,17 +4,18 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using S7.Net.Interfaces;
 
 namespace S7.Net
 {
     public class PlcProtocol
     {
-        private readonly NetworkStream _stream;
+        private readonly ICommunicationChannel _channel;
         private readonly Action<string> _log;
 
-        public PlcProtocol(NetworkStream stream, Action<string> logger)
+        public PlcProtocol(ICommunicationChannel channel, Action<string> logger)
         {
-            _stream = stream;
+            _channel = channel;
             _log = logger;
         }
 
@@ -43,30 +44,32 @@ namespace S7.Net
             for (int i = 0; i < packet.Length; i += step)
             {
                 int bytesToSend = Math.Min(step, packet.Length - i);
-                await _stream.WriteAsync(packet, i, bytesToSend);
+                await _channel.WriteAsync(packet, i, bytesToSend);
                 if (sleepMs > 0) await Task.Delay(sleepMs);
             }
         }
 
-        public bool DataAvailable => _stream.DataAvailable;
+        public bool DataAvailable => _channel.DataAvailable;
 
         public async Task RawWriteAsync(byte[] buffer, int offset, int count)
         {
-            await _stream.WriteAsync(buffer, offset, count);
+            await _channel.WriteAsync(buffer, offset, count);
         }
 
         public async Task<int> RawReadAsync(byte[] buffer, int offset, int count)
         {
-            return await _stream.ReadAsync(buffer, offset, count);
+            return await _channel.ReadAsync(buffer, offset, count);
         }
 
         public async Task<byte[]?> ReceivePacketAsync(int timeoutMs = 2000)
         {
-            var cancellationTokenSource = new CancellationTokenSource(timeoutMs);
-            var token = cancellationTokenSource.Token;
+            // CancellationToken is not easily compatible with the custom ICommunicationChannel,
+            // so we'll rely on the underlying implementation's timeouts for now.
+            // var cancellationTokenSource = new CancellationTokenSource(timeoutMs);
+            // var token = cancellationTokenSource.Token;
 
             var lengthByte = new byte[1];
-            await _stream.ReadAsync(lengthByte, 0, 1, token);
+            await _channel.ReadAsync(lengthByte, 0, 1);
             int bytesToRead = lengthByte[0];
 
             if (bytesToRead == 0) return Array.Empty<byte>();
@@ -77,7 +80,7 @@ namespace S7.Net
             int bytesRead = 0;
             while(bytesRead < bytesToRead)
             {
-                bytesRead += await _stream.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead, token);
+                bytesRead += await _channel.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead);
             }
 
             _log($"<- RECV: {BitConverter.ToString(fullPacket).Replace("-", "")}");

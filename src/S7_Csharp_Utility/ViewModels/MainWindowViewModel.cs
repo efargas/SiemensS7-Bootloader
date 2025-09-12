@@ -88,7 +88,6 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand PowerOnCommand { get; }
         public ICommand PowerOffCommand { get; }
 
-        private readonly S7.Net.PlcClient _plcClient;
         private readonly S7.Net.PayloadManager _payloadManager;
 
         private string _dumpAddress = "0x10000000";
@@ -250,6 +249,30 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand SaveConfigurationCommand { get; }
         public ICommand LoadConfigurationCommand { get; }
 
+        public ObservableCollection<string> CommunicationModes { get; } = new ObservableCollection<string> { "TCP (socat)", "Serial" };
+        private string _selectedCommunicationMode = "TCP (socat)";
+        public string SelectedCommunicationMode
+        {
+            get => _selectedCommunicationMode;
+            set
+            {
+                _selectedCommunicationMode = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<int> AvailableBaudRates { get; } = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
+        private int _selectedBaudRate = 115200;
+        public int SelectedBaudRate
+        {
+            get => _selectedBaudRate;
+            set
+            {
+                _selectedBaudRate = value;
+                OnPropertyChanged();
+            }
+        }
+
 
         private string _compareFolder = string.Empty;
         public string CompareFolder
@@ -287,11 +310,10 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly Interfaces.IDialogService _dialogService;
         private readonly ConfigurationService _configService;
 
-        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PlcClient plcClient, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService)
+        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService)
         {
             Logging = loggingService;
             _powerController = powerController;
-            _plcClient = plcClient;
             _payloadManager = payloadManager;
             _dialogService = dialogService;
             _socatService = socatService;
@@ -319,9 +341,22 @@ namespace S7_Csharp_Utility.ViewModels
             RefreshSerialPorts();
         }
 
+        private S7.Net.Interfaces.ICommunicationChannel CreateCommunicationChannel()
+        {
+            if (SelectedCommunicationMode == "TCP (socat)")
+            {
+                return new S7.Net.Channels.TcpChannel(PlcHost, PlcPort);
+            }
+            else
+            {
+                return new S7.Net.Channels.SerialChannel(SelectedSerialPort, SelectedBaudRate);
+            }
+        }
+
         private async Task UploadStager()
         {
             IsUploadingStager = true;
+            S7.Net.Interfaces.ICommunicationChannel? channel = null;
             try
             {
                 await _powerController.SetPowerAsync(ModbusHost, ModbusPort, ModbusCoil, false);
@@ -331,7 +366,10 @@ namespace S7_Csharp_Utility.ViewModels
 
                 await Task.Delay(50);
 
-                await RunStagerSequenceAsync();
+                channel = CreateCommunicationChannel();
+                await channel.ConnectAsync();
+                var plcClient = new S7.Net.PlcClient(channel, (message) => Logging.Log(message, LogCategory.Info));
+                await RunStagerSequenceAsync(plcClient);
             }
             catch (Exception ex)
             {
@@ -340,28 +378,24 @@ namespace S7_Csharp_Utility.ViewModels
             }
             finally
             {
-                if (_plcClient.IsConnected)
-                {
-                    _plcClient.Disconnect();
-                }
+                channel?.Disconnect();
                 IsUploadingStager = false;
             }
         }
 
-        private async Task RunStagerSequenceAsync()
+        private async Task RunStagerSequenceAsync(S7.Net.PlcClient plcClient)
         {
             StagerInstalled = false;
-            await _plcClient.ConnectAsync(PlcHost, PlcPort);
-            if (!_plcClient.IsConnected) return;
+            if (!plcClient.IsConnected) return;
 
-            if (await _plcClient.PerformHandshakeAsync())
+            if (await plcClient.PerformHandshakeAsync())
             {
-                await _plcClient.GetVersion();
+                await plcClient.GetVersion();
 
                 byte[] stagerPayload = _payloadManager.GetStagerPayload();
                 Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes).", LogCategory.Info);
 
-                await _plcClient.InstallStager(stagerPayload);
+                await plcClient.InstallStager(stagerPayload);
                 StagerInstalled = true;
                 Logging.Log("Stager is installed and ready.", LogCategory.Info);
             }
@@ -370,6 +404,7 @@ namespace S7_Csharp_Utility.ViewModels
         private async Task DumpMemory()
         {
             IsDumpingMemory = true;
+            S7.Net.Interfaces.ICommunicationChannel? channel = null;
             try
             {
                 if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.CurrentCulture, out uint address))
@@ -383,7 +418,10 @@ namespace S7_Csharp_Utility.ViewModels
                     return;
                 }
 
-                await RunDumpSequenceAsync(address, DumpLength);
+                channel = CreateCommunicationChannel();
+                await channel.ConnectAsync();
+                var plcClient = new S7.Net.PlcClient(channel, (message) => Logging.Log(message, LogCategory.Info));
+                await RunDumpSequenceAsync(plcClient, address, DumpLength);
             }
             catch (Exception ex)
             {
@@ -392,11 +430,12 @@ namespace S7_Csharp_Utility.ViewModels
             }
             finally
             {
+                channel?.Disconnect();
                 IsDumpingMemory = false;
             }
         }
 
-        private async Task RunDumpSequenceAsync(uint address, uint length)
+        private async Task RunDumpSequenceAsync(S7.Net.PlcClient plcClient, uint address, uint length)
         {
             Logging.Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
 
@@ -404,7 +443,7 @@ namespace S7_Csharp_Utility.ViewModels
             Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes).", LogCategory.Info);
 
             int dumperHookIndex = PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND;
-            await _plcClient.InstallAddHookViaStager(PlcConstants.DUMPER_PAYLOAD_LOCATION, dumperPayload, dumperHookIndex);
+            await plcClient.InstallAddHookViaStager(PlcConstants.DUMPER_PAYLOAD_LOCATION, dumperPayload, dumperHookIndex);
             Logging.Log("Memory dumper payload installed.", LogCategory.Info);
 
             var args = new byte[1 + 4 + 4];
@@ -412,7 +451,7 @@ namespace S7_Csharp_Utility.ViewModels
             BitConverter.GetBytes(address).CopyTo(args, 1);
             BitConverter.GetBytes(length).CopyTo(args, 5);
 
-            await _plcClient.InvokeAddHook(dumperHookIndex, args);
+            await plcClient.InvokeAddHook(dumperHookIndex, args);
             Logging.Log("Dump command sent. Receiving data...", LogCategory.Info);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -430,7 +469,7 @@ namespace S7_Csharp_Utility.ViewModels
                 DumpProgressTime = $"Elapsed: {elapsedSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
             });
 
-            var dumpedData = await _plcClient.ReceiveMany(progress);
+            var dumpedData = await plcClient.ReceiveMany(progress);
             stopwatch.Stop();
 
             string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";

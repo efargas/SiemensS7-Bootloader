@@ -1,4 +1,5 @@
 using System;
+using S7.Net.Interfaces;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Linq;
@@ -11,43 +12,18 @@ namespace S7.Net
 {
     public class PlcClient
     {
-        private TcpClient? _client;
-        private PlcProtocol? _protocol;
+        private readonly ICommunicationChannel _channel;
+        private readonly PlcProtocol _protocol;
         private readonly Action<string> _log;
 
-        public PlcClient(Action<string> logger)
+        public PlcClient(ICommunicationChannel channel, Action<string> logger)
         {
+            _channel = channel;
             _log = logger;
+            _protocol = new PlcProtocol(channel, logger);
         }
 
-        public bool IsConnected => _client?.Connected ?? false;
-
-        public async Task ConnectAsync(string host, int port)
-        {
-            if (IsConnected) Disconnect();
-
-            _client = new TcpClient();
-            _log($"Connecting to {host}:{port}...");
-            try
-            {
-                await _client.ConnectAsync(host, port);
-                var stream = _client.GetStream();
-                _protocol = new PlcProtocol(stream, _log);
-                _log("Successfully connected to PLC proxy.");
-            }
-            catch (Exception ex)
-            {
-                _log($"Error connecting to PLC proxy: {ex.Message}");
-                _client = null;
-            }
-        }
-
-        public void Disconnect()
-        {
-            _client?.Close();
-            _client = null;
-            _log("Disconnected from PLC proxy.");
-        }
+        public bool IsConnected => _channel.IsConnected;
 
         public async Task<byte[]?> InvokePrimaryHandler(byte handlerIndex, byte[] args, bool awaitResponse = true)
         {

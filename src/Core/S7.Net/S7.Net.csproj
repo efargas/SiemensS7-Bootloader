@@ -3,4 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="9.0.9" />
+  </ItemGroup>
 </Project>
