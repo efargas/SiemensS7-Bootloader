@@ -66,22 +66,43 @@ namespace S7.Net
             byte[] padding = Encoding.ASCII.GetBytes("AAAA");
             var handshakePayload = padding.Concat(magic).ToArray();
 
-            var sw = Stopwatch.StartNew();
-            while (sw.ElapsedMilliseconds < 500) // Try for 0.5 seconds
+            for (int attempt = 0; attempt < 100; attempt++)
             {
                 await _protocol.RawWriteAsync(handshakePayload, 0, handshakePayload.Length);
-                await Task.Delay(50);
-                if (_protocol.DataAvailable)
+                var sw = Stopwatch.StartNew();
+                var responseBuffer = new System.Collections.Generic.List<byte>();
+                while (sw.ElapsedMilliseconds < 300)
                 {
-                    var buffer = new byte[256];
-                    int bytesRead = await _protocol.RawReadAsync(buffer, 0, buffer.Length);
-                    // Expected response is \x05-CPU
-                    if (bytesRead >= 5 && buffer[0] == 5 && Encoding.ASCII.GetString(buffer, 1, 4) == "-CPU")
+                    if (_protocol.DataAvailable)
                     {
-                        _log("Handshake successful, got special access greeting.");
+                        var tmpBuf = new byte[256];
+                        int bytesRead = await _protocol.RawReadAsync(tmpBuf, 0, tmpBuf.Length);
+                        if (bytesRead > 0)
+                        {
+                            responseBuffer.AddRange(tmpBuf.Take(bytesRead));
+                            var ascii = Encoding.ASCII.GetString(responseBuffer.ToArray());
+                            _log($"Handshake attempt {attempt + 1}: buf={BitConverter.ToString(responseBuffer.ToArray())} ASCII={ascii}");
+                            if (ascii.Contains("-CPU"))
+                            {
+                                _log("Handshake successful: Found -CPU signature!");
+                                return true;
+                            }
+                        }
+                    }
+                    await Task.Delay(50);
+                }
+                // Final buffer check after silence
+                if (responseBuffer.Count > 0)
+                {
+                    var ascii = Encoding.ASCII.GetString(responseBuffer.ToArray());
+                    _log($"Handshake final buf={BitConverter.ToString(responseBuffer.ToArray())} ASCII={ascii}");
+                    if (ascii.Contains("-CPU"))
+                    {
+                        _log("Handshake successful (after silence): Found -CPU signature!");
                         return true;
                     }
                 }
+                await Task.Delay(10); // brief pause before retry
             }
             _log("Handshake failed.");
             return false;

@@ -1,0 +1,142 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PLCSploit.Gui.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        x:Class="PLCSploit.Gui.Views.MainView"
+        Title="PLCSploit"
+        MinWidth="1000" MinHeight="600">
+
+    <Design.DataContext>
+        <vm:MainViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
+        <!-- Top Controls Panel -->
+        <Grid Grid.Row="0" ColumnDefinitions="1*,1*,2*" Margin="5">
+            <!-- Socat Control - Compact -->
+            <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="3" Grid.Column="0" Margin="2" DataContext="{Binding Socat}">
+                <StackPanel Spacing="2" Margin="5">
+                    <TextBlock Text="Socat" FontWeight="Bold" FontSize="12" />
+                    <TextBlock Text="{Binding Status}" FontWeight="Bold" FontSize="10" />
+                    <TextBox Text="{Binding SerialDevice}" Watermark="/dev/ttyUSB0" FontSize="10" Height="25" />
+                    <Grid ColumnDefinitions="*,2,*">
+                        <Button Grid.Column="0" Content="Start" Command="{Binding StartCommand}" FontSize="10" Height="25" />
+                        <Button Grid.Column="2" Content="Stop" Command="{Binding StopCommand}" FontSize="10" Height="25" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,2,*">
+                        <Button Grid.Column="0" Content="Check" Command="{Binding CheckCommand}" FontSize="10" Height="25" />
+                        <Button Grid.Column="2" Content="Kill All" Command="{Binding KillAllCommand}" FontSize="10" Height="25" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Modbus Control - Compact -->
+            <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="3" Grid.Column="1" Margin="2" DataContext="{Binding Modbus}">
+                <StackPanel Spacing="2" Margin="5">
+                    <TextBlock Text="Modbus" FontWeight="Bold" FontSize="12" />
+                    <TextBlock Text="{Binding Status}" FontWeight="Bold" FontSize="10" />
+                    <TextBox Text="{Binding Host}" Watermark="192.168.1.18" FontSize="10" Height="25" />
+                    <NumericUpDown Value="{Binding Delay}" FormatString="N0" Watermark="Delay (ms)" FontSize="10" Height="25" />
+                    <Grid ColumnDefinitions="*,2,*">
+                        <Button Grid.Column="0" Content="Connect" Command="{Binding ConnectCommand}" FontSize="10" Height="25" />
+                        <Button Grid.Column="2" Content="Disconnect" Command="{Binding DisconnectCommand}" FontSize="10" Height="25" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,2,*">
+                        <Button Grid.Column="0" Content="On" Command="{Binding TurnOnCommand}" FontSize="10" Height="25" />
+                        <Button Grid.Column="2" Content="Off" Command="{Binding TurnOffCommand}" FontSize="10" Height="25" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Exploit Control - Compact -->
+            <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="3" Grid.Column="2" Margin="2" DataContext="{Binding Exploit}">
+                <StackPanel Spacing="2" Margin="5">
+                    <TextBlock Text="Exploit Control" FontWeight="Bold" FontSize="12" />
+                    <TextBlock Text="{Binding Status}" FontWeight="Bold" FontSize="10" />
+                    <Grid ColumnDefinitions="2*,2,1*">
+                        <TextBox Grid.Column="0" Text="{Binding Host}" Watermark="localhost" FontSize="10" Height="25" />
+                        <NumericUpDown Grid.Column="2" Value="{Binding Port}" FormatString="N0" FontSize="10" Height="25" />
+                    </Grid>
+                    <TextBox Text="{Binding StagerPath}" Watermark="Stager Path" FontSize="10" Height="25" />
+                    
+                    <Grid ColumnDefinitions="*,2,*">
+                        <Button Grid.Column="0" Content="Auto Exploit" Command="{Binding ConnectCommand}" FontSize="10" Height="25" />
+                        <Button Grid.Column="2" Content="Install Stager" Command="{Binding PrepareCommand}" FontSize="10" Height="25" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,2,*">
+                        <Button Grid.Column="0" Content="Select Payload" Command="{Binding SelectPayloadCommand}" FontSize="10" Height="25" />
+                        <Button Grid.Column="2" Content="Send Payload" Command="{Binding SendPayloadCommand}" FontSize="10" Height="25" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,2,*">
+                        <Button Grid.Column="0" Content="Stop Payload" Command="{Binding StopPayloadCommand}" FontSize="10" Height="25" />
+                        <Button Grid.Column="2" Content="Send Bye &amp; Disconnect" Command="{Binding ByeCommand}" FontSize="10" Height="25" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Logs Panel - Takes most space -->
+        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="3" Grid.Row="1" Margin="5">
+            <Grid ColumnDefinitions="*,*">
+                <DockPanel Grid.Column="0" Margin="5">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,2">
+                        <TextBlock Text="General Logs" FontWeight="Bold" FontSize="12" />
+                        <ComboBox Margin="10,0,0,0"
+                                  Width="150"
+                                  HorizontalAlignment="Left"
+                                  ItemsSource="{Binding LogFilters}"
+                                  SelectedItem="{Binding SelectedLogFilter, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Display}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </DockPanel>
+                    <ListBox ItemsSource="{Binding FilteredLogs}" Name="GeneralLogsList" 
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto" 
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             FontFamily="Consolas" FontSize="10">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="{Binding Timestamp, StringFormat=HH:mm:ss}" Foreground="Gray" Width="65"/>
+                                    <TextBlock Text="{Binding Category}" Foreground="DarkCyan" MinWidth="92"/>
+                                    <TextBlock Text="{Binding Message}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="2,1" />
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="MinHeight" Value="16" />
+                            </Style>
+                        </ListBox.Styles>
+                    </ListBox>
+                </DockPanel>
+                
+                <DockPanel Grid.Column="1" Margin="5" DataContext="{Binding SocatViewer}">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,2">
+                        <Button DockPanel.Dock="Right" Content="Clear" Command="{Binding ClearCommand}" FontSize="10" Height="20" Width="50" />
+                        <TextBlock Text="Socat Output" FontWeight="Bold" FontSize="12" />
+                    </DockPanel>
+                    <ListBox ItemsSource="{Binding SocatMessages}" Name="SocatLogsList" 
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto" 
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             FontFamily="Consolas" FontSize="10">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="2,1" />
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="MinHeight" Value="16" />
+                            </Style>
+                        </ListBox.Styles>
+                    </ListBox>
+                </DockPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

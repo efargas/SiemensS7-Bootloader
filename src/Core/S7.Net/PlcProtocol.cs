@@ -52,20 +52,34 @@ namespace S7.Net
         /// <param name="sleepMs">The number of milliseconds to sleep between steps.</param>
         public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10)
         {
-            if (contents.Length > PlcConstants.MAX_MSG_LEN)
-                throw new ArgumentException($"Message too long. Max length is {PlcConstants.MAX_MSG_LEN} bytes.");
+            const int ProtocolChunkSize = 32;
+            int offset = 0;
 
-            var packet = new byte[contents.Length + 2];
-            packet[0] = (byte)(contents.Length + 1);
-            Array.Copy(contents, 0, packet, 1, contents.Length);
-            packet[packet.Length - 1] = CalculateChecksum(packet, 0, packet.Length - 1);
-
-            _log($"-> SEND: {BitConverter.ToString(packet).Replace("-", "")}");
-
-            for (int i = 0; i < packet.Length; i += step)
+            while (offset < contents.Length)
             {
-                int bytesToSend = Math.Min(step, packet.Length - i);
-                await _channel.WriteAsync(packet, i, bytesToSend);
+                int chunkSize = Math.Min(ProtocolChunkSize, contents.Length - offset);
+                var packet = new byte[chunkSize + 2];
+                packet[0] = (byte)(chunkSize + 1);
+                Array.Copy(contents, offset, packet, 1, chunkSize);
+                packet[packet.Length - 1] = CalculateChecksum(packet, 0, packet.Length - 1);
+                _log($"-> SEND: {BitConverter.ToString(packet).Replace("-", "")}");
+                for (int i = 0; i < packet.Length; i += step)
+                {
+                    int bytesToSend = Math.Min(step, packet.Length - i);
+                    await _channel.WriteAsync(packet, i, bytesToSend);
+                    if (sleepMs > 0) await Task.Delay(sleepMs);
+                }
+                offset += chunkSize;
+            }
+            // Reference protocol: send terminating zero-length packet
+            var endPacket = new byte[2];
+            endPacket[0] = 1; // means length 0
+            endPacket[1] = CalculateChecksum(endPacket, 0, 1);
+            _log($"-> SEND: {BitConverter.ToString(endPacket).Replace("-", "")} (end packet)");
+            for (int i = 0; i < endPacket.Length; i += step)
+            {
+                int bytesToSend = Math.Min(step, endPacket.Length - i);
+                await _channel.WriteAsync(endPacket, i, bytesToSend);
                 if (sleepMs > 0) await Task.Delay(sleepMs);
             }
         }

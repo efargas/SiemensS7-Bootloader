@@ -63,6 +63,40 @@ namespace S7_Csharp_Utility.Services
             string arguments = $"{flagArgs}TCP-LISTEN:{tcpPort},fork,reuseaddr {rhs}";
             _logger.Log($"Executing: socat {arguments}");
 
+            // On Unix platforms, set default serial parameters with stty as in reference 'start.sh'
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                string sttyFlags = "cs8 38400 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke -ixon -crtscts -parodd parenb raw";
+                string sttyCmd = $"stty -F {device} {sttyFlags}";
+                _logger.Log($"Executing: {sttyCmd}");
+                try
+                {
+                    var sttyProcess = new Process()
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "/bin/bash",
+                            Arguments = $"-c \"{sttyCmd}\"",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                        }
+                    };
+                    sttyProcess.Start();
+                    sttyProcess.WaitForExit();
+                    if (sttyProcess.ExitCode != 0)
+                    {
+                        string err = sttyProcess.StandardError.ReadToEnd();
+                        _logger.Log($"WARNING: stty exited with code {sttyProcess.ExitCode}: {err}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Log($"WARNING: Failed to run stty for serial device setup: {ex.Message}");
+                }
+            }
+
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = "socat",
