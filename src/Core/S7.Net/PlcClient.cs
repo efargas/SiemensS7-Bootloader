@@ -118,7 +118,20 @@ namespace S7.Net
             _log("Getting bootloader version...");
             var response = await InvokePrimaryHandler(0, Array.Empty<byte>());
             if (response is null) throw new Exception("Failed to get version.");
-            string version = $"v{response[2]}.{response[3]}.{response[4]}";
+            _log($"[VERSION RAW HEX] {BitConverter.ToString(response)}");
+            _log($"[VERSION RAW ASCII] {Encoding.ASCII.GetString(response)}");
+            // Look for V as prefix, then take next three bytes
+            int idxV = Array.IndexOf(response, (byte)'V');
+            string version = "(invalid)";
+            if (idxV >= 0 && response.Length >= idxV + 4)
+            {
+                version = $"V{response[idxV+1]}.{response[idxV+2]}.{response[idxV+3]}";
+            }
+            else if (response.Length >= 6)
+            {
+                // fallback: manually use offset 2 as that's where V appears in typical bootloader
+                version = $"{(char)response[2]}{response[3]}.{response[4]}.{response[5]}";
+            }
             _log($"Got version: {version}");
             return version;
         }

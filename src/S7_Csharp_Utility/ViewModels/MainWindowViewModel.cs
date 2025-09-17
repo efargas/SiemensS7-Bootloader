@@ -319,7 +319,7 @@ namespace S7_Csharp_Utility.ViewModels
             get => _payloadsPath;
             set { _payloadsPath = value; OnPropertyChanged(); }
         }
-        private string _payloadsPath = "Resources/payloads";
+        private string _payloadsPath = "src/payloads";
         /// <summary>
         /// The path to the folder where memory dumps will be saved.
         /// </summary>
@@ -777,8 +777,8 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 await plcClient.GetVersion();
 
-                byte[] stagerPayload = _payloadManager.GetStagerPayload();
-                Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes).", LogCategory.Info);
+                byte[] stagerPayload = _payloadManager.GetStagerPayload(PayloadsPath);
+                Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
 
                 await plcClient.InstallStager(stagerPayload);
                 StagerInstalled = true;
@@ -833,8 +833,8 @@ namespace S7_Csharp_Utility.ViewModels
         {
             Logging.Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
 
-            byte[] dumperPayload = _payloadManager.GetMemoryDumperPayload();
-            Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes).", LogCategory.Info);
+            byte[] dumperPayload = _payloadManager.GetMemoryDumperPayload(PayloadsPath);
+            Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
 
             int dumperHookIndex = PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND;
             await plcClient.InstallAddHookViaStager(PlcConstants.DUMPER_PAYLOAD_LOCATION, dumperPayload, dumperHookIndex);

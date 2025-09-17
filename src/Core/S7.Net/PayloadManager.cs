@@ -22,18 +22,18 @@ namespace S7.Net
         /// Gets the stager payload.
         /// </summary>
         /// <returns>The stager payload as a byte array.</returns>
-        public byte[] GetStagerPayload()
+        public byte[] GetStagerPayload(string payloadsBase)
         {
-            return LoadPayload("stager", "stager.bin");
+            return LoadPayload(payloadsBase, "stager", "stager.bin");
         }
 
         /// <summary>
         /// Gets the memory dumper payload.
         /// </summary>
         /// <returns>The memory dumper payload as a byte array.</returns>
-        public byte[] GetMemoryDumperPayload()
+        public byte[] GetMemoryDumperPayload(string payloadsBase)
         {
-            return LoadPayload("dump_mem", "build", "dump_mem.bin");
+            return LoadPayload(payloadsBase, "dump_mem", "build", "dump_mem.bin");
         }
 
         /// <summary>
@@ -41,14 +41,13 @@ namespace S7.Net
         /// </summary>
         /// <param name="pathSegments">The path segments of the payload file.</param>
         /// <returns>The payload as a byte array.</returns>
-        private byte[] LoadPayload(params string[] pathSegments)
+        private byte[] LoadPayload(string payloadsBase, params string[] pathSegments)
         {
-            var fullPath = Path.Combine(_baseDirectory, "payloads");
+            var fullPath = payloadsBase;
             foreach(var segment in pathSegments)
             {
                 fullPath = Path.Combine(fullPath, segment);
             }
-
             if (!File.Exists(fullPath))
             {
                 throw new FileNotFoundException($"Payload not found at {fullPath}");
