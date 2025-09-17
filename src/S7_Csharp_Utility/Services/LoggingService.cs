@@ -41,6 +41,7 @@ namespace S7_Csharp_Utility.Services
         private const int MaxLogLines = 2000;
         private readonly Dispatcher _dispatcher;
         private string _logText = string.Empty;
+        private readonly string _mainLogFile;
 
         /// <summary>
         /// Indicates whether to display informational messages.
@@ -96,6 +97,9 @@ namespace S7_Csharp_Utility.Services
         public LoggingService(Dispatcher dispatcher)
         {
             _dispatcher = dispatcher;
+            var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+            Directory.CreateDirectory(logDir);
+            _mainLogFile = Path.Combine(logDir, $"Main_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
             ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
             ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
             ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
@@ -181,23 +185,7 @@ namespace S7_Csharp_Utility.Services
         /// <param name="entry">The log entry to write.</param>
         private void HandleLogFile(LogMessage entry)
         {
-            string logDir = Path.Combine(AppContext.BaseDirectory, "logs");
-            Directory.CreateDirectory(logDir);
-            string logFile = Path.Combine(logDir, "log.txt");
-            long maxSize = 5 * 1024 * 1024; // 5 MB
-            if (File.Exists(logFile) && new FileInfo(logFile).Length > maxSize)
-            {
-                int idx = 1;
-                string newLogFile;
-                do
-                {
-                    newLogFile = Path.Combine(logDir, $"log_{idx}.txt");
-                    idx++;
-                }
-                while (File.Exists(newLogFile));
-                File.Move(logFile, newLogFile);
-            }
-            File.AppendAllText(logFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Category} {entry.Message}{Environment.NewLine}");
+            File.AppendAllText(_mainLogFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Category} {entry.Message}{Environment.NewLine}");
         }
 
         /// <summary>

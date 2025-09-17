@@ -368,6 +368,8 @@ namespace S7_Csharp_Utility.ViewModels
         /// Command to save the configured paths.
         /// </summary>
         public ICommand SavePathsCommand { get; }
+        public ICommand CheckSocatProcessesCommand { get; }
+        public ICommand KillSocatProcessesCommand { get; }
 
         /// <summary>
         /// Command to start the exploit sequence.
@@ -713,6 +715,9 @@ namespace S7_Csharp_Utility.ViewModels
             SavePathsCommand = new Commands.RelayCommand(async _ => await SaveConfiguration(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
 
             RefreshSerialPorts();
+
+            CheckSocatProcessesCommand = new Commands.RelayCommand(async _ => await CheckSocatProcesses(), _ => true);
+            KillSocatProcessesCommand = new Commands.RelayCommand(async _ => await KillSocatProcesses(), _ => true);
         }
 
         /// <summary>
@@ -782,6 +787,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 await plcClient.InstallStager(stagerPayload);
                 StagerInstalled = true;
+                OnPropertyChanged(nameof(StagerInstalled));
                 Logging.Log("Stager is installed and ready.", LogCategory.Info);
             }
         }
@@ -903,6 +909,22 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 IsComparing = false;
             }
+        }
+
+        private async Task CheckSocatProcesses()
+        {
+            var pids = SocatService.GetSocatProcessIds();
+            if (pids.Length == 0)
+                Logging.Log("No running socat instances detected.", LogCategory.Info);
+            else
+                Logging.Log($"Socat running instances: {string.Join(", ", pids)}", LogCategory.Info);
+            await Task.CompletedTask;
+        }
+
+        private async Task KillSocatProcesses()
+        {
+            SocatService.KillAllSocatProcesses(s => Logging.Log(s));
+            await Task.CompletedTask;
         }
 
         /// <summary>

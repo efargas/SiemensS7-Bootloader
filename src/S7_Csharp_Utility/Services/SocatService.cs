@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace S7_Csharp_Utility.Services
@@ -12,6 +13,69 @@ namespace S7_Csharp_Utility.Services
     {
         private Process? _socatProcess;
         private readonly SocatLoggerService _logger;
+
+        /// <summary>
+        /// Gets all running socat process IDs as an array.
+        /// </summary>
+        public static int[] GetSocatProcessIds()
+        {
+            try
+            {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    return Process.GetProcessesByName("socat").Select(p => p.Id).ToArray();
+                }
+                else
+                {
+                    var list = new System.Collections.Generic.List<int>();
+                    var p = new Process()
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "/bin/bash",
+                            Arguments = "-c 'pgrep socat'",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                        }
+                    };
+                    p.Start();
+                    while (!p.StandardOutput.EndOfStream)
+                    {
+                        var line = p.StandardOutput.ReadLine();
+                        if (int.TryParse(line, out int pid))
+                        {
+                            list.Add(pid);
+                        }
+                    }
+                    p.WaitForExit();
+                    return list.ToArray();
+                }
+            }
+            catch {
+                return Array.Empty<int>();
+            }
+        }
+
+        /// <summary>
+        /// Kills all running socat processes.
+        /// </summary>
+        public static void KillAllSocatProcesses(Action<string>? log = null)
+        {
+            foreach (var pid in GetSocatProcessIds())
+            {
+                try
+                {
+                    Process.GetProcessById(pid).Kill();
+                    log?.Invoke($"Killed socat process with PID {pid}");
+                }
+                catch (Exception ex)
+                {
+                    log?.Invoke($"Failed to kill socat process with PID {pid}: {ex.Message}");
+                }
+            }
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SocatService"/> class.

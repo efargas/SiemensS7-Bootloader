@@ -25,6 +25,7 @@ namespace S7_Csharp_Utility
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.MainWindow = new MainWindow();
+                desktop.Exit += (_, __) => S7_Csharp_Utility.Services.SocatService.KillAllSocatProcesses();
             }
 
             base.OnFrameworkInitializationCompleted();

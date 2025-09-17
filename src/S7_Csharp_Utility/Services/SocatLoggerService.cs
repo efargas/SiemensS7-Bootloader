@@ -32,6 +32,7 @@ namespace S7_Csharp_Utility.Services
         private readonly object _sync = new object();
         private string _logText = string.Empty;
         private const int MaxLogLines = 2000;
+        private readonly string _socatLogFile;
 
         public System.Windows.Input.ICommand ClearLogCommand { get; }
         public System.Windows.Input.ICommand ExportLogCommand { get; }
@@ -63,6 +64,9 @@ namespace S7_Csharp_Utility.Services
         public SocatLoggerService(Dispatcher dispatcher)
         {
             _dispatcher = dispatcher;
+            var logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+            System.IO.Directory.CreateDirectory(logDir);
+            _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
             ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
             ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
             ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
@@ -75,7 +79,6 @@ namespace S7_Csharp_Utility.Services
         public void Log(string? data)
         {
             if (data == null) return;
-
             lock (_sync)
             {
                 var entry = new SocatLogEntry { Timestamp = DateTime.Now, Message = data };
@@ -84,8 +87,8 @@ namespace S7_Csharp_Utility.Services
                 {
                     _logEntries.RemoveAt(0);
                 }
+                System.IO.File.AppendAllText(_socatLogFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}{Environment.NewLine}");
             }
-
             _dispatcher.Post(UpdateLogText);
         }
 
