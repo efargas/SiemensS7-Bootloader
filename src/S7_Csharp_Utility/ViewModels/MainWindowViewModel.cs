@@ -175,7 +175,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         private readonly S7.Net.PayloadManager _payloadManager;
 
-        private string _dumpAddress = "0x10000000";
+        private string _dumpAddress = "0x691E28";
         /// <summary>
         /// The starting memory address for the dump, in hexadecimal format.
         /// </summary>
@@ -191,7 +191,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private uint _dumpLength = 4096;
+        private uint _dumpLength = 16;
         /// <summary>
         /// The number of bytes to dump from the memory address.
         /// </summary>
@@ -1051,8 +1051,8 @@ namespace S7_Csharp_Utility.ViewModels
                     ModbusPort = config.ModbusPort;
                     ModbusCoil = config.ModbusCoil;
                     DelaySeconds = config.DelaySeconds;
-                    DumpAddress = config.DumpAddress;
-                    DumpLength = config.DumpLength;
+                    DumpAddress = config.DumpAddress; OnPropertyChanged(nameof(DumpAddress));
+                    DumpLength = config.DumpLength; OnPropertyChanged(nameof(DumpLength));
                     CompareFolder = config.CompareFolder;
                     CompareFile1 = config.CompareFile1;
                     CompareFile2 = config.CompareFile2;
@@ -1065,6 +1065,10 @@ namespace S7_Csharp_Utility.ViewModels
                     SocatVerbose = config.SocatVerbose;
                     SocatHexDump = config.SocatHexDump;
                     SocatBlockSize = config.SocatBlockSize;
+                    OnPropertyChanged(nameof(PayloadsPath));
+                    OnPropertyChanged(nameof(DumpsPath));
+                    OnPropertyChanged(nameof(LogsPath));
+                    OnPropertyChanged(nameof(ExtractionPath));
                 }
             }
         }
