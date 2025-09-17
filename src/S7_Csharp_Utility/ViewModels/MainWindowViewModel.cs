@@ -305,9 +305,12 @@ namespace S7_Csharp_Utility.ViewModels
             get => _stagerInstalled;
             set
             {
-                _stagerInstalled = value;
-                OnPropertyChanged();
-                (DumpMemoryCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                if (_stagerInstalled != value)
+                {
+                    _stagerInstalled = value;
+                    OnPropertyChanged();
+                    (DumpMemoryCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                }
             }
         }
 
@@ -737,6 +740,22 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         /// <summary>
+        /// Gets the appropriate logger based on the selected communication mode.
+        /// </summary>
+        /// <returns>A logging action.</returns>
+        private Action<string> GetLogger()
+        {
+            if (SelectedCommunicationMode == "TCP (socat)")
+            {
+                return (message) => SocatLogging.Log(message);
+            }
+            else
+            {
+                return (message) => Logging.Log(message, LogCategory.Info);
+            }
+        }
+
+        /// <summary>
         /// Starts the exploit sequence, which includes power cycling the PLC and installing the stager.
         /// </summary>
         private async Task StartExploitSequence()
@@ -754,7 +773,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 channel = CreateCommunicationChannel();
                 await channel.ConnectAsync();
-                var plcClient = new S7.Net.PlcClient(channel, (message) => Logging.Log(message, LogCategory.Info));
+                var plcClient = new S7.Net.PlcClient(channel, GetLogger());
                 await RunStagerSequenceAsync(plcClient);
             }
             catch (Exception ex)
@@ -787,7 +806,6 @@ namespace S7_Csharp_Utility.ViewModels
 
                 await plcClient.InstallStager(stagerPayload);
                 StagerInstalled = true;
-                OnPropertyChanged(nameof(StagerInstalled));
                 Logging.Log("Stager is installed and ready.", LogCategory.Info);
             }
         }
@@ -814,7 +832,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 channel = CreateCommunicationChannel();
                 await channel.ConnectAsync();
-                var plcClient = new S7.Net.PlcClient(channel, (message) => Logging.Log(message, LogCategory.Info));
+                var plcClient = new S7.Net.PlcClient(channel, GetLogger());
                 await RunDumpSequenceAsync(plcClient, address, DumpLength);
             }
             catch (Exception ex)
@@ -1065,10 +1083,10 @@ namespace S7_Csharp_Utility.ViewModels
                     SocatVerbose = config.SocatVerbose;
                     SocatHexDump = config.SocatHexDump;
                     SocatBlockSize = config.SocatBlockSize;
-                    OnPropertyChanged(nameof(PayloadsPath));
-                    OnPropertyChanged(nameof(DumpsPath));
-                    OnPropertyChanged(nameof(LogsPath));
-                    OnPropertyChanged(nameof(ExtractionPath));
+                    PayloadsPath = config.PayloadsPath;
+                    DumpsPath = config.DumpsPath;
+                    LogsPath = config.LogsPath;
+                    ExtractionPath = config.ExtractionPath;
                 }
             }
         }
@@ -1106,6 +1124,10 @@ namespace S7_Csharp_Utility.ViewModels
                         SocatVerbose = config.SocatVerbose;
                         SocatHexDump = config.SocatHexDump;
                         SocatBlockSize = config.SocatBlockSize;
+                        PayloadsPath = config.PayloadsPath;
+                        DumpsPath = config.DumpsPath;
+                        LogsPath = config.LogsPath;
+                        ExtractionPath = config.ExtractionPath;
                     }
                 }
                 else
@@ -1132,7 +1154,11 @@ namespace S7_Csharp_Utility.ViewModels
                         SelectedFlowControl = this.SelectedFlowControl,
                         SocatVerbose = this.SocatVerbose,
                         SocatHexDump = this.SocatHexDump,
-                        SocatBlockSize = this.SocatBlockSize
+                        SocatBlockSize = this.SocatBlockSize,
+                        PayloadsPath = this.PayloadsPath,
+                        DumpsPath = this.DumpsPath,
+                        LogsPath = this.LogsPath,
+                        ExtractionPath = this.ExtractionPath
                     };
 
                     var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
@@ -1176,7 +1202,11 @@ namespace S7_Csharp_Utility.ViewModels
                     SelectedFlowControl = this.SelectedFlowControl,
                     SocatVerbose = this.SocatVerbose,
                     SocatHexDump = this.SocatHexDump,
-                    SocatBlockSize = this.SocatBlockSize
+                    SocatBlockSize = this.SocatBlockSize,
+                    PayloadsPath = this.PayloadsPath,
+                    DumpsPath = this.DumpsPath,
+                    LogsPath = this.LogsPath,
+                    ExtractionPath = this.ExtractionPath
                 };
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
                 string json = System.Text.Json.JsonSerializer.Serialize(config, options);
@@ -1195,7 +1225,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))
             {
-                await _dialogService.ShowMessageAsync("Error", "Please select two valid files.");
+                await _dialogService.ShowMessageAsync("Error", "Please select a valid file.");
                 return;
             }
 

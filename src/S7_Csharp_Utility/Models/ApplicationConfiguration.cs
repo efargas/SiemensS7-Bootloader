@@ -87,5 +87,25 @@ namespace S7_Csharp_Utility.Models
         /// Sets the I/O block size for socat (equivalent to -b N).
         /// </summary>
         public int SocatBlockSize { get; set; } = 4;
+
+        /// <summary>
+        /// The path to the folder containing the stager payloads.
+        /// </summary>
+        public string PayloadsPath { get; set; } = "payloads";
+
+        /// <summary>
+        /// The path to the folder where memory dumps will be saved.
+        /// </summary>
+        public string DumpsPath { get; set; } = "dumps";
+
+        /// <summary>
+        /// The path to the folder where logs will be saved.
+        /// </summary>
+        public string LogsPath { get; set; } = "logs";
+
+        /// <summary>
+        /// The path to the folder where extracted files will be saved.
+        /// </summary>
+        public string ExtractionPath { get; set; } = "extracted";
     }
 }
