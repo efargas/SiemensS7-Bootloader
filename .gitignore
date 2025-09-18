@@ -18,7 +18,7 @@ src/**/bin/
 Thumbs.db
 
 # Logs/Temp
-*.log
+!*.log
 *.tmp
 
 # Python legacy artifacts
@@ -30,14 +30,15 @@ Legacy/*.log
 Legacy/*.tmp
 
 # Payloads/project generated outputs
-payloads/**/*.exe
-payloads/**/*.tmp
-payloads/**/*.d
-payloads/**/*.ihex
-payloads/**/*.o
-payloads/**/*.sym
-payloads/**/build/*
-!payloads/**/build/*.bin
+src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.exe
+src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.tmp
+src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.d
+src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.ihex
+src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.o
+src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.sym
+src/bootloader-payloads/docker-scripts/compiled_payloads/**/build/*
+!src/bootloader-payloads/docker-scripts/compiled_payloads/**/build/*.bin
+!src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.bin
 
 # Rider
 .idea/

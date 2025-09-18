@@ -28,32 +28,26 @@ namespace S7_Csharp_Utility.Services
                 else
                 {
                     var list = new System.Collections.Generic.List<int>();
-                    var p = new Process()
+                    foreach (var dir in Directory.GetDirectories("/proc"))
                     {
-                        StartInfo = new ProcessStartInfo
+                        if (int.TryParse(Path.GetFileName(dir), out int pid))
                         {
-                            FileName = "/bin/bash",
-                            Arguments = "-c 'pgrep socat'",
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                        }
-                    };
-                    p.Start();
-                    while (!p.StandardOutput.EndOfStream)
-                    {
-                        var line = p.StandardOutput.ReadLine();
-                        if (int.TryParse(line, out int pid))
-                        {
-                            list.Add(pid);
+                            try
+                            {
+                                string cmdline = File.ReadAllText(Path.Combine(dir, "cmdline"));
+                                if (cmdline.Contains("socat"))
+                                {
+                                    list.Add(pid);
+                                }
+                            }
+                            catch { }
                         }
                     }
-                    p.WaitForExit();
                     return list.ToArray();
                 }
             }
-            catch {
+            catch
+            {
                 return Array.Empty<int>();
             }
         }
@@ -63,18 +57,29 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         public static void KillAllSocatProcesses(Action<string>? log = null)
         {
-            foreach (var pid in GetSocatProcessIds())
+            var firstPIDs = GetSocatProcessIds();
+            log?.Invoke($"[SOCAT] Attempting to kill socat PIDs: {string.Join(", ", firstPIDs)}");
+            foreach (var pid in firstPIDs)
             {
                 try
                 {
-                    Process.GetProcessById(pid).Kill();
-                    log?.Invoke($"Killed socat process with PID {pid}");
+                    var proc = Process.GetProcessById(pid);
+                    var processName = proc.ProcessName;
+                    proc.Kill();
+                    proc.WaitForExit(1000);
+                    log?.Invoke($"[SOCAT] Killed socat process with PID {pid} ({processName})");
                 }
                 catch (Exception ex)
                 {
-                    log?.Invoke($"Failed to kill socat process with PID {pid}: {ex.Message}");
+                    log?.Invoke($"[SOCAT] Failed to kill socat process with PID {pid}: {ex.Message}");
                 }
             }
+            // Check again for survivors
+            var remaining = GetSocatProcessIds();
+            if (remaining.Length > 0)
+                log?.Invoke($"[SOCAT][WARNING] The following socat PIDs are still running after kill: {string.Join(", ", remaining)}");
+            else
+                log?.Invoke("[SOCAT] All socat processes terminated.");
         }
 
         /// <summary>

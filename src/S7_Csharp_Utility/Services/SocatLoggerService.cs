@@ -32,7 +32,8 @@ namespace S7_Csharp_Utility.Services
         private readonly object _sync = new object();
         private string _logText = string.Empty;
         private const int MaxLogLines = 2000;
-        private readonly string _socatLogFile;
+        private string _socatLogFile;
+        private const long MaxLogFileSize = 5 * 1024 * 1024; // 5MB
 
         public System.Windows.Input.ICommand ClearLogCommand { get; }
         public System.Windows.Input.ICommand ExportLogCommand { get; }
@@ -66,7 +67,7 @@ namespace S7_Csharp_Utility.Services
             _dispatcher = dispatcher;
             var logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
             System.IO.Directory.CreateDirectory(logDir);
-            _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
             ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
             ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
@@ -87,6 +88,7 @@ namespace S7_Csharp_Utility.Services
                 {
                     _logEntries.RemoveAt(0);
                 }
+                RotateIfNeeded();
                 System.IO.File.AppendAllText(_socatLogFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}{Environment.NewLine}");
             }
             _dispatcher.Post(UpdateLogText);
@@ -145,6 +147,17 @@ namespace S7_Csharp_Utility.Services
                 {
                     writer.WriteLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}");
                 }
+            }
+        }
+
+        private void RotateIfNeeded()
+        {
+            if (!System.IO.File.Exists(_socatLogFile)) return;
+            var fi = new System.IO.FileInfo(_socatLogFile);
+            if (fi.Length >= MaxLogFileSize)
+            {
+                var logDir = System.IO.Path.GetDirectoryName(_socatLogFile);
+                _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             }
         }
 

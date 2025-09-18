@@ -7,11 +7,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A15C1C63-994
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7_Csharp_Utility", "S7_Csharp_Utility/S7_Csharp_Utility.csproj", "{16698461-1D97-4607-A434-77B26D29AF62}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core", "Core", "{2A4B6C8D-1E3F-5A7B-9C1D-2E4F6A8B0C2D}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "S7_Csharp_Core", "S7_Csharp_Core", "{2A4B6C8D-1E3F-5A7B-9C1D-2E4F6A8B0C2D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.Net", "Core/S7.Net/S7.Net.csproj", "{3B5C7D9E-2F4A-6B8C-1D3E-5F7A9B1C3D5E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.Net", "S7_Csharp_Core/S7.Net/S7.Net.csproj", "{3B5C7D9E-2F4A-6B8C-1D3E-5F7A9B1C3D5E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.Utils", "Core/S7.Utils/S7.Utils.csproj", "{4C6D8E1F-3A5B-7C9D-2E4F-6A8B0C2D4E6F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.Utils", "S7_Csharp_Core/S7.Utils/S7.Utils.csproj", "{4C6D8E1F-3A5B-7C9D-2E4F-6A8B0C2D4E6F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Core\S7.Net\S7.Net.csproj" />
-    <ProjectReference Include="..\Core\S7.Utils\S7.Utils.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Net\S7.Net.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Utils\S7.Utils.csproj" />
   </ItemGroup>
 </Project>

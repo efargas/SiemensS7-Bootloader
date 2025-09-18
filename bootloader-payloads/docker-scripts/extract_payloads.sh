@@ -6,7 +6,7 @@
 set -e
 
 # Default output directory
-OUTPUT_DIR="${1:-./compiled_payloads}"
+OUTPUT_DIR="${1:-../../src/Resources/payloads}"
 IMAGE_NAME="siemens-s7-payloads-enhanced"
 
 echo "=== SiemensS7-Bootloader Payload Extraction (Volume Method) ==="

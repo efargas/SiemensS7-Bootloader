@@ -1,1 +1,0 @@
-arm-none-eabi-as -EB -o tmp.elf stager.s && arm-none-eabi-objcopy -j .text -Obinary tmp.elf stager.bin && rm tmp.elf

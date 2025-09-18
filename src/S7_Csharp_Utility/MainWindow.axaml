@@ -151,9 +151,9 @@
                             <TextBlock Text="Select Region:" />
                             <ComboBox Name="RegionComboBox" HorizontalAlignment="Stretch" />
                             <TextBlock Text="Address (hex):" />
-                            <TextBox Name="DumpAddressTextBox" HorizontalAlignment="Stretch" />
+                            <TextBox Name="DumpAddressTextBox" Text="{Binding DumpAddress, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             <TextBlock Text="Length (bytes):" />
-                            <TextBox Name="DumpLengthTextBox" HorizontalAlignment="Stretch" />
+                            <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             <ProgressBar Name="DumpProgressBar" HorizontalAlignment="Stretch" />
                             <TextBlock Name="DumpPercentLabel" Text="0%" />
                             <TextBlock Name="DumpBytesLabel" Text="Read: 0 / 0 bytes" />

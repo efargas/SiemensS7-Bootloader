@@ -1,1 +1,0 @@
-arm-none-eabi-as -EB -o tmp.elf hello_world.s && arm-none-eabi-objcopy -j .text -Obinary tmp.elf hello_world.bin && rm tmp.elf
