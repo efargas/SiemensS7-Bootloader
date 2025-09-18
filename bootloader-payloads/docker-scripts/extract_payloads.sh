@@ -23,7 +23,10 @@ cd ../docker-scripts
 
 # Run container with volume mount to extract payloads
 echo "Running container and extracting payloads via volume mount..."
-docker run --rm -v "$(pwd)/$OUTPUT_DIR:/host_output" "$IMAGE_NAME" \
+# Convert relative path to absolute path for Docker volume mount
+ABS_OUTPUT_DIR=$(realpath "$OUTPUT_DIR")
+echo "Absolute output path: $ABS_OUTPUT_DIR"
+docker run --rm -v "$ABS_OUTPUT_DIR:/host_output" "$IMAGE_NAME" \
     sh -c "cp -r /app/compiled_output/* /host_output/ && echo 'Payloads copied to host successfully!'"
 
 # Create a summary file

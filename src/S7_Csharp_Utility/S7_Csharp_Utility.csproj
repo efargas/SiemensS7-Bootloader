@@ -21,10 +21,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Resources\\payloads\\**">
+    <Content Include="../Resources/**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Resources/%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
+
+  <!-- Ensure all required directories exist in output -->
+  <Target Name="CreateResourceDirectories" AfterTargets="Build">
+    <MakeDir Directories="$(OutputPath)Resources\payloads" />
+    <MakeDir Directories="$(OutputPath)Resources\dumps" />
+    <MakeDir Directories="$(OutputPath)Resources\logs" />
+    <MakeDir Directories="$(OutputPath)Resources\extracted" />
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="..\S7_Csharp_Core\S7.Net\S7.Net.csproj" />

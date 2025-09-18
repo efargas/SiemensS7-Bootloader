@@ -38,10 +38,12 @@ namespace S7_Csharp_Utility.Services
     public class LoggingService : INotifyPropertyChanged
     {
         private readonly List<LogMessage> _allLogMessages = new List<LogMessage>();
+        private readonly object _sync = new object();
         private const int MaxLogLines = 2000;
         private readonly Dispatcher _dispatcher;
         private string _logText = string.Empty;
         private string _mainLogFile;
+        private string _logsPath;
         private const long MaxLogFileSize = 5 * 1024 * 1024; // 5MB
 
         /// <summary>
@@ -95,12 +97,13 @@ namespace S7_Csharp_Utility.Services
         /// Initializes a new instance of the <see cref="LoggingService"/> class.
         /// </summary>
         /// <param name="dispatcher">The dispatcher to use for UI updates.</param>
-        public LoggingService(Dispatcher dispatcher)
+        /// <param name="logsPath">The path where log files should be saved. If null, uses default path.</param>
+        public LoggingService(Dispatcher dispatcher, string? logsPath = null)
         {
             _dispatcher = dispatcher;
-            var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
-            Directory.CreateDirectory(logDir);
-            _mainLogFile = Path.Combine(logDir, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+            _logsPath = logsPath ?? Path.Combine(AppContext.BaseDirectory, "logs");
+            Directory.CreateDirectory(_logsPath);
+            _mainLogFile = Path.Combine(_logsPath, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
             ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
             ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
@@ -111,12 +114,16 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         private void ExportLogs()
         {
-            string logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
-            System.IO.Directory.CreateDirectory(logDir);
-            string logFile = System.IO.Path.Combine(logDir, $"exported_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-            using (var writer = new System.IO.StreamWriter(logFile, false))
+            Directory.CreateDirectory(_logsPath);
+            string logFile = Path.Combine(_logsPath, $"exported_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            List<LogMessage> snapshot;
+            lock (_sync)
             {
-                foreach (var entry in _allLogMessages)
+                snapshot = new List<LogMessage>(_allLogMessages);
+            }
+            using (var writer = new StreamWriter(logFile, false))
+            {
+                foreach (var entry in snapshot)
                 {
                     writer.WriteLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Category} {entry.Message}");
                 }
@@ -130,6 +137,8 @@ namespace S7_Csharp_Utility.Services
         /// <param name="category">The category of the message.</param>
         public void Log(string message, LogCategory category = LogCategory.Info)
         {
+            if (string.IsNullOrEmpty(message)) return;
+            
             var entry = new LogMessage
             {
                 Timestamp = DateTime.Now,
@@ -137,18 +146,17 @@ namespace S7_Csharp_Utility.Services
                 Message = message
             };
 
-            _allLogMessages.Add(entry);
-            if (_allLogMessages.Count > MaxLogLines)
+            lock (_sync)
             {
-                _allLogMessages.RemoveAt(0);
+                _allLogMessages.Add(entry);
+                if (_allLogMessages.Count > MaxLogLines)
+                {
+                    _allLogMessages.RemoveAt(0);
+                }
+                HandleLogFile(entry);
             }
 
-            _dispatcher.Post(() =>
-            {
-                UpdateLogFilter();
-            });
-
-            HandleLogFile(entry);
+            _dispatcher.Post(UpdateLogFilter);
         }
 
         /// <summary>
@@ -156,9 +164,14 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         public void UpdateLogFilter()
         {
+            List<LogMessage> snapshot;
+            lock (_sync)
+            {
+                snapshot = new List<LogMessage>(_allLogMessages);
+            }
+
             var sb = new StringBuilder();
-            
-            foreach (var entry in _allLogMessages)
+            foreach (var entry in snapshot)
             {
                 if ((FilterInfo && entry.Category == LogCategory.Info)
                     || (FilterError && entry.Category == LogCategory.Error)
@@ -202,12 +215,34 @@ namespace S7_Csharp_Utility.Services
         }
 
         /// <summary>
+        /// Updates the logs path and creates a new log file in the new location.
+        /// </summary>
+        /// <param name="newLogsPath">The new path where log files should be saved.</param>
+        public void UpdateLogsPath(string newLogsPath)
+        {
+            if (string.IsNullOrWhiteSpace(newLogsPath))
+                return;
+
+            _logsPath = newLogsPath;
+            Directory.CreateDirectory(_logsPath);
+            _mainLogFile = Path.Combine(_logsPath, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+            
+            Log($"Log path updated to: {_logsPath}", LogCategory.Info);
+        }
+
+        /// <summary>
         /// Clears the log.
         /// </summary>
         public void Clear()
         {
-            _allLogMessages.Clear();
-            LogText = string.Empty;
+            _dispatcher.Post(() =>
+            {
+                lock (_sync)
+                {
+                    _allLogMessages.Clear();
+                }
+                LogText = string.Empty;
+            });
         }
 
         /// <summary>

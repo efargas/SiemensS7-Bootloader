@@ -33,6 +33,7 @@ namespace S7_Csharp_Utility.Services
         private string _logText = string.Empty;
         private const int MaxLogLines = 2000;
         private string _socatLogFile;
+        private string _logsPath;
         private const long MaxLogFileSize = 5 * 1024 * 1024; // 5MB
 
         public System.Windows.Input.ICommand ClearLogCommand { get; }
@@ -62,12 +63,13 @@ namespace S7_Csharp_Utility.Services
         /// Initializes a new instance of the <see cref="SocatLoggerService"/> class.
         /// </summary>
         /// <param name="dispatcher">The dispatcher to use for UI updates.</param>
-        public SocatLoggerService(Dispatcher dispatcher)
+        /// <param name="logsPath">The path where log files should be saved. If null, uses default path.</param>
+        public SocatLoggerService(Dispatcher dispatcher, string? logsPath = null)
         {
             _dispatcher = dispatcher;
-            var logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
-            System.IO.Directory.CreateDirectory(logDir);
-            _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+            _logsPath = logsPath ?? System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+            System.IO.Directory.CreateDirectory(_logsPath);
+            _socatLogFile = System.IO.Path.Combine(_logsPath, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
             ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
             ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
@@ -133,9 +135,8 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         private void ExportLogs()
         {
-            string logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
-            System.IO.Directory.CreateDirectory(logDir);
-            string logFile = System.IO.Path.Combine(logDir, $"socat_exported_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            System.IO.Directory.CreateDirectory(_logsPath);
+            string logFile = System.IO.Path.Combine(_logsPath, $"socat_exported_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
             List<SocatLogEntry> snapshot;
             lock (_sync)
             {
@@ -159,6 +160,20 @@ namespace S7_Csharp_Utility.Services
                 var logDir = System.IO.Path.GetDirectoryName(_socatLogFile);
                 _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             }
+        }
+
+        /// <summary>
+        /// Updates the logs path and creates a new log file in the new location.
+        /// </summary>
+        /// <param name="newLogsPath">The new path where log files should be saved.</param>
+        public void UpdateLogsPath(string newLogsPath)
+        {
+            if (string.IsNullOrWhiteSpace(newLogsPath))
+                return;
+
+            _logsPath = newLogsPath;
+            System.IO.Directory.CreateDirectory(_logsPath);
+            _socatLogFile = System.IO.Path.Combine(_logsPath, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
         }
 
         /// <summary>

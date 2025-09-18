@@ -52,35 +52,31 @@ namespace S7.Net
         /// <param name="sleepMs">The number of milliseconds to sleep between steps.</param>
         public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10)
         {
-            const int ProtocolChunkSize = 32;
-            int offset = 0;
+            // This initial delay mirrors the Python client's SEND_REQ_SAFETY_SLEEP_AMT
+            // and is critical for stability.
+            await Task.Delay(10);
 
-            while (offset < contents.Length)
+            if (contents.Length > PlcConstants.MAX_MSG_LEN)
             {
-                int chunkSize = Math.Min(ProtocolChunkSize, contents.Length - offset);
-                var packet = new byte[chunkSize + 2];
-                packet[0] = (byte)(chunkSize + 1);
-                Array.Copy(contents, offset, packet, 1, chunkSize);
-                packet[packet.Length - 1] = CalculateChecksum(packet, 0, packet.Length - 1);
-                _log($"-> SEND: {BitConverter.ToString(packet).Replace("-", "")}");
-                for (int i = 0; i < packet.Length; i += step)
-                {
-                    int bytesToSend = Math.Min(step, packet.Length - i);
-                    await _channel.WriteAsync(packet, i, bytesToSend);
-                    if (sleepMs > 0) await Task.Delay(sleepMs);
-                }
-                offset += chunkSize;
+                throw new ArgumentException($"Packet contents too large. Max size is {PlcConstants.MAX_MSG_LEN} bytes.", nameof(contents));
             }
-            // Reference protocol: send terminating zero-length packet
-            var endPacket = new byte[2];
-            endPacket[0] = 1; // means length 0
-            endPacket[1] = CalculateChecksum(endPacket, 0, 1);
-            _log($"-> SEND: {BitConverter.ToString(endPacket).Replace("-", "")} (end packet)");
-            for (int i = 0; i < endPacket.Length; i += step)
+
+            var packet = new byte[contents.Length + 2];
+            packet[0] = (byte)(contents.Length + 1);
+            Array.Copy(contents, 0, packet, 1, contents.Length);
+            packet[packet.Length - 1] = CalculateChecksum(packet, 0, packet.Length - 1);
+
+            _log($"-> SEND: {BitConverter.ToString(packet).Replace("-", "")}");
+
+            // Send the packet in small chunks to avoid overflowing the PLC's UART buffer
+            for (int i = 0; i < packet.Length; i += step)
             {
-                int bytesToSend = Math.Min(step, endPacket.Length - i);
-                await _channel.WriteAsync(endPacket, i, bytesToSend);
-                if (sleepMs > 0) await Task.Delay(sleepMs);
+                int bytesToSend = Math.Min(step, packet.Length - i);
+                await _channel.WriteAsync(packet, i, bytesToSend);
+                if (sleepMs > 0)
+                {
+                    await Task.Delay(sleepMs);
+                }
             }
         }
 
@@ -119,7 +115,7 @@ namespace S7.Net
         /// <returns>The contents of the packet, or null if a checksum error occurred.</returns>
         public async Task<byte[]?> ReceivePacketAsync(int timeoutMs = 2000)
         {
-            // CancellationToken is not easily compatible with the custom ICommunicationChannel,
+            // CancellationToken is not easily compatible with the custom ICommunicationChannel
             // so we'll rely on the underlying implementation's timeouts for now.
             // var cancellationTokenSource = new CancellationTokenSource(timeoutMs);
             // var token = cancellationTokenSource.Token;

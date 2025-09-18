@@ -16,12 +16,16 @@ namespace S7_Csharp_Utility
     {
         private S7UpdateUnpacker _unpacker = new S7UpdateUnpacker();
         private string _firmwarePath = "";
+        private string _extractionPath = "";
+        
         /// <summary>
         /// Initializes a new instance of the <see cref="FirmwareUnpackerWindow"/> class.
         /// </summary>
-        public FirmwareUnpackerWindow()
+        /// <param name="extractionPath">The configured extraction path. If null or empty, user will be prompted to select a folder.</param>
+        public FirmwareUnpackerWindow(string? extractionPath = null)
         {
             InitializeComponent();
+            _extractionPath = extractionPath ?? "";
             SelectFirmwareButton.Click += SelectFirmwareButton_Click;
             UnpackFirmwareButton.Click += UnpackFirmwareButton_Click;
         }
@@ -68,21 +72,39 @@ namespace S7_Csharp_Utility
         private async void UnpackFirmwareButton_Click(object? sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(_firmwarePath)) return;
-            var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel == null) return;
-            var folder = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            
+            string destinationFolder;
+            
+            // Use configured extraction path if available, otherwise prompt user
+            if (!string.IsNullOrWhiteSpace(_extractionPath))
             {
-                Title = "Select Destination Folder"
-            });
-
-            if (folder.Count >= 1)
+                // Ensure the extraction directory exists
+                Directory.CreateDirectory(_extractionPath);
+                destinationFolder = _extractionPath;
+            }
+            else
             {
-                string output = Path.Combine(new Uri(folder[0].Path.ToString()).LocalPath, Path.GetFileName(_firmwarePath) + ".unpacked.bin");
-                try
+                // Fallback to user selection if no configured path
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null) return;
+                var folder = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
                 {
-                    await Task.Run(() => _unpacker.Unpack(_firmwarePath, output));
-                    await ShowMessage($"Unpacked to: {output}");
-                } catch (Exception ex) { await ShowMessage($"Error: {ex.Message}"); }
+                    Title = "Select Destination Folder"
+                });
+
+                if (folder.Count < 1) return;
+                destinationFolder = new Uri(folder[0].Path.ToString()).LocalPath;
+            }
+
+            string output = Path.Combine(destinationFolder, Path.GetFileName(_firmwarePath) + ".unpacked.bin");
+            try
+            {
+                await Task.Run(() => _unpacker.Unpack(_firmwarePath, output));
+                await ShowMessage($"Unpacked to: {output}");
+            } 
+            catch (Exception ex) 
+            { 
+                await ShowMessage($"Error: {ex.Message}"); 
             }
         }
         /// <summary>

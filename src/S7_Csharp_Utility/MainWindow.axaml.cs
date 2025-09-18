@@ -46,7 +46,13 @@ namespace S7_Csharp_Utility
             FilterDebugCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterDebug = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
 
             MenuProfileManagement.Click += (s, e) => new ProfileManagementWindow().Show();
-            MenuFirmwareUnpacker.Click += (s, e) => new FirmwareUnpackerWindow().Show();
+            MenuFirmwareUnpacker.Click += (s, e) => 
+            {
+                var vm = DataContext as ViewModels.MainWindowViewModel;
+                string extractionPath = vm?.ExtractionPath ?? "";
+                string resolvedPath = Models.ApplicationConfiguration.ResolvePath(extractionPath, Models.ApplicationConfiguration.GetDefaultExtractionPath());
+                new FirmwareUnpackerWindow(resolvedPath).Show();
+            };
             
             MenuSaveConfig.Click += (s, e) => viewModel.SaveConfigurationCommand.Execute(null);
             MenuLoadConfig.Click += (s, e) => viewModel.LoadConfigurationCommand.Execute(null);
