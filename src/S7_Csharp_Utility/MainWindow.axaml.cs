@@ -53,6 +53,14 @@ namespace S7_Csharp_Utility
                 string resolvedPath = Models.ApplicationConfiguration.ResolvePath(extractionPath, Models.ApplicationConfiguration.GetDefaultExtractionPath());
                 new FirmwareUnpackerWindow(resolvedPath).Show();
             };
+            MenuHexViewer.Click += async (s, e) =>
+            {
+                var filePath = await OpenFilePickerAsync("Open file");
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    new HexViewerWindow(filePath).Show();
+                }
+            };
             
             MenuSaveConfig.Click += (s, e) => viewModel.SaveConfigurationCommand.Execute(null);
             MenuLoadConfig.Click += (s, e) => viewModel.LoadConfigurationCommand.Execute(null);
@@ -62,60 +70,24 @@ namespace S7_Csharp_Utility
             ExportLogButton.Click += async (s, e) => await ExportLogToFileAsync(_loggingService.LogText, "Export Main Log");
 
             // --- Autoscroll Implementation ---
-            var logScrollViewer = this.FindControl<ScrollViewer>("LogScrollViewer");
-            var socatLogScrollViewer = this.FindControl<ScrollViewer>("SocatLogScrollViewer");
-            var isAutoScroll = true;
-            var isSocatAutoScroll = true;
+            var logListBox = this.FindControl<ListBox>("LogListBox");
+            var socatLogListBox = this.FindControl<ListBox>("SocatLogListBox");
 
-            if (logScrollViewer != null)
+            _loggingService.ScrollToEnd += () =>
             {
-                logScrollViewer.ScrollChanged += (s, e) =>
+                if (logListBox != null && logListBox.Items.Count > 0)
                 {
-                    // Only update auto-scroll state if the user manually scrolled
-                    if (e.OffsetDelta.Y != 0) isAutoScroll = IsAtBottom(logScrollViewer);
-                };
-            }
-
-            if (socatLogScrollViewer != null)
-            {
-                socatLogScrollViewer.ScrollChanged += (s, e) =>
-                {
-                    // Only update auto-scroll state if the user manually scrolled
-                    if (e.OffsetDelta.Y != 0) isSocatAutoScroll = IsAtBottom(socatLogScrollViewer);
-                };
-            }
-
-            _loggingService.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(Services.LoggingService.LogText) && isAutoScroll)
-                {
-                    Dispatcher.UIThread.Post(() => logScrollViewer?.ScrollToEnd());
+                    logListBox.ScrollIntoView(logListBox.Items[logListBox.Items.Count - 1]);
                 }
             };
 
-            _socatLoggerService.PropertyChanged += (s, e) =>
+            _socatLoggerService.ScrollToEnd += () =>
             {
-                if (e.PropertyName == nameof(Services.SocatLoggerService.LogText) && isSocatAutoScroll)
+                if (socatLogListBox != null && socatLogListBox.Items.Count > 0)
                 {
-                    Dispatcher.UIThread.Post(() => socatLogScrollViewer?.ScrollToEnd());
+                    socatLogListBox.ScrollIntoView(socatLogListBox.Items[socatLogListBox.Items.Count - 1]);
                 }
             };
-
-            ScrollToEndButton.Click += (s, e) =>
-            {
-                isAutoScroll = true;
-                logScrollViewer?.ScrollToEnd();
-            };
-
-            var socatScrollToEndButton = this.FindControl<Button>("SocatScrollToEndButton");
-            if (socatScrollToEndButton != null)
-            {
-                socatScrollToEndButton.Click += (s, e) =>
-                {
-                    isSocatAutoScroll = true;
-                    socatLogScrollViewer?.ScrollToEnd();
-                };
-            }
         }
 
         /// <summary>

@@ -37,5 +37,23 @@ namespace S7_Csharp_Utility.Services
             string json = await File.ReadAllTextAsync(filePath);
             return JsonSerializer.Deserialize<ApplicationConfiguration>(json);
         }
+
+        public async Task SaveProfileAsync(DeviceProfile profile, string filePath)
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(profile, options);
+            await File.WriteAllTextAsync(filePath, json);
+        }
+
+        public async Task<DeviceProfile?> LoadProfileAsync(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                return null;
+            }
+
+            string json = await File.ReadAllTextAsync(filePath);
+            return JsonSerializer.Deserialize<DeviceProfile>(json);
+        }
     }
 }

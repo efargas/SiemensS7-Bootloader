@@ -32,22 +32,15 @@ namespace S7.Utils
         {
             var hashes = new Dictionary<string, List<string>>();
             var files = Directory.GetFiles(folderPath, "*");
-            using (var md5 = MD5.Create())
+            foreach (var file in files)
             {
-                foreach (var file in files)
+                _progressReporter?.Invoke($"Hashing {Path.GetFileName(file)}...");
+                string hashString = await ComputeFileHashAsync(file);
+                if (!hashes.ContainsKey(hashString))
                 {
-                    _progressReporter?.Invoke($"Hashing {Path.GetFileName(file)}...");
-                    using (var stream = File.OpenRead(file))
-                    {
-                        var hashBytes = await md5.ComputeHashAsync(stream);
-                        string hashString = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
-                        if (!hashes.ContainsKey(hashString))
-                        {
-                            hashes[hashString] = new List<string>();
-                        }
-                        hashes[hashString].Add(file);
-                    }
+                    hashes[hashString] = new List<string>();
                 }
+                hashes[hashString].Add(file);
             }
             return hashes;
         }

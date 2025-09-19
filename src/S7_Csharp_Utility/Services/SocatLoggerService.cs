@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -28,9 +29,8 @@ namespace S7_Csharp_Utility.Services
     public class SocatLoggerService : INotifyPropertyChanged
     {
         private readonly Dispatcher _dispatcher;
-        private readonly List<SocatLogEntry> _logEntries = new List<SocatLogEntry>();
+        public ObservableCollection<SocatLogEntry> LogEntries { get; } = new ObservableCollection<SocatLogEntry>();
         private readonly object _sync = new object();
-        private string _logText = string.Empty;
         private const int MaxLogLines = 2000;
         private string _socatLogFile;
         private string _logsPath;
@@ -40,19 +40,6 @@ namespace S7_Csharp_Utility.Services
         public System.Windows.Input.ICommand ExportLogCommand { get; }
         public System.Windows.Input.ICommand ScrollToEndCommand { get; }
         public event Action? ScrollToEnd;
-
-        /// <summary>
-        /// The formatted log text to be displayed in the UI.
-        /// </summary>
-        public string LogText
-        {
-            get => _logText;
-            private set
-            {
-                _logText = value;
-                OnPropertyChanged();
-            }
-        }
 
         /// <summary>
         /// Event triggered when a property value changes.
@@ -82,37 +69,26 @@ namespace S7_Csharp_Utility.Services
         public void Log(string? data)
         {
             if (data == null) return;
+            var entry = new SocatLogEntry { Timestamp = DateTime.Now, Message = data };
+
+            _dispatcher.Post(() =>
+            {
+                lock (_sync)
+                {
+                    LogEntries.Add(entry);
+                    if (LogEntries.Count > MaxLogLines)
+                    {
+                        LogEntries.RemoveAt(0);
+                    }
+                }
+                ScrollToEnd?.Invoke();
+            });
+
             lock (_sync)
             {
-                var entry = new SocatLogEntry { Timestamp = DateTime.Now, Message = data };
-                _logEntries.Add(entry);
-                if (_logEntries.Count > MaxLogLines)
-                {
-                    _logEntries.RemoveAt(0);
-                }
                 RotateIfNeeded();
                 System.IO.File.AppendAllText(_socatLogFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}{Environment.NewLine}");
             }
-            _dispatcher.Post(UpdateLogText);
-        }
-
-        /// <summary>
-        /// Updates the log text to be displayed in the UI.
-        /// </summary>
-        private void UpdateLogText()
-        {
-            List<SocatLogEntry> snapshot;
-            lock (_sync)
-            {
-                snapshot = new List<SocatLogEntry>(_logEntries);
-            }
-
-            var sb = new StringBuilder();
-            foreach (var entry in snapshot)
-            {
-                sb.AppendLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}");
-            }
-            LogText = sb.ToString();
         }
 
         /// <summary>
@@ -124,9 +100,8 @@ namespace S7_Csharp_Utility.Services
             {
                 lock (_sync)
                 {
-                    _logEntries.Clear();
+                    LogEntries.Clear();
                 }
-                LogText = string.Empty;
             });
         }
 
@@ -140,7 +115,7 @@ namespace S7_Csharp_Utility.Services
             List<SocatLogEntry> snapshot;
             lock (_sync)
             {
-                snapshot = new List<SocatLogEntry>(_logEntries);
+                snapshot = new List<SocatLogEntry>(LogEntries);
             }
             using (var writer = new System.IO.StreamWriter(logFile, false))
             {

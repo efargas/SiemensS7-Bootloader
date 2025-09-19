@@ -99,23 +99,23 @@ namespace S7.Net
         }
 
         /// <summary>
-        /// Gets the stager payload.
+        /// Asynchronously gets the stager payload.
         /// </summary>
         /// <returns>The stager payload as a byte array.</returns>
-        public byte[] GetStagerPayload(string payloadsBase)
+        public async Task<byte[]> GetStagerPayloadAsync(string payloadsBase)
         {
-            var filePath = FindPayloadFile(payloadsBase, new[] { "stager.bin", "stager" });
-            return File.ReadAllBytes(filePath);
+            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "stager.bin", "stager" });
+            return await File.ReadAllBytesAsync(filePath);
         }
 
         /// <summary>
-        /// Gets the memory dumper payload.
+        /// Asynchronously gets the memory dumper payload.
         /// </summary>
         /// <returns>The memory dumper payload as a byte array.</returns>
-        public byte[] GetMemoryDumperPayload(string payloadsBase)
+        public async Task<byte[]> GetMemoryDumperPayloadAsync(string payloadsBase)
         {
-            var filePath = FindPayloadFile(payloadsBase, new[] { "dump_mem.bin", "dump_mem" });
-            return File.ReadAllBytes(filePath);
+            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "dump_mem.bin", "dump_mem" });
+            return await File.ReadAllBytesAsync(filePath);
         }
 
         /// <summary>
@@ -141,50 +141,46 @@ namespace S7.Net
         }
 
         /// <summary>
-        /// Recursively searches for the payload file in the base directory.
+        /// Asynchronously and recursively searches for the payload file in the base directory.
         /// Tries multiple possible file names in order of preference.
         /// </summary>
-        private static string FindPayloadFile(string payloadsBase, string[] possibleNames)
+        private static Task<string> FindPayloadFileAsync(string payloadsBase, string[] possibleNames)
         {
-            if (!Directory.Exists(payloadsBase))
+            return Task.Run(() =>
             {
-                throw new DirectoryNotFoundException($"Payloads directory not found: {payloadsBase}. Please check the path configuration.");
-            }
-
-            try
-            {
-                // Try each possible name in order
-                foreach (var fileName in possibleNames)
+                if (!Directory.Exists(payloadsBase))
                 {
-                    foreach (var file in Directory.GetFiles(payloadsBase, fileName, SearchOption.AllDirectories))
+                    throw new DirectoryNotFoundException($"Payloads directory not found: {payloadsBase}. Please check the path configuration.");
+                }
+
+                try
+                {
+                    // Try each possible name in order
+                    foreach (var fileName in possibleNames)
                     {
-                        return file; // Return first match
+                        var firstFile = Directory.EnumerateFiles(payloadsBase, fileName, SearchOption.AllDirectories).FirstOrDefault();
+                        if (firstFile != null)
+                        {
+                            return firstFile; // Return first match
+                        }
                     }
                 }
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                throw new UnauthorizedAccessException($"Access denied to payloads directory: {payloadsBase}. {ex.Message}");
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                throw new DirectoryNotFoundException($"Payloads directory not found: {payloadsBase}. {ex.Message}");
-            }
-            
-            // If we get here, none of the files were found
-            var allFiles = Directory.GetFiles(payloadsBase, "*", SearchOption.AllDirectories)
-                .Select(Path.GetFileName)
-                .ToArray();
-            
-            throw new FileNotFoundException($"None of the expected payload files ({string.Join(", ", possibleNames)}) found under {payloadsBase}. Available files: {string.Join(", ", allFiles)}");
-        }
+                catch (UnauthorizedAccessException ex)
+                {
+                    throw new UnauthorizedAccessException($"Access denied to payloads directory: {payloadsBase}. {ex.Message}");
+                }
+                catch (DirectoryNotFoundException ex)
+                {
+                    throw new DirectoryNotFoundException($"Payloads directory not found: {payloadsBase}. {ex.Message}");
+                }
 
-        /// <summary>
-        /// Recursively searches for the payload file in the base directory.
-        /// </summary>
-        private static string FindPayloadFile(string payloadsBase, string fileName)
-        {
-            return FindPayloadFile(payloadsBase, new[] { fileName });
+                // If we get here, none of the files were found
+                var allFiles = Directory.EnumerateFiles(payloadsBase, "*", SearchOption.AllDirectories)
+                    .Select(Path.GetFileName)
+                    .ToArray();
+
+                throw new FileNotFoundException($"None of the expected payload files ({string.Join(", ", possibleNames)}) found under {payloadsBase}. Available files: {string.Join(", ", allFiles)}");
+            });
         }
     }
 }

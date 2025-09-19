@@ -1,7 +1,16 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:S7_Csharp_Utility"
+             xmlns:converters="using:S7_Csharp_Utility.Converters"
              x:Class="S7_Csharp_Utility.App">
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+
     <Application.Styles>
-        <FluentTheme />
+        <FluentTheme Mode="Dark"/>
     </Application.Styles>
+    <Application.Resources>
+        <converters:LogCategoryToColorConverter x:Key="LogCategoryToColorConverter"/>
+    </Application.Resources>
 </Application>

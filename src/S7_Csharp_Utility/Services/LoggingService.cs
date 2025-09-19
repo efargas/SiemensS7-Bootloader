@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia.Threading;
@@ -37,40 +39,64 @@ namespace S7_Csharp_Utility.Services
     /// </summary>
     public class LoggingService : INotifyPropertyChanged
     {
-        private readonly List<LogMessage> _allLogMessages = new List<LogMessage>();
         private readonly object _sync = new object();
         private const int MaxLogLines = 2000;
         private readonly Dispatcher _dispatcher;
-        private string _logText = string.Empty;
         private string _mainLogFile;
         private string _logsPath;
         private const long MaxLogFileSize = 5 * 1024 * 1024; // 5MB
 
+        private readonly ObservableCollection<LogMessage> _allLogMessages = new();
+        private bool _filterInfo = true;
         /// <summary>
         /// Indicates whether to display informational messages.
         /// </summary>
-        public bool FilterInfo { get; set; } = true;
+        public bool FilterInfo
+        {
+            get => _filterInfo;
+            set
+            {
+                if (_filterInfo == value) return;
+                _filterInfo = value;
+                OnPropertyChanged();
+                ApplyFilter();
+            }
+        }
+
+        private bool _filterError = true;
         /// <summary>
-        /// Indicates whether to display error messages.
+        /// Indicates whether to display error and warning messages.
         /// </summary>
-        public bool FilterError { get; set; } = true;
+        public bool FilterError
+        {
+            get => _filterError;
+            set
+            {
+                if (_filterError == value) return;
+                _filterError = value;
+                OnPropertyChanged();
+                ApplyFilter();
+            }
+        }
+
+        private bool _filterDebug = true;
         /// <summary>
         /// Indicates whether to display debug messages.
         /// </summary>
-        public bool FilterDebug { get; set; } = true;
-
-        /// <summary>
-        /// The formatted log text to be displayed in the UI.
-        /// </summary>
-        public string LogText
+        public bool FilterDebug
         {
-            get => _logText;
-            private set
+            get => _filterDebug;
+            set
             {
-                _logText = value;
+                if (_filterDebug == value) return;
+                _filterDebug = value;
                 OnPropertyChanged();
+                ApplyFilter();
             }
         }
+
+        public ObservableCollection<LogMessage> LogMessages { get; } = new();
+
 
         /// <summary>
         /// Command to clear the log.
@@ -138,7 +164,7 @@ namespace S7_Csharp_Utility.Services
         public void Log(string message, LogCategory category = LogCategory.Info)
         {
             if (string.IsNullOrEmpty(message)) return;
-            
+
             var entry = new LogMessage
             {
                 Timestamp = DateTime.Now,
@@ -146,51 +172,31 @@ namespace S7_Csharp_Utility.Services
                 Message = message
             };
 
+            _dispatcher.Post(() =>
+            {
+                lock (_sync)
+                {
+                    _allLogMessages.Add(entry);
+
+                    if (ShouldBeVisible(entry))
+                    {
+                        LogMessages.Add(entry);
+                    }
+
+                    if (_allLogMessages.Count > MaxLogLines)
+                    {
+                        var toRemove = _allLogMessages[0];
+                        _allLogMessages.RemoveAt(0);
+                        LogMessages.Remove(toRemove); // This will do nothing if the item is not in the list
+                    }
+                }
+                ScrollToEnd?.Invoke();
+            });
+
             lock (_sync)
             {
-                _allLogMessages.Add(entry);
-                if (_allLogMessages.Count > MaxLogLines)
-                {
-                    _allLogMessages.RemoveAt(0);
-                }
                 HandleLogFile(entry);
             }
-
-            _dispatcher.Post(UpdateLogFilter);
-        }
-
-        /// <summary>
-        /// Updates the log text based on the current filter settings.
-        /// </summary>
-        public void UpdateLogFilter()
-        {
-            List<LogMessage> snapshot;
-            lock (_sync)
-            {
-                snapshot = new List<LogMessage>(_allLogMessages);
-            }
-
-            var sb = new StringBuilder();
-            foreach (var entry in snapshot)
-            {
-                if ((FilterInfo && entry.Category == LogCategory.Info)
-                    || (FilterError && entry.Category == LogCategory.Error)
-                    || (FilterDebug && entry.Category == LogCategory.Debug)
-                    || (FilterInfo && entry.Category == LogCategory.Warning))
-                {
-                    var categoryStr = entry.Category switch
-                    {
-                        LogCategory.Info => "[INFO]",
-                        LogCategory.Error => "[ERROR]",
-                        LogCategory.Debug => "[DEBUG]",
-                        LogCategory.Warning => "[WARN]",
-                        _ => "[INFO]"
-                    };
-                    sb.AppendLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {categoryStr} {entry.Message}");
-                }
-            }
-            
-            LogText = sb.ToString();
         }
 
         /// <summary>
@@ -226,7 +232,7 @@ namespace S7_Csharp_Utility.Services
             _logsPath = newLogsPath;
             Directory.CreateDirectory(_logsPath);
             _mainLogFile = Path.Combine(_logsPath, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
-            
+
             Log($"Log path updated to: {_logsPath}", LogCategory.Info);
         }
 
@@ -240,9 +246,45 @@ namespace S7_Csharp_Utility.Services
                 lock (_sync)
                 {
                     _allLogMessages.Clear();
+                    LogMessages.Clear();
                 }
-                LogText = string.Empty;
             });
+        }
+
+        private void ApplyFilter()
+        {
+            List<LogMessage> snapshot;
+            lock (_sync)
+            {
+                snapshot = new List<LogMessage>(_allLogMessages);
+            }
+
+            var filtered = snapshot.Where(ShouldBeVisible).ToList();
+
+            _dispatcher.Post(() =>
+            {
+                lock (_sync)
+                {
+                    LogMessages.Clear();
+                    foreach (var item in filtered)
+                    {
+                        LogMessages.Add(item);
+                    }
+                }
+                ScrollToEnd?.Invoke();
+            });
+        }
+
+        private bool ShouldBeVisible(LogMessage entry)
+        {
+            return entry.Category switch
+            {
+                LogCategory.Info => FilterInfo,
+                LogCategory.Warning => FilterError,
+                LogCategory.Error => FilterError,
+                LogCategory.Debug => FilterDebug,
+                _ => true
+            };
         }
 
         /// <summary>

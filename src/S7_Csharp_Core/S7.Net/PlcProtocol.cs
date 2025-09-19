@@ -50,6 +50,8 @@ namespace S7.Net
         /// <param name="contents">The contents of the packet.</param>
         /// <param name="step">The number of bytes to send at a time.</param>
         /// <param name="sleepMs">The number of milliseconds to sleep between steps.</param>
+        // The default values for step (2) and sleepMs (10) are based on the Python
+        // client's `send_packet` function, which uses a step of 2 and a sleep_amt of 0.01s.
         public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10)
         {
             // This initial delay mirrors the Python client's SEND_REQ_SAFETY_SLEEP_AMT
@@ -143,7 +145,7 @@ namespace S7.Net
             if (receivedChecksum != calculatedChecksum)
             {
                 _log("CHECKSUM ERROR!");
-                return null;
+                throw new ChecksumMismatchException();
             }
 
             var contents = new byte[bytesToRead - 1];

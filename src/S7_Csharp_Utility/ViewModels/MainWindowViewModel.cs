@@ -325,7 +325,7 @@ namespace S7_Csharp_Utility.ViewModels
                 _payloadsPath = value; 
                 OnPropertyChanged();
                 // Automatically scan for payloads when path changes
-                ScanPayloadsAsync();
+                _ = ScanPayloadsAsync();
             }
         }
         private string _payloadsPath = Models.ApplicationConfiguration.GetPayloadsPath();
@@ -410,6 +410,7 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand LoadDefaultPathsCommand { get; }
         public ICommand CheckSocatProcessesCommand { get; }
         public ICommand KillSocatProcessesCommand { get; }
+        public ICommand LoadProfileCommand { get; }
 
         /// <summary>
         /// Command to start the exploit sequence.
@@ -503,7 +504,11 @@ namespace S7_Csharp_Utility.ViewModels
         public int SocatBlockSize
         {
             get => _socatBlockSize;
-            set { _socatBlockSize = value; OnPropertyChanged(); }
+            set
+            {
+                _socatBlockSize = value;
+                OnPropertyChanged();
+            }
         }
 
         private string _socatStatus = "Stopped";
@@ -706,6 +711,36 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         private readonly ConfigurationService _configService;
 
+        private DeviceProfile? _loadedProfile;
+        public DeviceProfile? LoadedProfile
+        {
+            get => _loadedProfile;
+            set
+            {
+                _loadedProfile = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(MemoryRegions));
+            }
+        }
+
+        public ObservableCollection<MemoryRegion> MemoryRegions => new ObservableCollection<MemoryRegion>(LoadedProfile?.Regions ?? new List<MemoryRegion>());
+
+        private MemoryRegion? _selectedMemoryRegion;
+        public MemoryRegion? SelectedMemoryRegion
+        {
+            get => _selectedMemoryRegion;
+            set
+            {
+                _selectedMemoryRegion = value;
+                OnPropertyChanged();
+                if (_selectedMemoryRegion != null)
+                {
+                    DumpAddress = _selectedMemoryRegion.Address;
+                    DumpLength = _selectedMemoryRegion.Size;
+                }
+            }
+        }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MainWindowViewModel"/> class.
         /// </summary>
@@ -726,13 +761,13 @@ namespace S7_Csharp_Utility.ViewModels
             _socatService = socatService;
             _configService = configService;
 
-            ConnectModbusCommand = new Commands.RelayCommand(async _ => await ConnectModbusAsync(), _ => ModbusStatus != "Connected");
+            ConnectModbusCommand = new Commands.RelayCommand(_ => ConnectModbusAsync(), _ => ModbusStatus != "Connected");
             DisconnectModbusCommand = new Commands.RelayCommand(_ => DisconnectModbus(), _ => ModbusStatus == "Connected");
 
-            PowerOnCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, true, ModbusSlaveId), _ => _powerController.IsConnected);
-            PowerOffCommand = new Commands.RelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId), _ => _powerController.IsConnected);
-            StartExploitSequenceCommand = new Commands.RelayCommand(async _ => await StartExploitSequence(), _ => SocatStatus == "Running" && _powerController.IsConnected && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
-            DumpMemoryCommand = new Commands.RelayCommand(async _ => await DumpMemory(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            PowerOnCommand = new Commands.AsyncRelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, true, ModbusSlaveId), _ => _powerController.IsConnected);
+            PowerOffCommand = new Commands.AsyncRelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId), _ => _powerController.IsConnected);
+            StartExploitSequenceCommand = new Commands.AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => SocatStatus == "Running" && _powerController.IsConnected && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            DumpMemoryCommand = new Commands.AsyncRelayCommand(_ => DumpMemoryAsync(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
 
             BrowsePayloadsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if(result != null) PayloadsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             BrowseDumpsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Dumps Folder"); if(result != null) DumpsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
@@ -742,26 +777,40 @@ namespace S7_Csharp_Utility.ViewModels
             BrowseCompareFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if(result != null) CompareFolder = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             BrowseCompareFile1Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if(result != null) CompareFile1 = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             BrowseCompareFile2Command = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if(result != null) CompareFile2 = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
-            CompareDumpsCommand = new Commands.RelayCommand(async _ => await CompareDumps(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFolder));
-            CompareTwoFilesCommand = new Commands.RelayCommand(async _ => await CompareTwoFiles(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
+            CompareDumpsCommand = new Commands.AsyncRelayCommand(_ => CompareDumpsAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFolder));
+            CompareTwoFilesCommand = new Commands.AsyncRelayCommand(_ => CompareTwoFilesAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2));
 
-            StartSocatCommand = new Commands.RelayCommand(async _ => await StartSocatAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && IsSocatModeSelected && SocatStatus != "Running");
-            StopSocatCommand = new Commands.RelayCommand(async _ => await StopSocatAsync(), _ => IsSocatModeSelected && SocatStatus == "Running");
+            StartSocatCommand = new Commands.AsyncRelayCommand(_ => StartSocatAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing && IsSocatModeSelected && SocatStatus != "Running");
+            StopSocatCommand = new Commands.AsyncRelayCommand(_ => StopSocatAsync(), _ => IsSocatModeSelected && SocatStatus == "Running");
             RefreshSerialPortsCommand = new Commands.RelayCommand(_ => RefreshSerialPorts());
             ShowSocatLogCommand = new Commands.RelayCommand(_ => _dialogService.ShowSocatLogWindow());
 
-            SaveConfigurationCommand = new Commands.RelayCommand(async _ => await SaveConfiguration());
-            LoadConfigurationCommand = new Commands.RelayCommand(async _ => await LoadConfiguration());
-            SavePathsCommand = new Commands.RelayCommand(async _ => await SaveConfiguration(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            SaveConfigurationCommand = new Commands.RelayCommand(_ => SaveConfiguration());
+            LoadConfigurationCommand = new Commands.RelayCommand(_ => LoadConfiguration());
+            SavePathsCommand = new Commands.RelayCommand(_ => SaveConfiguration(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             LoadDefaultPathsCommand = new Commands.RelayCommand(_ => LoadDefaultPaths(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
 
             RefreshSerialPorts();
 
-            CheckSocatProcessesCommand = new Commands.RelayCommand(async _ => await CheckSocatProcesses(), _ => true);
-            KillSocatProcessesCommand = new Commands.RelayCommand(async _ => await KillSocatProcesses(), _ => true);
+            CheckSocatProcessesCommand = new Commands.RelayCommand(_ => CheckSocatProcesses(), _ => true);
+            KillSocatProcessesCommand = new Commands.RelayCommand(_ => KillSocatProcesses(), _ => true);
+            LoadProfileCommand = new RelayCommand(async _ => await LoadProfile());
             
             // Perform initial payload scan
-            ScanPayloadsAsync();
+            _ = ScanPayloadsAsync();
+        }
+
+        private async Task LoadProfile()
+        {
+            var path = await _dialogService.ShowOpenFileDialogAsync("Load Profile", "json", "JSON Profiles");
+            if (path != null)
+            {
+                var profile = await _configService.LoadProfileAsync(path);
+                if (profile != null)
+                {
+                    LoadedProfile = profile;
+                }
+            }
         }
 
         /// <summary>
@@ -784,14 +833,14 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Starts the exploit sequence, which includes power cycling the PLC and installing the stager.
         /// </summary>
-        private async Task StartExploitSequence()
+        private async Task StartExploitSequenceAsync()
         {
             IsUploadingStager = true;
             S7.Net.Interfaces.ICommunicationChannel? channel = null;
             try
             {
                 Logging.Log("[EXPLOIT] Starting exploit sequence...", LogCategory.Info);
-                
+
                 // Power cycle the PLC
                 Logging.Log("[POWER] Turning PLC power OFF...", LogCategory.Info);
                 await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId);
@@ -806,23 +855,23 @@ namespace S7_Csharp_Utility.ViewModels
                 // Connect to PLC
                 Logging.Log("[CONNECTION] Creating communication channel...", LogCategory.Info);
                 channel = CreateCommunicationChannel();
-                
+
                 Logging.Log($"[CONNECTION] Connecting to PLC at {PlcHost}:{SocatTcpPort}...", LogCategory.Info);
                 await channel.ConnectAsync();
-                
+
                 if (!channel.IsConnected)
                 {
                     throw new Exception("Failed to establish connection to PLC");
                 }
-                
+
                 Logging.Log("[CONNECTION] ✅ Connected to PLC successfully", LogCategory.Info);
-                var plcClient = new S7.Net.PlcClient(channel, (message) => Logging.Log(message, LogCategory.Info));
+                var plcClient = new S7.Net.PlcClient(channel, (message, category) => Logging.Log(message, category));
                 await RunStagerSequenceAsync(plcClient);
             }
             catch (TimeoutException timeoutEx)
             {
-                Logging.Log($"[ERROR] ⏱️ Timeout during stager sequence: {timeoutEx.Message}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Timeout Error", 
+                Logging.Log($"[ERROR] ⏱️ Timeout during stager sequence: {timeoutEx.ToString()}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Timeout Error",
                     $"The operation timed out. This may happen if:\n" +
                     $"• Socat is not running or has stopped\n" +
                     $"• PLC is not responding\n" +
@@ -831,8 +880,8 @@ namespace S7_Csharp_Utility.ViewModels
             }
             catch (System.IO.IOException ioEx)
             {
-                Logging.Log($"[ERROR] 🔌 Connection error during stager sequence: {ioEx.Message}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Connection Error", 
+                Logging.Log($"[ERROR] 🔌 Connection error during stager sequence: {ioEx.ToString()}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Connection Error",
                     $"Connection to PLC was lost. This may happen if:\n" +
                     $"• Socat process was stopped\n" +
                     $"• Network connection was interrupted\n" +
@@ -841,10 +890,10 @@ namespace S7_Csharp_Utility.ViewModels
             }
             catch (Exception ex)
             {
-                Logging.Log($"[ERROR] ❌ Unexpected error during stager sequence: {ex.Message}", LogCategory.Error);
+                Logging.Log($"[ERROR] ❌ Unexpected error during stager sequence: {ex.ToString()}", LogCategory.Error);
                 if (ex.InnerException != null)
                 {
-                    Logging.Log($"[ERROR] Inner exception: {ex.InnerException.Message}", LogCategory.Error);
+                    Logging.Log($"[ERROR] Inner exception: {ex.InnerException.ToString()}", LogCategory.Error);
                 }
                 await _dialogService.ShowMessageAsync("Error", $"An error occurred during the stager sequence: {ex.Message}");
             }
@@ -877,12 +926,11 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 await plcClient.GetVersion();
 
-                byte[] stagerPayload = _payloadManager.GetStagerPayload(PayloadsPath);
+                byte[] stagerPayload = await _payloadManager.GetStagerPayloadAsync(PayloadsPath);
                 Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
 
                 await plcClient.InstallStager(stagerPayload);
                 StagerInstalled = true;
-                OnPropertyChanged(nameof(StagerInstalled));
                 Logging.Log("Stager is installed and ready.", LogCategory.Info);
             }
         }
@@ -890,50 +938,41 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Dumps the memory from the PLC.
         /// </summary>
-        private Task DumpMemory()
+        private async Task DumpMemoryAsync()
         {
             IsDumpingMemory = true;
-            // Start the work on a background thread to keep the UI responsive
-            Task.Run(async () =>
+            S7.Net.Interfaces.ICommunicationChannel? channel = null;
+            try
             {
-                S7.Net.Interfaces.ICommunicationChannel? channel = null;
-                try
+                if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.CurrentCulture, out uint address))
                 {
-                    // No UI updates needed for validation, can stay on background thread
-                    if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.CurrentCulture, out uint address))
-                    {
-                        Logging.Log("Error: Invalid dump address. Must be a valid hex number (e.g., 0x10000000).", LogCategory.Error);
-                        return;
-                    }
-                    if (DumpLength == 0)
-                    {
-                        Logging.Log("Error: Invalid dump length. Must be a positive number.", LogCategory.Error);
-                        return;
-                    }
+                    Logging.Log("Error: Invalid dump address. Must be a valid hex number (e.g., 0x10000000).", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Validation Error", "Invalid dump address. Must be a valid hex number (e.g., 0x10000000).");
+                    return;
+                }
+                if (DumpLength == 0)
+                {
+                    Logging.Log("Error: Invalid dump length. Must be a positive number.", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Validation Error", "Invalid dump length. Must be a positive number.");
+                    return;
+                }
 
-                    channel = CreateCommunicationChannel();
-                    await channel.ConnectAsync();
-                    var plcClient = new S7.Net.PlcClient(channel, (message) => Logging.Log(message, LogCategory.Info));
-                    await RunDumpSequenceAsync(plcClient, address, DumpLength);
-                }
-                catch (Exception ex)
-                {
-                    var errorMessage = $"An error occurred during the dump sequence: {ex.Message}";
-                    Logging.Log(errorMessage, LogCategory.Error);
-                    // Must marshal dialog call back to UI thread
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await _dialogService.ShowMessageAsync("Error", errorMessage);
-                    });
-                }
-                finally
-                {
-                    channel?.Disconnect();
-                    // Must marshal property update back to UI thread
-                    Dispatcher.UIThread.Post(() => IsDumpingMemory = false);
-                }
-            });
-            return Task.CompletedTask;
+                channel = CreateCommunicationChannel();
+                await channel.ConnectAsync();
+                var plcClient = new S7.Net.PlcClient(channel, (message, category) => Logging.Log(message, category));
+                await RunDumpSequenceAsync(plcClient, address, DumpLength);
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"An error occurred during the dump sequence: {ex.Message}";
+                Logging.Log(errorMessage + Environment.NewLine + ex.ToString(), LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", errorMessage);
+            }
+            finally
+            {
+                channel?.Disconnect();
+                IsDumpingMemory = false;
+            }
         }
 
         /// <summary>
@@ -946,42 +985,29 @@ namespace S7_Csharp_Utility.ViewModels
         {
             Logging.Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
 
-            byte[] dumperPayload = _payloadManager.GetMemoryDumperPayload(PayloadsPath);
+            byte[] dumperPayload = await _payloadManager.GetMemoryDumperPayloadAsync(PayloadsPath);
             Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
-
-            int dumperHookIndex = PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND;
-            await plcClient.InstallAddHookViaStager(PlcConstants.DUMPER_PAYLOAD_LOCATION, dumperPayload, dumperHookIndex);
-            Logging.Log("Memory dumper payload installed.", LogCategory.Info);
-
-            var args = new byte[1 + 4 + 4];
-            args[0] = (byte)'A';
-            BitConverter.GetBytes(address).CopyTo(args, 1);
-            BitConverter.GetBytes(length).CopyTo(args, 5);
-
-            await plcClient.InvokeAddHook(dumperHookIndex, args);
-            Logging.Log("Dump command sent. Receiving data...", LogCategory.Info);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var progress = new Progress<long>(bytesRead =>
             {
-                // Calculations can happen on background thread
+                // This callback is invoked on whatever thread the async operation completes.
+                // We must ensure UI updates are dispatched to the UI thread.
                 double percentage = (double)bytesRead / length * 100;
-                stopwatch.Stop();
-                double elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
-                double bytesPerSecond = bytesRead > 0 ? bytesRead / elapsedSeconds : 0;
+                var elapsed = stopwatch.Elapsed;
+                double bytesPerSecond = bytesRead > 0 ? bytesRead / elapsed.TotalSeconds : 0;
                 double remainingSeconds = (bytesPerSecond > 0) ? (length - bytesRead) / bytesPerSecond : 0;
-                stopwatch.Start();
 
                 // Post UI updates to the UI thread
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                Dispatch(() =>
                 {
                     DumpProgressPercentage = percentage;
                     DumpProgressBytes = $"Read: {bytesRead} / {length} bytes";
-                    DumpProgressTime = $"Elapsed: {elapsedSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
+                    DumpProgressTime = $"Elapsed: {elapsed.TotalSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
                 });
             });
 
-            var dumpedData = await plcClient.ReceiveMany(progress);
+            var dumpedData = await plcClient.DumpMemoryAsync(address, length, dumperPayload, progress);
             stopwatch.Stop();
 
             // Ensure dumps directory exists and resolve the path
@@ -996,7 +1022,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Compares all dump files in a specified folder.
         /// </summary>
-        private async Task CompareDumps()
+        private async Task CompareDumpsAsync()
         {
             if (string.IsNullOrWhiteSpace(CompareFolder) || !System.IO.Directory.Exists(CompareFolder))
             {
@@ -1007,19 +1033,20 @@ namespace S7_Csharp_Utility.ViewModels
             IsComparing = true;
             try
             {
-                var comparer = new S7.Utils.DumpComparer(message => Logging.Log(message));
-                var fileHashes = await comparer.ComputeFileHashesAsync(CompareFolder);
-                string report = comparer.GenerateFolderCompareReport(fileHashes, CompareFolder);
+                string report = await Task.Run(async () =>
+                {
+                    var comparer = new S7.Utils.DumpComparer(message => Logging.Log(message));
+                    var fileHashes = await comparer.ComputeFileHashesAsync(CompareFolder);
+                    return comparer.GenerateFolderCompareReport(fileHashes, CompareFolder);
+                });
 
-                // The results should be displayed in the UI. This requires more properties in the VM.
-                // For now, just showing a popup.
                 await _dialogService.ShowMessageAsync("Comparison Result", report);
                 Logging.Log("Comparison complete. See popup for detailed result.");
             }
             catch (Exception ex)
             {
                 await _dialogService.ShowMessageAsync("Error", $"Error during folder compare: {ex.Message}");
-                Logging.Log($"Error during folder compare: {ex.Message}", LogCategory.Error);
+                Logging.Log($"Error during folder compare: {ex.ToString()}", LogCategory.Error);
             }
             finally
             {
@@ -1027,20 +1054,24 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async Task CheckSocatProcesses()
+        private Task CheckSocatProcesses()
         {
-            var pids = SocatService.GetSocatProcessIds();
-            if (pids.Length == 0)
-                Logging.Log("No running socat instances detected.", LogCategory.Info);
-            else
-                Logging.Log($"Socat running instances: {string.Join(", ", pids)}", LogCategory.Info);
-            await Task.CompletedTask;
+            return Task.Run(() =>
+            {
+                var pids = SocatService.GetSocatProcessIds();
+                if (pids.Length == 0)
+                    Logging.Log("No running socat instances detected.", LogCategory.Info);
+                else
+                    Logging.Log($"Socat running instances: {string.Join(", ", pids)}", LogCategory.Info);
+            });
         }
 
-        private async Task KillSocatProcesses()
+        private Task KillSocatProcesses()
         {
-            SocatService.KillAllSocatProcesses(s => Logging.Log(s));
-            await Task.CompletedTask;
+            return Task.Run(() =>
+            {
+                SocatService.KillAllSocatProcesses(s => Logging.Log(s));
+            });
         }
 
         /// <summary>
@@ -1048,65 +1079,90 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         private void RefreshSerialPorts()
         {
-            AvailableSerialPorts.Clear();
-            foreach (var port in System.IO.Ports.SerialPort.GetPortNames())
+            Task.Run(() =>
             {
-                AvailableSerialPorts.Add(port);
-            }
-            if (AvailableSerialPorts.Any())
-            {
-                SelectedSerialPort = AvailableSerialPorts[0];
-            }
+                var ports = System.IO.Ports.SerialPort.GetPortNames();
+                Dispatcher.UIThread.Post(() =>
+                {
+                    AvailableSerialPorts.Clear();
+                    foreach (var port in ports)
+                    {
+                        AvailableSerialPorts.Add(port);
+                    }
+                    if (AvailableSerialPorts.Any())
+                    {
+                        SelectedSerialPort = AvailableSerialPorts[0];
+                    }
+                });
+            });
         }
 
         /// <summary>
         /// Starts the socat service.
         /// </summary>
-        private async Task StartSocatAsync()
+        private Task StartSocatAsync()
         {
-            try
+            return Task.Run(async () =>
             {
-                _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize);
-                SocatStatus = "Running";
-            }
-            catch (Exception ex)
-            {
-                Logging.Log($"Error starting socat: {ex.Message}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"Error starting socat: {ex.Message}");
-                SocatStatus = "Error";
-            }
+                try
+                {
+                    _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize);
+                    Dispatcher.UIThread.Post(() => SocatStatus = "Running");
+                }
+                catch (Exception ex)
+                {
+                    Logging.Log($"Error starting socat: {ex.ToString()}", LogCategory.Error);
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await _dialogService.ShowMessageAsync("Error", $"Error starting socat: {ex.Message}");
+                        SocatStatus = "Error";
+                    });
+                }
+            });
         }
 
         /// <summary>
         /// Stops the socat service.
         /// </summary>
-        private async Task StopSocatAsync()
+        private Task StopSocatAsync()
         {
-            try
+            return Task.Run(async () =>
             {
-                _socatService.Stop();
-                SocatStatus = "Stopped";
-            }
-            catch (Exception ex)
-            {
-                Logging.Log($"Error stopping socat: {ex.Message}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
-            }
+                try
+                {
+                    _socatService.Stop();
+                    Dispatcher.UIThread.Post(() => SocatStatus = "Stopped");
+                }
+                catch (Exception ex)
+                {
+                    Logging.Log($"Error stopping socat: {ex.ToString()}", LogCategory.Error);
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
+                    });
+                }
+            });
         }
 
-        private async Task ConnectModbusAsync()
+        private Task ConnectModbusAsync()
         {
-            try
+            return Task.Run(async () =>
             {
-                await _powerController.ConnectAsync(ModbusHost, ModbusPort);
-                ModbusStatus = _powerController.IsConnected ? "Connected" : "Error";
-            }
-            catch (Exception ex)
-            {
-                Logging.Log($"Error connecting to Modbus: {ex.Message}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"Error connecting to Modbus: {ex.Message}");
-                ModbusStatus = "Error";
-            }
+                try
+                {
+                    await _powerController.ConnectAsync(ModbusHost, ModbusPort);
+                    Dispatcher.UIThread.Post(() => ModbusStatus = _powerController.IsConnected ? "Connected" : "Error");
+                }
+                catch (Exception ex)
+                {
+                    Logging.Log($"Error connecting to Modbus: {ex.ToString()}", LogCategory.Error);
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await _dialogService.ShowMessageAsync("Error", $"Error connecting to Modbus: {ex.Message}");
+                        ModbusStatus = "Error";
+                    });
+                }
+            });
         }
 
         private void DisconnectModbus()
@@ -1118,75 +1174,92 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Saves the current configuration to a file.
         /// </summary>
-        private async Task SaveConfiguration()
+        private Task SaveConfiguration()
         {
-            var path = await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Files");
-            if (path != null)
+            return Task.Run(async () =>
             {
-                var config = new Models.ApplicationConfiguration
+                var path = await Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    PlcHost = this.PlcHost,
-                    PlcPort = this.PlcPort,
-                    ModbusHost = this.ModbusHost,
-                    ModbusPort = this.ModbusPort,
-                    ModbusCoil = this.ModbusCoil,
-                    DelaySeconds = this.DelaySeconds,
-                    DumpAddress = this.DumpAddress,
-                    DumpLength = this.DumpLength,
-                    CompareFolder = this.CompareFolder,
-                    CompareFile1 = this.CompareFile1,
-                    CompareFile2 = this.CompareFile2,
-                    SelectedSerialPort = this.SelectedSerialPort,
-                    SocatTcpPort = this.SocatTcpPort,
-                    SelectedBaudRate = this.SelectedBaudRate,
-                    SelectedParity = this.SelectedParity,
-                    SelectedStopBits = this.SelectedStopBits,
-                    SelectedFlowControl = this.SelectedFlowControl,
-                    SocatVerbose = this.SocatVerbose,
-                    SocatHexDump = this.SocatHexDump,
-                    SocatBlockSize = this.SocatBlockSize
-                };
-                await _configService.SaveConfiguration(config, path);
-            }
+                    return await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Files");
+                });
+
+                if (path != null)
+                {
+                    var config = new Models.ApplicationConfiguration
+                    {
+                        PlcHost = this.PlcHost,
+                        PlcPort = this.PlcPort,
+                        ModbusHost = this.ModbusHost,
+                        ModbusPort = this.ModbusPort,
+                        ModbusCoil = this.ModbusCoil,
+                        DelaySeconds = this.DelaySeconds,
+                        DumpAddress = this.DumpAddress,
+                        DumpLength = this.DumpLength,
+                        CompareFolder = this.CompareFolder,
+                        CompareFile1 = this.CompareFile1,
+                        CompareFile2 = this.CompareFile2,
+                        SelectedSerialPort = this.SelectedSerialPort,
+                        SocatTcpPort = this.SocatTcpPort,
+                        SelectedBaudRate = this.SelectedBaudRate,
+                        SelectedParity = this.SelectedParity,
+                        SelectedStopBits = this.SelectedStopBits,
+                        SelectedFlowControl = this.SelectedFlowControl,
+                        SocatVerbose = this.SocatVerbose,
+                        SocatHexDump = this.SocatHexDump,
+                        SocatBlockSize = this.SocatBlockSize
+                    };
+                    await _configService.SaveConfiguration(config, path);
+                }
+            });
         }
 
         /// <summary>
         /// Loads the configuration from a file.
         /// </summary>
-        private async Task LoadConfiguration()
+        private Task LoadConfiguration()
         {
-            var path = await _dialogService.ShowOpenFileDialogAsync("Load Configuration", "json", "JSON Files");
-            if (path != null)
+            return Task.Run(async () =>
             {
-                var config = await _configService.LoadConfiguration(path);
-                if (config != null)
+                var path = await Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    PlcHost = config.PlcHost;
-                    PlcPort = config.PlcPort;
-                    ModbusHost = config.ModbusHost;
-                    ModbusPort = config.ModbusPort;
-                    ModbusCoil = config.ModbusCoil;
-                    DelaySeconds = config.DelaySeconds;
-                    DumpAddress = config.DumpAddress; OnPropertyChanged(nameof(DumpAddress));
-                    DumpLength = config.DumpLength; OnPropertyChanged(nameof(DumpLength));
-                    CompareFolder = config.CompareFolder;
-                    CompareFile1 = config.CompareFile1;
-                    CompareFile2 = config.CompareFile2;
-                    SelectedSerialPort = config.SelectedSerialPort;
-                    SocatTcpPort = config.SocatTcpPort;
-                    SelectedBaudRate = config.SelectedBaudRate;
-                    SelectedParity = config.SelectedParity;
-                    SelectedStopBits = config.SelectedStopBits;
-                    SelectedFlowControl = config.SelectedFlowControl;
-                    SocatVerbose = config.SocatVerbose;
-                    SocatHexDump = config.SocatHexDump;
-                    SocatBlockSize = config.SocatBlockSize;
-                    PayloadsPath = config.PayloadsPath;
-                    DumpsPath = config.DumpsPath;
-                    LogsPath = config.LogsPath;
-                    ExtractionPath = config.ExtractionPath;
+                    return await _dialogService.ShowOpenFileDialogAsync("Load Configuration", "json", "JSON Files");
+                });
+
+                if (path != null)
+                {
+                    var config = await _configService.LoadConfiguration(path);
+                    if (config != null)
+                    {
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            PlcHost = config.PlcHost;
+                            PlcPort = config.PlcPort;
+                            ModbusHost = config.ModbusHost;
+                            ModbusPort = config.ModbusPort;
+                            ModbusCoil = config.ModbusCoil;
+                            DelaySeconds = config.DelaySeconds;
+                            DumpAddress = config.DumpAddress;
+                            DumpLength = config.DumpLength;
+                            CompareFolder = config.CompareFolder;
+                            CompareFile1 = config.CompareFile1;
+                            CompareFile2 = config.CompareFile2;
+                            SelectedSerialPort = config.SelectedSerialPort;
+                            SocatTcpPort = config.SocatTcpPort;
+                            SelectedBaudRate = config.SelectedBaudRate;
+                            SelectedParity = config.SelectedParity;
+                            SelectedStopBits = config.SelectedStopBits;
+                            SelectedFlowControl = config.SelectedFlowControl;
+                            SocatVerbose = config.SocatVerbose;
+                            SocatHexDump = config.SocatHexDump;
+                            SocatBlockSize = config.SocatBlockSize;
+                            PayloadsPath = config.PayloadsPath;
+                            DumpsPath = config.DumpsPath;
+                            LogsPath = config.LogsPath;
+                            ExtractionPath = config.ExtractionPath;
+                        });
+                    }
                 }
-            }
+            });
         }
 
         /// <summary>
@@ -1194,44 +1267,105 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public void LoadConfigurationOnStartup()
         {
-            try
+            Task.Run(() =>
             {
-                var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-                if (System.IO.File.Exists(path))
+                try
                 {
-                    var config = System.Text.Json.JsonSerializer.Deserialize<Models.ApplicationConfiguration>(System.IO.File.ReadAllText(path));
-                    if (config != null)
+                    var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
+                    if (System.IO.File.Exists(path))
                     {
-                        PlcHost = config.PlcHost;
-                        PlcPort = config.PlcPort;
-                        ModbusHost = config.ModbusHost;
-                        ModbusPort = config.ModbusPort;
-                        ModbusCoil = config.ModbusCoil;
-                        DelaySeconds = config.DelaySeconds;
-                        DumpAddress = config.DumpAddress;
-                        DumpLength = config.DumpLength;
-                        CompareFolder = config.CompareFolder;
-                        CompareFile1 = config.CompareFile1;
-                        CompareFile2 = config.CompareFile2;
-                        SelectedSerialPort = config.SelectedSerialPort;
-                        SocatTcpPort = config.SocatTcpPort;
-                        SelectedBaudRate = config.SelectedBaudRate;
-                        SelectedParity = config.SelectedParity;
-                        SelectedStopBits = config.SelectedStopBits;
-                        SelectedFlowControl = config.SelectedFlowControl;
-                        SocatVerbose = config.SocatVerbose;
-                        SocatHexDump = config.SocatHexDump;
-                        SocatBlockSize = config.SocatBlockSize;
-                        PayloadsPath = config.PayloadsPath;
-                        DumpsPath = config.DumpsPath;
-                        LogsPath = config.LogsPath;
-                        ExtractionPath = config.ExtractionPath;
+                        var config = System.Text.Json.JsonSerializer.Deserialize<Models.ApplicationConfiguration>(System.IO.File.ReadAllText(path));
+                        if (config != null)
+                        {
+                            Dispatcher.UIThread.Post(() =>
+                            {
+                                PlcHost = config.PlcHost;
+                                PlcPort = config.PlcPort;
+                                ModbusHost = config.ModbusHost;
+                                ModbusPort = config.ModbusPort;
+                                ModbusCoil = config.ModbusCoil;
+                                DelaySeconds = config.DelaySeconds;
+                                DumpAddress = config.DumpAddress;
+                                DumpLength = config.DumpLength;
+                                CompareFolder = config.CompareFolder;
+                                CompareFile1 = config.CompareFile1;
+                                CompareFile2 = config.CompareFile2;
+                                SelectedSerialPort = config.SelectedSerialPort;
+                                SocatTcpPort = config.SocatTcpPort;
+                                SelectedBaudRate = config.SelectedBaudRate;
+                                SelectedParity = config.SelectedParity;
+                                SelectedStopBits = config.SelectedStopBits;
+                                SelectedFlowControl = config.SelectedFlowControl;
+                                SocatVerbose = config.SocatVerbose;
+                                SocatHexDump = config.SocatHexDump;
+                                SocatBlockSize = config.SocatBlockSize;
+                                PayloadsPath = config.PayloadsPath;
+                                DumpsPath = config.DumpsPath;
+                                LogsPath = config.LogsPath;
+                                ExtractionPath = config.ExtractionPath;
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // No existing configuration file; persist current defaults as the permanent configuration
+                        var defaultConfig = new Models.ApplicationConfiguration
+                        {
+                            PlcHost = this.PlcHost,
+                            PlcPort = this.PlcPort,
+                            ModbusHost = this.ModbusHost,
+                            ModbusPort = this.ModbusPort,
+                            ModbusCoil = this.ModbusCoil,
+                            DelaySeconds = this.DelaySeconds,
+                            DumpAddress = this.DumpAddress,
+                            DumpLength = this.DumpLength,
+                            CompareFolder = this.CompareFolder,
+                            CompareFile1 = this.CompareFile1,
+                            CompareFile2 = this.CompareFile2,
+                            SelectedSerialPort = this.SelectedSerialPort,
+                            SocatTcpPort = this.SocatTcpPort,
+                            SelectedBaudRate = this.SelectedBaudRate,
+                            SelectedParity = this.SelectedParity,
+                            SelectedStopBits = this.SelectedStopBits,
+                            SelectedFlowControl = this.SelectedFlowControl,
+                            SocatVerbose = this.SocatVerbose,
+                            SocatHexDump = this.SocatHexDump,
+                            SocatBlockSize = this.SocatBlockSize,
+                            PayloadsPath = this.PayloadsPath,
+                            DumpsPath = this.DumpsPath,
+                            LogsPath = this.LogsPath,
+                            ExtractionPath = this.ExtractionPath
+                        };
+
+                        var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+                        string json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, options);
+                        System.IO.File.WriteAllText(path, json);
+                        Logging.Log($"No configuration found. Created default configuration at {path}.", LogCategory.Info);
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    // No existing configuration file; persist current defaults as the permanent configuration
-                    var defaultConfig = new Models.ApplicationConfiguration
+                    Logging.Log($"Could not load or create configuration: {ex.ToString()}", LogCategory.Warning);
+                }
+
+                // Ensure both logging services use the configured path
+                string resolvedLogsPath = Models.ApplicationConfiguration.ResolvePath(LogsPath, Models.ApplicationConfiguration.GetDefaultLogsPath());
+                Logging.UpdateLogsPath(resolvedLogsPath);
+                SocatLogging.UpdateLogsPath(resolvedLogsPath);
+            });
+        }
+
+        /// <summary>
+        /// Saves the current configuration to the default file on exit.
+        /// </summary>
+        public void SaveConfigurationOnExit()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
+                    var config = new Models.ApplicationConfiguration
                     {
                         PlcHost = this.PlcHost,
                         PlcPort = this.PlcPort,
@@ -1258,106 +1392,66 @@ namespace S7_Csharp_Utility.ViewModels
                         LogsPath = this.LogsPath,
                         ExtractionPath = this.ExtractionPath
                     };
-
                     var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-                    string json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, options);
+                    string json = System.Text.Json.JsonSerializer.Serialize(config, options);
                     System.IO.File.WriteAllText(path, json);
-                    Logging.Log($"No configuration found. Created default configuration at {path}.", LogCategory.Info);
                 }
-            }
-            catch (Exception ex)
-            {
-                Logging.Log($"Could not load or create configuration: {ex.Message}", LogCategory.Warning);
-            }
-            
-            // Ensure both logging services use the configured path
-            string resolvedLogsPath = Models.ApplicationConfiguration.ResolvePath(LogsPath, Models.ApplicationConfiguration.GetDefaultLogsPath());
-            Logging.UpdateLogsPath(resolvedLogsPath);
-            SocatLogging.UpdateLogsPath(resolvedLogsPath);
-        }
-
-        /// <summary>
-        /// Saves the current configuration to the default file on exit.
-        /// </summary>
-        public void SaveConfigurationOnExit()
-        {
-            try
-            {
-                var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-                var config = new Models.ApplicationConfiguration
+                catch (Exception ex)
                 {
-                    PlcHost = this.PlcHost,
-                    PlcPort = this.PlcPort,
-                    ModbusHost = this.ModbusHost,
-                    ModbusPort = this.ModbusPort,
-                    ModbusCoil = this.ModbusCoil,
-                    DelaySeconds = this.DelaySeconds,
-                    DumpAddress = this.DumpAddress,
-                    DumpLength = this.DumpLength,
-                    CompareFolder = this.CompareFolder,
-                    CompareFile1 = this.CompareFile1,
-                    CompareFile2 = this.CompareFile2,
-                    SelectedSerialPort = this.SelectedSerialPort,
-                    SocatTcpPort = this.SocatTcpPort,
-                    SelectedBaudRate = this.SelectedBaudRate,
-                    SelectedParity = this.SelectedParity,
-                    SelectedStopBits = this.SelectedStopBits,
-                    SelectedFlowControl = this.SelectedFlowControl,
-                    SocatVerbose = this.SocatVerbose,
-                    SocatHexDump = this.SocatHexDump,
-                    SocatBlockSize = this.SocatBlockSize,
-                    PayloadsPath = this.PayloadsPath,
-                    DumpsPath = this.DumpsPath,
-                    LogsPath = this.LogsPath,
-                    ExtractionPath = this.ExtractionPath
-                };
-                var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-                string json = System.Text.Json.JsonSerializer.Serialize(config, options);
-                System.IO.File.WriteAllText(path, json);
-            }
-            catch (Exception ex)
-            {
-                Logging.Log($"Could not save configuration: {ex.Message}", LogCategory.Error);
-            }
+                    Logging.Log($"Could not save configuration: {ex.ToString()}", LogCategory.Error);
+                }
+            });
         }
 
         /// <summary>
         /// Compares two selected dump files.
         /// </summary>
-        private async Task CompareTwoFiles()
+        private Task CompareTwoFiles()
         {
-            if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))
+            return Task.Run(async () =>
             {
-                await _dialogService.ShowMessageAsync("Error", "Please select a valid file.");
-                return;
-            }
+                if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))
+                {
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await _dialogService.ShowMessageAsync("Error", "Please select a valid file.");
+                    });
+                    return;
+                }
 
-            IsComparing = true;
-            try
-            {
-                var comparer = new S7.Utils.DumpComparer();
-                string hashA = await comparer.ComputeFileHashAsync(CompareFile1);
-                string hashB = await comparer.ComputeFileHashAsync(CompareFile2);
-                bool match = hashA == hashB;
-                var sb = new System.Text.StringBuilder();
-                sb.AppendLine($"File 1: {System.IO.Path.GetFileName(CompareFile1)}");
-                sb.AppendLine($"MD5: {hashA}");
-                sb.AppendLine($"File 2: {System.IO.Path.GetFileName(CompareFile2)}");
-                sb.AppendLine($"MD5: {hashB}");
-                sb.AppendLine(match ? "=> MATCH" : "=> DIFFER");
+                Dispatcher.UIThread.Post(() => IsComparing = true);
+                try
+                {
+                    var comparer = new S7.Utils.DumpComparer();
+                    string hashA = await comparer.ComputeFileHashAsync(CompareFile1);
+                    string hashB = await comparer.ComputeFileHashAsync(CompareFile2);
+                    bool match = hashA == hashB;
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine($"File 1: {System.IO.Path.GetFileName(CompareFile1)}");
+                    sb.AppendLine($"MD5: {hashA}");
+                    sb.AppendLine($"File 2: {System.IO.Path.GetFileName(CompareFile2)}");
+                    sb.AppendLine($"MD5: {hashB}");
+                    sb.AppendLine(match ? "=> MATCH" : "=> DIFFER");
 
-                await _dialogService.ShowMessageAsync("Comparison Result", sb.ToString());
-                Logging.Log("Comparison complete. See popup for detailed result.");
-            }
-            catch (Exception ex)
-            {
-                await _dialogService.ShowMessageAsync("Error", $"Error during file compare: {ex.Message}");
-                Logging.Log($"Error during file compare: {ex.Message}", LogCategory.Error);
-            }
-            finally
-            {
-                IsComparing = false;
-            }
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await _dialogService.ShowMessageAsync("Comparison Result", sb.ToString());
+                    });
+                    Logging.Log("Comparison complete. See popup for detailed result.");
+                }
+                catch (Exception ex)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await _dialogService.ShowMessageAsync("Error", $"Error during file compare: {ex.Message}");
+                    });
+                    Logging.Log($"Error during file compare: {ex.ToString()}", LogCategory.Error);
+                }
+                finally
+                {
+                    Dispatcher.UIThread.Post(() => IsComparing = false);
+                }
+            });
         }
 
         /// <summary>
@@ -1383,7 +1477,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Scans the payloads directory asynchronously and updates the DiscoveredPayloads collection.
         /// </summary>
-        private async void ScanPayloadsAsync()
+        private async Task ScanPayloadsAsync()
         {
             if (IsScanning || string.IsNullOrWhiteSpace(PayloadsPath))
                 return;
@@ -1417,7 +1511,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             catch (Exception ex)
             {
-                Logging.Log($"Error scanning payloads: {ex.Message}", LogCategory.Error);
+                Logging.Log($"Error scanning payloads: {ex.ToString()}", LogCategory.Error);
             }
             finally
             {

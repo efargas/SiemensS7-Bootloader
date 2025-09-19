@@ -1,115 +1,73 @@
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using System.Text.Json;
-using System.Collections.ObjectModel;
-using System.IO;
-using System;
-using System.Linq;
 using System.Threading.Tasks;
+using S7_Csharp_Utility.Interfaces;
+using S7_Csharp_Utility.Services;
+using S7_Csharp_Utility.ViewModels;
 
 namespace S7_Csharp_Utility
 {
-    /// <summary>
-    /// The profile management window.
-    /// </summary>
-    public partial class ProfileManagementWindow : Window
+    public partial class ProfileManagementWindow : Window, IDialogService
     {
-        private DeviceProfile? _currentProfile = new DeviceProfile();
-        private ObservableCollection<MemoryRegion> _profileRegions = new ObservableCollection<MemoryRegion>();
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ProfileManagementWindow"/> class.
-        /// </summary>
         public ProfileManagementWindow()
         {
             InitializeComponent();
-            RegionsDataGrid.ItemsSource = _profileRegions;
-            LoadProfileButton.Click += LoadProfileButton_Click;
-            SaveProfileButton.Click += SaveProfileButton_Click;
+            var configService = new ConfigurationService();
+            DataContext = new ProfileManagementViewModel(configService, this);
         }
 
-        /// <summary>
-        /// Handles the Click event of the LoadProfileButton control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
-        private async void LoadProfileButton_Click(object? sender, RoutedEventArgs e)
+        public async Task<string?> ShowOpenFileDialogAsync(string title, string defaultExtension, string fileType)
         {
             var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel == null) return;
+            if (topLevel == null) return null;
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Open Profile File",
+                Title = title,
                 AllowMultiple = false,
-                FileTypeFilter = new[] { new FilePickerFileType("JSON Profiles") { Patterns = new[] { "*.json" } } }
+                FileTypeFilter = new[] { new FilePickerFileType(fileType) { Patterns = new[] { $"*.{defaultExtension}" } } }
             });
-
-            if (files.Count >= 1)
-            {
-                try
-                {
-                    await using var stream = await files[0].OpenReadAsync();
-                    using var reader = new StreamReader(stream);
-                    string json = await reader.ReadToEndAsync();
-                    _currentProfile = JsonSerializer.Deserialize<DeviceProfile>(json);
-                    if (_currentProfile != null)
-                    {
-                        ProfileModelNameTextBox.Text = _currentProfile.ModelName;
-                        _profileRegions.Clear();
-                        foreach (var region in _currentProfile.Regions)
-                            _profileRegions.Add(region);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await ShowMessage($"Error loading profile: {ex.Message}");
-                }
-            }
+            return files.Count == 1 ? files[0].TryGetLocalPath() : null;
         }
 
-        /// <summary>
-        /// Handles the Click event of the SaveProfileButton control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
-        private async void SaveProfileButton_Click(object? sender, RoutedEventArgs e)
+        public async Task<string?> OpenFolderPickerAsync(string title)
         {
             var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel == null) return;
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-            {
-                Title = "Save Profile File",
-                DefaultExtension = "json",
-                FileTypeChoices = new[] { new FilePickerFileType("JSON Profiles") { Patterns = new[] { "*.json" } } }
-            });
-
-            if (file is not null)
-            {
-                var profileToSave = new DeviceProfile { ModelName = ProfileModelNameTextBox.Text ?? string.Empty, Regions = _profileRegions.ToList() };
-                try
-                {
-                    var options = new JsonSerializerOptions { WriteIndented = true };
-                    string json = JsonSerializer.Serialize(profileToSave, options);
-                    await using var stream = await file.OpenWriteAsync();
-                    using var writer = new StreamWriter(stream);
-                    await writer.WriteAsync(json);
-                }
-                catch (Exception ex)
-                {
-                    await ShowMessage($"Error saving profile: {ex.Message}");
-                }
-            }
+            if (topLevel == null) return null;
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title });
+            return folders.Count == 1 ? folders[0].TryGetLocalPath() : null;
         }
 
-        /// <summary>
-        /// Shows a message dialog.
-        /// </summary>
-        /// <param name="msg">The message to show.</param>
-        private async Task ShowMessage(string msg)
+        public async Task<string?> OpenFilePickerAsync(string title)
         {
-            var dlg = new Window { Title = "Info", Content = new TextBlock { Text = msg, Margin = new Avalonia.Thickness(12) }, Width = 360, Height = 120 };
-            await dlg.ShowDialog(this);
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return null;
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = false });
+            return files.Count == 1 ? files[0].TryGetLocalPath() : null;
+        }
+
+        public async Task<string?> ShowSaveFileDialogAsync(string title, string defaultExtension, string fileType)
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel == null) return null;
+            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = title,
+                DefaultExtension = defaultExtension,
+                FileTypeChoices = new[] { new FilePickerFileType(fileType) { Patterns = new[] { $"*.{defaultExtension}" } } }
+            });
+            return file?.TryGetLocalPath();
+        }
+
+        public async Task ShowMessageAsync(string title, string message)
+        {
+            var dialog = new Window
+            {
+                Title = title,
+                Width = 400,
+                Height = 200,
+                Content = new TextBlock { Text = message, Margin = new Avalonia.Thickness(20) }
+            };
+            await dialog.ShowDialog(this);
         }
     }
 }

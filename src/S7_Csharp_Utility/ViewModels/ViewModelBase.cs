@@ -42,13 +42,73 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         /// <summary>
-        /// Raises the PropertyChanged event.
+        /// Raises the PropertyChanged event in a thread-safe manner.
         /// </summary>
         /// <param name="propertyName">The name of the property that changed.</param>
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            ValidateProperty(propertyName);
+            Action action = () =>
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+                ValidateProperty(propertyName);
+            };
+
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                action();
+            }
+            else
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(action);
+            }
+        }
+
+        /// <summary>
+        /// Executes an action on the UI thread. If the current thread is the UI thread, the action is executed synchronously.
+        /// </summary>
+        /// <param name="action">The action to execute.</param>
+        protected static void Dispatch(Action action)
+        {
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                action();
+            }
+            else
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(action);
+            }
+        }
+
+        /// <summary>
+        /// Executes an async function on the UI thread and returns a task that completes when the function is finished.
+        /// </summary>
+        /// <param name="func">The async function to execute.</param>
+        protected static Task DispatchAsync(Func<Task> func)
+        {
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                return func();
+            }
+            else
+            {
+                return Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(func);
+            }
+        }
+
+        /// <summary>
+        /// Executes an async function with a return value on the UI thread and returns a task that completes when the function is finished.
+        /// </summary>
+        /// <param name="func">The async function to execute.</param>
+        protected static Task<T> DispatchAsync<T>(Func<Task<T>> func)
+        {
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                return func();
+            }
+            else
+            {
+                return Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(func);
+            }
         }
 
         /// <summary>

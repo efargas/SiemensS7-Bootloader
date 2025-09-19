@@ -31,6 +31,10 @@ namespace S7_Csharp_Utility
         /// </summary>
         public string ModelName { get; set; } = "New Profile";
         /// <summary>
+        /// The firmware version of the device.
+        /// </summary>
+        public string FirmwareVersion { get; set; } = string.Empty;
+        /// <summary>
         /// A list of memory regions in the device.
         /// </summary>
         public List<MemoryRegion> Regions { get; set; } = new List<MemoryRegion>();
