@@ -4,9 +4,11 @@ using System.Threading.Tasks;
 using System;
 using S7.Net;
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.IO.Ports;
+using System.Threading;
 using Avalonia.Threading;
 
 namespace S7_Csharp_Utility.ViewModels
@@ -156,9 +158,9 @@ namespace S7_Csharp_Utility.ViewModels
                 OnPropertyChanged();
                 (ConnectModbusCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
                 (DisconnectModbusCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
-                (PowerOnCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
-                (PowerOffCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
-                (StartExploitSequenceCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (PowerOnCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (PowerOffCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (StartExploitSequenceCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -219,8 +221,8 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isUploadingStager = value;
                 OnPropertyChanged();
-                (StartExploitSequenceCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
-                (DumpMemoryCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (StartExploitSequenceCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (DumpMemoryCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -235,9 +237,16 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isDumpingMemory = value;
                 OnPropertyChanged();
-                (DumpMemoryCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (DumpMemoryCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (CancelDumpCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (StartExploitSequenceCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
+
+        /// <summary>
+        /// Cancellation token source for memory dump operations.
+        /// </summary>
+        private CancellationTokenSource? _dumpCancellationTokenSource;
 
         private bool _isComparing;
         /// <summary>
@@ -250,9 +259,10 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isComparing = value;
                 OnPropertyChanged();
-                (CompareDumpsCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
-                (CompareTwoFilesCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
-                (DumpMemoryCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (CompareDumpsCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (CompareTwoFilesCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (DumpMemoryCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (StartExploitSequenceCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -310,7 +320,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _stagerInstalled = value;
                 OnPropertyChanged();
-                (DumpMemoryCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (DumpMemoryCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -421,6 +431,10 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ICommand DumpMemoryCommand { get; }
         /// <summary>
+        /// Command to cancel the memory dump operation.
+        /// </summary>
+        public ICommand CancelDumpCommand { get; }
+        /// <summary>
         /// Command to browse for a folder to compare dumps.
         /// </summary>
         public ICommand BrowseCompareFolderCommand { get; }
@@ -522,8 +536,9 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _socatStatus = value;
                 OnPropertyChanged();
-                (StartSocatCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
-                (StopSocatCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (StartSocatCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (StopSocatCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                (StartExploitSequenceCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -668,7 +683,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _compareFolder = value;
                 OnPropertyChanged();
-                (CompareDumpsCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (CompareDumpsCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -683,7 +698,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _compareFile1 = value;
                 OnPropertyChanged();
-                (CompareTwoFilesCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (CompareTwoFilesCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -698,7 +713,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _compareFile2 = value;
                 OnPropertyChanged();
-                (CompareTwoFilesCommand as Commands.RelayCommand)?.RaiseCanExecuteChanged();
+                (CompareTwoFilesCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -764,10 +779,11 @@ namespace S7_Csharp_Utility.ViewModels
             ConnectModbusCommand = new Commands.RelayCommand(_ => ConnectModbusAsync(), _ => ModbusStatus != "Connected");
             DisconnectModbusCommand = new Commands.RelayCommand(_ => DisconnectModbus(), _ => ModbusStatus == "Connected");
 
-            PowerOnCommand = new Commands.AsyncRelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, true, ModbusSlaveId), _ => _powerController.IsConnected);
-            PowerOffCommand = new Commands.AsyncRelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId), _ => _powerController.IsConnected);
-            StartExploitSequenceCommand = new Commands.AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => SocatStatus == "Running" && _powerController.IsConnected && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            PowerOnCommand = new Commands.AsyncRelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, true, ModbusSlaveId), _ => ModbusStatus == "Connected");
+            PowerOffCommand = new Commands.AsyncRelayCommand(async _ => await _powerController.SetPowerAsync(ModbusCoil, false, ModbusSlaveId), _ => ModbusStatus == "Connected");
+            StartExploitSequenceCommand = new Commands.AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => SocatStatus == "Running" && ModbusStatus == "Connected" && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             DumpMemoryCommand = new Commands.AsyncRelayCommand(_ => DumpMemoryAsync(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            CancelDumpCommand = new Commands.RelayCommand(_ => CancelDump(), _ => IsDumpingMemory);
 
             BrowsePayloadsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if(result != null) PayloadsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             BrowseDumpsFolderCommand = new Commands.RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Dumps Folder"); if(result != null) DumpsPath = result; }, _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
@@ -794,7 +810,7 @@ namespace S7_Csharp_Utility.ViewModels
 
             CheckSocatProcessesCommand = new Commands.RelayCommand(_ => CheckSocatProcesses(), _ => true);
             KillSocatProcessesCommand = new Commands.RelayCommand(_ => KillSocatProcesses(), _ => true);
-            LoadProfileCommand = new RelayCommand(async _ => await LoadProfile());
+            LoadProfileCommand = new Commands.RelayCommand(async _ => await LoadProfile());
             
             // Perform initial payload scan
             _ = ScanPayloadsAsync();
@@ -865,7 +881,7 @@ namespace S7_Csharp_Utility.ViewModels
                 }
 
                 Logging.Log("[CONNECTION] ✅ Connected to PLC successfully", LogCategory.Info);
-                var plcClient = new S7.Net.PlcClient(channel, (message, category) => Logging.Log(message, category));
+                var plcClient = new S7.Net.PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
                 await RunStagerSequenceAsync(plcClient);
             }
             catch (TimeoutException timeoutEx)
@@ -941,7 +957,14 @@ namespace S7_Csharp_Utility.ViewModels
         private async Task DumpMemoryAsync()
         {
             IsDumpingMemory = true;
+            _dumpCancellationTokenSource = new CancellationTokenSource();
             S7.Net.Interfaces.ICommunicationChannel? channel = null;
+            
+            // Reset progress
+            DumpProgressPercentage = 0;
+            DumpProgressBytes = "Read: 0 / 0 bytes";
+            DumpProgressTime = "Elapsed: 0s | Remaining: calculating...";
+            
             try
             {
                 if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.CurrentCulture, out uint address))
@@ -959,8 +982,12 @@ namespace S7_Csharp_Utility.ViewModels
 
                 channel = CreateCommunicationChannel();
                 await channel.ConnectAsync();
-                var plcClient = new S7.Net.PlcClient(channel, (message, category) => Logging.Log(message, category));
+                var plcClient = new S7.Net.PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
                 await RunDumpSequenceAsync(plcClient, address, DumpLength);
+            }
+            catch (OperationCanceledException)
+            {
+                Logging.Log("Memory dump operation was cancelled by user.", LogCategory.Info);
             }
             catch (Exception ex)
             {
@@ -971,7 +998,21 @@ namespace S7_Csharp_Utility.ViewModels
             finally
             {
                 channel?.Disconnect();
+                _dumpCancellationTokenSource?.Dispose();
+                _dumpCancellationTokenSource = null;
                 IsDumpingMemory = false;
+            }
+        }
+
+        /// <summary>
+        /// Cancels the current memory dump operation.
+        /// </summary>
+        private void CancelDump()
+        {
+            if (_dumpCancellationTokenSource != null && !_dumpCancellationTokenSource.Token.IsCancellationRequested)
+            {
+                _dumpCancellationTokenSource.Cancel();
+                Logging.Log("Memory dump cancellation requested.", LogCategory.Info);
             }
         }
 
@@ -1035,7 +1076,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 string report = await Task.Run(async () =>
                 {
-                    var comparer = new S7.Utils.DumpComparer(message => Logging.Log(message));
+                    var comparer = new S7.Utils.DumpComparer(message => Logging.Log(message, LogCategory.Info));
                     var fileHashes = await comparer.ComputeFileHashesAsync(CompareFolder);
                     return comparer.GenerateFolderCompareReport(fileHashes, CompareFolder);
                 });
@@ -1070,7 +1111,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             return Task.Run(() =>
             {
-                SocatService.KillAllSocatProcesses(s => Logging.Log(s));
+                SocatService.KillAllSocatProcesses(s => Logging.Log(s, LogCategory.Info));
             });
         }
 
@@ -1406,7 +1447,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Compares two selected dump files.
         /// </summary>
-        private Task CompareTwoFiles()
+        private Task CompareTwoFilesAsync()
         {
             return Task.Run(async () =>
             {

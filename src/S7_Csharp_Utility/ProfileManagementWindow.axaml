@@ -23,7 +23,7 @@
             <Button Content="Remove Region" Command="{Binding RemoveRegionCommand}" CommandParameter="{Binding $parent[DataGrid].SelectedItem}" />
         </StackPanel>
 
-        <DataGrid ItemsSource="{Binding Profile.Regions}" AutoGenerateColumns="False" CanUserAddRows="True" CanUserDeleteRows="True">
+        <DataGrid ItemsSource="{Binding Profile.Regions}" AutoGenerateColumns="False">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay}" Width="*" />
                 <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=TwoWay}" Width="2*" />

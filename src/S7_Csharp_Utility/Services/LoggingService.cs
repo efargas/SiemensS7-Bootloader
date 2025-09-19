@@ -237,6 +237,41 @@ namespace S7_Csharp_Utility.Services
         }
 
         /// <summary>
+        /// Updates the log filter settings and applies them.
+        /// </summary>
+        /// <param name="showInfo">Whether to show info messages.</param>
+        /// <param name="showError">Whether to show error and warning messages.</param>
+        /// <param name="showDebug">Whether to show debug messages.</param>
+        public void UpdateLogFilter(bool showInfo, bool showError, bool showDebug)
+        {
+            FilterInfo = showInfo;
+            FilterError = showError;
+            FilterDebug = showDebug;
+        }
+
+        /// <summary>
+        /// Gets all log messages as a single text string.
+        /// </summary>
+        public string LogText
+        {
+            get
+            {
+                List<LogMessage> snapshot;
+                lock (_sync)
+                {
+                    snapshot = new List<LogMessage>(_allLogMessages);
+                }
+
+                var sb = new StringBuilder();
+                foreach (var entry in snapshot)
+                {
+                    sb.AppendLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Category}: {entry.Message}");
+                }
+                return sb.ToString();
+            }
+        }
+
+        /// <summary>
         /// Clears the log.
         /// </summary>
         public void Clear()

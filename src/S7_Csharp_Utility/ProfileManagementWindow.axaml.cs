@@ -69,5 +69,11 @@ namespace S7_Csharp_Utility
             };
             await dialog.ShowDialog(this);
         }
+
+        public void ShowSocatLogWindow()
+        {
+            // This method is not applicable for ProfileManagementWindow
+            // It's only used in the main window context
+        }
     }
 }

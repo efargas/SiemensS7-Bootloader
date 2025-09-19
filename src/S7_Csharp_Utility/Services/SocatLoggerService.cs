@@ -152,6 +152,28 @@ namespace S7_Csharp_Utility.Services
         }
 
         /// <summary>
+        /// Gets all socat log entries as a single text string.
+        /// </summary>
+        public string LogText
+        {
+            get
+            {
+                List<SocatLogEntry> snapshot;
+                lock (_sync)
+                {
+                    snapshot = new List<SocatLogEntry>(LogEntries);
+                }
+
+                var sb = new StringBuilder();
+                foreach (var entry in snapshot)
+                {
+                    sb.AppendLine($"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}");
+                }
+                return sb.ToString();
+            }
+        }
+
+        /// <summary>
         /// Triggers the PropertyChanged event.
         /// </summary>
         /// <param name="propertyName">The name of the property that changed.</param>

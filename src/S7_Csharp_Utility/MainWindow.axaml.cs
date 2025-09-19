@@ -41,9 +41,9 @@ namespace S7_Csharp_Utility
             viewModel.LoadConfigurationOnStartup();
             Closing += (s, e) => viewModel.SaveConfigurationOnExit();
 
-            FilterInfoCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterInfo = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
-            FilterErrorCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterError = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
-            FilterDebugCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterDebug = cb.IsChecked ?? false; _loggingService.UpdateLogFilter(); };
+            FilterInfoCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterInfo = cb.IsChecked ?? false; };
+            FilterErrorCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterError = cb.IsChecked ?? false; };
+            FilterDebugCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterDebug = cb.IsChecked ?? false; };
 
             MenuProfileManagement.Click += (s, e) => new ProfileManagementWindow().Show();
             MenuFirmwareUnpacker.Click += (s, e) => 
@@ -77,7 +77,23 @@ namespace S7_Csharp_Utility
             {
                 if (logListBox != null && logListBox.Items.Count > 0)
                 {
-                    logListBox.ScrollIntoView(logListBox.Items[logListBox.Items.Count - 1]);
+                    // Defer the scroll operation to avoid layout issues
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        try
+                        {
+                            var lastItem = logListBox.Items[logListBox.Items.Count - 1];
+                            if (lastItem != null)
+                            {
+                                logListBox.ScrollIntoView(lastItem);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Silently ignore scroll errors to prevent crashes
+                            System.Diagnostics.Debug.WriteLine($"ScrollIntoView error: {ex.Message}");
+                        }
+                    }, Avalonia.Threading.DispatcherPriority.Background);
                 }
             };
 
@@ -85,7 +101,23 @@ namespace S7_Csharp_Utility
             {
                 if (socatLogListBox != null && socatLogListBox.Items.Count > 0)
                 {
-                    socatLogListBox.ScrollIntoView(socatLogListBox.Items[socatLogListBox.Items.Count - 1]);
+                    // Defer the scroll operation to avoid layout issues
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        try
+                        {
+                            var lastItem = socatLogListBox.Items[socatLogListBox.Items.Count - 1];
+                            if (lastItem != null)
+                            {
+                                socatLogListBox.ScrollIntoView(lastItem);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Silently ignore scroll errors to prevent crashes
+                            System.Diagnostics.Debug.WriteLine($"ScrollIntoView error: {ex.Message}");
+                        }
+                    }, Avalonia.Threading.DispatcherPriority.Background);
                 }
             };
         }
