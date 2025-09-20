@@ -724,7 +724,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// The service responsible for saving and loading the application configuration.
         /// </summary>
-        private readonly ConfigurationService _configService;
+        public ConfigurationService ConfigService { get; }
 
         private DeviceProfile? _loadedProfile;
         public DeviceProfile? LoadedProfile
@@ -774,7 +774,7 @@ namespace S7_Csharp_Utility.ViewModels
             _payloadManager = payloadManager;
             _dialogService = dialogService;
             _socatService = socatService;
-            _configService = configService;
+            ConfigService = configService;
 
             ConnectModbusCommand = new Commands.RelayCommand(_ => ConnectModbusAsync(), _ => ModbusStatus != "Connected");
             DisconnectModbusCommand = new Commands.RelayCommand(_ => DisconnectModbus(), _ => ModbusStatus == "Connected");
@@ -821,7 +821,7 @@ namespace S7_Csharp_Utility.ViewModels
             var path = await _dialogService.ShowOpenFileDialogAsync("Load Profile", "json", "JSON Profiles");
             if (path != null)
             {
-                var profile = await _configService.LoadProfileAsync(path);
+                var profile = await ConfigService.LoadProfileAsync(path);
                 if (profile != null)
                 {
                     LoadedProfile = profile;
@@ -1249,7 +1249,7 @@ namespace S7_Csharp_Utility.ViewModels
                         SocatHexDump = this.SocatHexDump,
                         SocatBlockSize = this.SocatBlockSize
                     };
-                    await _configService.SaveConfiguration(config, path);
+                    await ConfigService.SaveConfiguration(config, path);
                 }
             });
         }
@@ -1268,7 +1268,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 if (path != null)
                 {
-                    var config = await _configService.LoadConfiguration(path);
+                    var config = await ConfigService.LoadConfiguration(path);
                     if (config != null)
                     {
                         Dispatcher.UIThread.Post(() =>

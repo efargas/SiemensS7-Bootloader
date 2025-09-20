@@ -1,19 +1,19 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
-using System.Threading.Tasks;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.ViewModels;
+using System;
+using System.Threading.Tasks;
 
 namespace S7_Csharp_Utility
 {
     public partial class ProfileManagementWindow : Window, IDialogService
     {
-        public ProfileManagementWindow()
+        public ProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile> onSetActiveProfile)
         {
             InitializeComponent();
-            var configService = new ConfigurationService();
-            DataContext = new ProfileManagementViewModel(configService, this);
+            DataContext = new ProfileManagementViewModel(configService, this, onSetActiveProfile);
         }
 
         public async Task<string?> ShowOpenFileDialogAsync(string title, string defaultExtension, string fileType)

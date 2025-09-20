@@ -34,4 +34,10 @@ namespace S7_Csharp_Utility.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class ObjectConverters
+    {
+        public static readonly IValueConverter IsNotNull =
+            new FuncValueConverter<object, bool>(x => x != null);
+    }
 }

@@ -45,7 +45,18 @@ namespace S7_Csharp_Utility
             FilterErrorCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterError = cb.IsChecked ?? false; };
             FilterDebugCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterDebug = cb.IsChecked ?? false; };
 
-            MenuProfileManagement.Click += (s, e) => new ProfileManagementWindow().Show();
+            MenuProfileManagement.Click += (s, e) =>
+            {
+                var vm = DataContext as ViewModels.MainWindowViewModel;
+                if (vm != null)
+                {
+                    Action<DeviceProfile> onSetActiveProfile = (profile) =>
+                    {
+                        vm.LoadedProfile = profile;
+                    };
+                    new ProfileManagementWindow(vm.ConfigService, onSetActiveProfile).Show(this);
+                }
+            };
             MenuFirmwareUnpacker.Click += (s, e) => 
             {
                 var vm = DataContext as ViewModels.MainWindowViewModel;

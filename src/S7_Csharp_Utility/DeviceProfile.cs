@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 
 namespace S7_Csharp_Utility
 {
@@ -19,6 +22,33 @@ namespace S7_Csharp_Utility
         /// The size of the memory region.
         /// </summary>
         public uint Size { get; set; } = 0;
+
+        /// <summary>
+        /// The calculated end address of the memory region.
+        /// </summary>
+        public string EndAddress
+        {
+            get
+            {
+                try
+                {
+                    if (Address.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var addressValue = Convert.ToUInt32(Address.Substring(2), 16);
+                        var endAddress = addressValue + Size;
+                        return $"0x{endAddress:X}";
+                    }
+                    else
+                    {
+                        return "Invalid Address";
+                    }
+                }
+                catch (Exception)
+                {
+                    return "Invalid Address";
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -26,6 +56,8 @@ namespace S7_Csharp_Utility
     /// </summary>
     public class DeviceProfile
     {
+        [JsonIgnore]
+        public string FilePath { get; set; } = "";
         /// <summary>
         /// The model name of the device.
         /// </summary>
@@ -37,6 +69,6 @@ namespace S7_Csharp_Utility
         /// <summary>
         /// A list of memory regions in the device.
         /// </summary>
-        public List<MemoryRegion> Regions { get; set; } = new List<MemoryRegion>();
+        public ObservableCollection<MemoryRegion> Regions { get; set; } = new ObservableCollection<MemoryRegion>();
     }
 }

@@ -1,93 +1,121 @@
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Input;
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Services;
+using System;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Threading.Tasks;
+using System.Windows.Input;
 
 namespace S7_Csharp_Utility.ViewModels
 {
     public class ProfileManagementViewModel : ViewModelBase
     {
-        private DeviceProfile _profile;
-        public DeviceProfile Profile
+        private readonly ConfigurationService _configService;
+        private readonly Interfaces.IDialogService _dialogService;
+        private Action<DeviceProfile> _onSetActiveProfile;
+
+        public ObservableCollection<DeviceProfile> Profiles { get; } = new ObservableCollection<DeviceProfile>();
+
+        private DeviceProfile _selectedProfile;
+        public DeviceProfile SelectedProfile
         {
-            get => _profile;
+            get => _selectedProfile;
             set
             {
-                _profile = value;
+                _selectedProfile = value;
                 OnPropertyChanged();
+                ((RelayCommand)SaveProfileCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)DeleteProfileCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)AddRegionCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)RemoveRegionCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)SetActiveProfileCommand).RaiseCanExecuteChanged();
             }
         }
 
-        public ICommand LoadProfileCommand { get; }
+        public ICommand AddProfileCommand { get; }
+        public ICommand DeleteProfileCommand { get; }
         public ICommand SaveProfileCommand { get; }
-        public ICommand SaveAsNewProfileCommand { get; }
         public ICommand AddRegionCommand { get; }
         public ICommand RemoveRegionCommand { get; }
+        public ICommand SetActiveProfileCommand { get; }
 
-        private readonly ConfigurationService _configService;
-        private readonly Interfaces.IDialogService _dialogService;
-        private string? _currentProfilePath;
-
-        public ProfileManagementViewModel(ConfigurationService configService, Interfaces.IDialogService dialogService)
+        public ProfileManagementViewModel(ConfigurationService configService, Interfaces.IDialogService dialogService, Action<DeviceProfile> onSetActiveProfile)
         {
             _configService = configService;
             _dialogService = dialogService;
-            _profile = new DeviceProfile();
+            _onSetActiveProfile = onSetActiveProfile;
 
-            LoadProfileCommand = new RelayCommand(async _ => await LoadProfile());
-            SaveProfileCommand = new RelayCommand(async _ => await SaveProfile(), _ => !string.IsNullOrEmpty(_currentProfilePath));
-            SaveAsNewProfileCommand = new RelayCommand(async _ => await SaveAsNewProfile());
-            AddRegionCommand = new RelayCommand(_ => AddRegion());
-            RemoveRegionCommand = new RelayCommand(region => RemoveRegion(region), region => region != null);
+            AddProfileCommand = new RelayCommand(_ => AddProfile());
+            DeleteProfileCommand = new RelayCommand(async _ => await DeleteProfile(), _ => SelectedProfile != null);
+            SaveProfileCommand = new RelayCommand(async _ => await SaveProfile(), _ => SelectedProfile != null);
+            AddRegionCommand = new RelayCommand(_ => AddRegion(), _ => SelectedProfile != null);
+            RemoveRegionCommand = new RelayCommand(region => RemoveRegion(region), _ => SelectedProfile != null);
+            SetActiveProfileCommand = new RelayCommand(_ => SetActiveProfile(), _ => SelectedProfile != null);
+
+            LoadProfilesAsync();
         }
 
-        private async Task LoadProfile()
+        private async void LoadProfilesAsync()
         {
-            var path = await _dialogService.ShowOpenFileDialogAsync("Load Profile", "json", "JSON Profiles");
-            if (path != null)
+            var profiles = await _configService.LoadAllProfilesAsync();
+            Profiles.Clear();
+            foreach (var profile in profiles)
             {
-                var profile = await _configService.LoadProfileAsync(path);
-                if (profile != null)
-                {
-                    Profile = profile;
-                    _currentProfilePath = path;
-                }
+                Profiles.Add(profile);
             }
+        }
+
+        private void AddProfile()
+        {
+            var newProfile = new DeviceProfile { ModelName = "New Profile" };
+            Profiles.Add(newProfile);
+            SelectedProfile = newProfile;
+        }
+
+        private async Task DeleteProfile()
+        {
+            if (SelectedProfile == null) return;
+
+            if (!string.IsNullOrEmpty(SelectedProfile.FilePath))
+            {
+                await _configService.DeleteProfileAsync(SelectedProfile.FilePath);
+            }
+            Profiles.Remove(SelectedProfile);
+            SelectedProfile = null;
         }
 
         private async Task SaveProfile()
         {
-            if (_currentProfilePath != null)
-            {
-                await _configService.SaveProfileAsync(Profile, _currentProfilePath);
-                await _dialogService.ShowMessageAsync("Profile Saved", "The profile has been saved successfully.");
-            }
-        }
+            if (SelectedProfile == null) return;
 
-        private async Task SaveAsNewProfile()
-        {
-            var path = await _dialogService.ShowSaveFileDialogAsync("Save New Profile", "json", "JSON Profiles");
-            if (path != null)
+            if (string.IsNullOrEmpty(SelectedProfile.FilePath))
             {
-                await _configService.SaveProfileAsync(Profile, path);
-                _currentProfilePath = path;
-                await _dialogService.ShowMessageAsync("Profile Saved", "The new profile has been saved successfully.");
+                var profilesDir = _configService.GetProfilesDirectory();
+                // Sanitize ModelName to create a valid file name
+                var fileName = string.Join("_", SelectedProfile.ModelName.Split(Path.GetInvalidFileNameChars()));
+                SelectedProfile.FilePath = Path.Combine(profilesDir, $"{fileName}.json");
             }
+
+            await _configService.SaveProfileAsync(SelectedProfile, SelectedProfile.FilePath);
+            await _dialogService.ShowMessageAsync("Profile Saved", "The profile has been saved successfully.");
         }
 
         private void AddRegion()
         {
-            Profile.Regions.Add(new MemoryRegion());
+            if (SelectedProfile == null) return;
+            SelectedProfile.Regions.Add(new MemoryRegion());
         }
 
         private void RemoveRegion(object? region)
         {
-            if (region is MemoryRegion memoryRegion)
-            {
-                Profile.Regions.Remove(memoryRegion);
-            }
+            if (SelectedProfile == null || !(region is MemoryRegion memoryRegion)) return;
+            SelectedProfile.Regions.Remove(memoryRegion);
+        }
+
+        private void SetActiveProfile()
+        {
+            if (SelectedProfile == null) return;
+            _onSetActiveProfile?.Invoke(SelectedProfile);
         }
     }
 }
