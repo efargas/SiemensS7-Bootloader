@@ -189,17 +189,19 @@ namespace S7_Csharp_Utility
                     }
                     else // .bin
                     {
+                        var bytesToWrite = new List<byte>();
                         foreach (var row in selectedRows)
                         {
                             var hexBytes = row.Hex.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                             foreach (var hexByte in hexBytes)
                             {
                                 if (byte.TryParse(hexByte, System.Globalization.NumberStyles.HexNumber, null, out byte b))
-                               {
-                                    stream.WriteByte(b);
+                                {
+                                    bytesToWrite.Add(b);
                                 }
                             }
                         }
+                        await stream.WriteAsync(bytesToWrite.ToArray());
                     }
                     StatusText.Text = $"Exported {selectedRows.Count} rows to {file.Name}";
                 }

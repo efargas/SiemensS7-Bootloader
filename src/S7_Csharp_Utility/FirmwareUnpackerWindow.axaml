@@ -5,8 +5,8 @@
         Width="520" Height="350"
         CanResize="True">
   <StackPanel Margin="14" Spacing="10">
-    <Button Name="SelectFirmwareButton" Content="Select Firmware (.upd) File" />
-    <TextBlock Name="FirmwareMetadataTextBlock" />
-    <Button Name="UnpackFirmwareButton" Content="Unpack to..." IsEnabled="False" />
+    <Button Name="SelectFirmwareButton" Content="Select Firmware (.upd) File" Command="{Binding SelectFirmwareCommand}" />
+    <TextBlock Name="FirmwareMetadataTextBlock" Text="{Binding FirmwareMetadataText}" />
+    <Button Name="UnpackFirmwareButton" Content="Unpack to..." IsEnabled="{Binding IsUnpackButtonEnabled}" Command="{Binding UnpackFirmwareCommand}" />
   </StackPanel>
 </Window>
