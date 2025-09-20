@@ -56,7 +56,7 @@ namespace S7_Csharp_Utility.Models
         /// <summary>
         /// The currently selected serial port.
         /// </summary>
-        public string SelectedSerialPort { get; set; } = "/dev/ttyUSB0";
+        public string? SelectedSerialPort { get; set; } = "/dev/ttyUSB0";
         /// <summary>
         /// The TCP port used by socat.
         /// </summary>

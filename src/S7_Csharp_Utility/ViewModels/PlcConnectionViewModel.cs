@@ -45,8 +45,8 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         public ObservableCollection<string> CommunicationModes { get; } = new ObservableCollection<string> { "TCP (socat)", "Serial" };
-        private string _selectedCommunicationMode = "TCP (socat)";
-        public string SelectedCommunicationMode
+        private string? _selectedCommunicationMode = "TCP (socat)";
+        public string? SelectedCommunicationMode
         {
             get => _selectedCommunicationMode;
             set
@@ -65,8 +65,8 @@ namespace S7_Csharp_Utility.ViewModels
         public bool IsSerialModeSelected => _selectedCommunicationMode == "Serial";
 
         public ObservableCollection<string> AvailableSerialPorts { get; } = new ObservableCollection<string>();
-        private string _selectedSerialPort = string.Empty;
-        public string SelectedSerialPort
+        private string? _selectedSerialPort = string.Empty;
+        public string? SelectedSerialPort
         {
             get => _selectedSerialPort;
             set
@@ -237,25 +237,25 @@ namespace S7_Csharp_Utility.ViewModels
             });
         }
 
-        private Task StartSocatAsync()
+        private async Task StartSocatAsync()
         {
-            return Task.Run(async () =>
+            if (SelectedSerialPort == null)
             {
-                try
-                {
-                    _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize);
-                    Dispatcher.UIThread.Post(() => SocatStatus = "Running");
-                }
-                catch (Exception ex)
-                {
-                    _loggingService.Log($"Error starting socat: {ex.ToString()}", LogCategory.Error);
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await _dialogService.ShowMessageAsync("Error", $"Error starting socat: {ex.Message}");
-                        SocatStatus = "Error";
-                    });
-                }
-            });
+                await _dialogService.ShowMessageAsync("Error", "Please select a serial port.");
+                return;
+            }
+
+            try
+            {
+                await Task.Run(() => _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize));
+                SocatStatus = "Running";
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Log($"Error starting socat: {ex.ToString()}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", $"Error starting socat: {ex.Message}");
+                SocatStatus = "Error";
+            }
         }
 
         private Task StopSocatAsync()

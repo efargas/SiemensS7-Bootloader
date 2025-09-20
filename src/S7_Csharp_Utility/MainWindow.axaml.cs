@@ -38,8 +38,8 @@ namespace S7_Csharp_Utility
             var viewModel = new ViewModels.MainWindowViewModel(_loggingService, _powerController, payloadManager, this, socatService, configService, _socatLoggerService);
             DataContext = viewModel;
 
-            viewModel.LoadConfigurationOnStartup();
-            Closing += (s, e) => viewModel.SaveConfigurationOnExit();
+            _ = InitializeAsync(viewModel);
+            Closing += async (s, e) => await viewModel.SaveConfigurationOnExit();
 
             MenuProfileManagement.Click += (s, e) =>
             {
@@ -129,6 +129,11 @@ namespace S7_Csharp_Utility
         /// </summary>
         /// <param name="sv">The ScrollViewer to check.</param>
         /// <returns>True if the ScrollViewer is at the bottom, false otherwise.</returns>
+        private async Task InitializeAsync(ViewModels.MainWindowViewModel viewModel)
+        {
+            await viewModel.LoadConfigurationOnStartup();
+        }
+
         private bool IsAtBottom(ScrollViewer sv)
         {
             const double tolerance = 1.0;
