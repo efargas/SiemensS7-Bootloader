@@ -261,14 +261,20 @@ namespace S7_Csharp_Utility.ViewModels
             PlcConnectionViewModel = new PlcConnectionViewModel(socatService, dialogService, loggingService);
             ModbusPowerSupplyViewModel = new ModbusPowerSupplyViewModel(powerController, dialogService, loggingService);
 
-            PlcConnectionViewModel.SocatStatusChanged += (status) =>
+            if (PlcConnectionViewModel != null)
             {
-                ((Commands.AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
-            };
-            ModbusPowerSupplyViewModel.ModbusStatusChanged += (status) =>
+                PlcConnectionViewModel.SocatStatusChanged += (status) =>
+                {
+                    (StartExploitSequenceCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                };
+            }
+            if (ModbusPowerSupplyViewModel != null)
             {
-                ((Commands.AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
-            };
+                ModbusPowerSupplyViewModel.ModbusStatusChanged += (status) =>
+                {
+                    (StartExploitSequenceCommand as Commands.AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                };
+            }
 
             StartExploitSequenceCommand = new Commands.AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => PlcConnectionViewModel.SocatStatus == "Running" && ModbusPowerSupplyViewModel.ModbusStatus == "Connected" && !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             DumpMemoryCommand = new Commands.AsyncRelayCommand(_ => DumpMemoryAsync(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing);

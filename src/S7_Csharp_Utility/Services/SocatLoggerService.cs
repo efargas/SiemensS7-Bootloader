@@ -133,7 +133,10 @@ namespace S7_Csharp_Utility.Services
             if (fi.Length >= MaxLogFileSize)
             {
                 var logDir = System.IO.Path.GetDirectoryName(_socatLogFile);
-                _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                if (logDir != null)
+                {
+                    _socatLogFile = System.IO.Path.Combine(logDir, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                }
             }
         }
 

@@ -216,7 +216,10 @@ namespace S7_Csharp_Utility.Services
             if (fi.Length >= MaxLogFileSize)
             {
                 var logDir = Path.GetDirectoryName(_mainLogFile);
-                _mainLogFile = Path.Combine(logDir, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                if (logDir != null)
+                {
+                    _mainLogFile = Path.Combine(logDir, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+                }
             }
         }
 

@@ -18,7 +18,7 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
 
-        public event Action<string> SocatStatusChanged;
+        public event Action<string>? SocatStatusChanged;
 
         private string _plcHost = "localhost";
         [Required]

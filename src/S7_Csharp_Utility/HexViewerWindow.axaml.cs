@@ -11,6 +11,8 @@ namespace S7_Csharp_Utility
         private readonly HexViewerViewModel _viewModel;
         private bool _isSyncingScroll;
 
+        public HexViewerWindow() : this(string.Empty) { }
+
         public HexViewerWindow(string filePath)
         {
             InitializeComponent();

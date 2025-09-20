@@ -10,6 +10,8 @@ namespace S7_Csharp_Utility
 {
     public partial class ProfileManagementWindow : Window, IDialogService
     {
+        public ProfileManagementWindow() : this(new ConfigurationService(), _ => { }) { }
+
         public ProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile> onSetActiveProfile)
         {
             InitializeComponent();

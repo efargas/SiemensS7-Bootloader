@@ -15,7 +15,7 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
 
-        public event Action<string> ModbusStatusChanged;
+        public event Action<string>? ModbusStatusChanged;
 
         private string _modbusHost = "localhost";
         [Required]

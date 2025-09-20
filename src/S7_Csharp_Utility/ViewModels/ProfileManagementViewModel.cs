@@ -16,31 +16,31 @@ namespace S7_Csharp_Utility.ViewModels
 
         public ObservableCollection<DeviceProfile> Profiles { get; } = new ObservableCollection<DeviceProfile>();
 
-        private DeviceProfile _selectedProfile;
-        public DeviceProfile SelectedProfile
+        private DeviceProfile? _selectedProfile;
+        public DeviceProfile? SelectedProfile
         {
             get => _selectedProfile;
             set
             {
                 _selectedProfile = value;
                 OnPropertyChanged();
-                ((RelayCommand)SaveProfileCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)DeleteProfileCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)AddRegionCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)RemoveRegionCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)SetActiveProfileCommand).RaiseCanExecuteChanged();
+                (SaveProfileCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (DeleteProfileCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (AddRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (RemoveRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (SetActiveProfileCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
-        private MemoryRegion _selectedRegion;
-        public MemoryRegion SelectedRegion
+        private MemoryRegion? _selectedRegion;
+        public MemoryRegion? SelectedRegion
         {
             get => _selectedRegion;
             set
             {
                 _selectedRegion = value;
                 OnPropertyChanged();
-                ((RelayCommand)RemoveRegionCommand).RaiseCanExecuteChanged();
+                (RemoveRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
