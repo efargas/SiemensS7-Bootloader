@@ -32,6 +32,18 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        private MemoryRegion _selectedRegion;
+        public MemoryRegion SelectedRegion
+        {
+            get => _selectedRegion;
+            set
+            {
+                _selectedRegion = value;
+                OnPropertyChanged();
+                ((RelayCommand)RemoveRegionCommand).RaiseCanExecuteChanged();
+            }
+        }
+
         public ICommand AddProfileCommand { get; }
         public ICommand DeleteProfileCommand { get; }
         public ICommand SaveProfileCommand { get; }
@@ -49,7 +61,7 @@ namespace S7_Csharp_Utility.ViewModels
             DeleteProfileCommand = new RelayCommand(async _ => await DeleteProfile(), _ => SelectedProfile != null);
             SaveProfileCommand = new RelayCommand(async _ => await SaveProfile(), _ => SelectedProfile != null);
             AddRegionCommand = new RelayCommand(_ => AddRegion(), _ => SelectedProfile != null);
-            RemoveRegionCommand = new RelayCommand(region => RemoveRegion(region), _ => SelectedProfile != null);
+            RemoveRegionCommand = new RelayCommand(_ => RemoveRegion(), _ => SelectedRegion != null);
             SetActiveProfileCommand = new RelayCommand(_ => SetActiveProfile(), _ => SelectedProfile != null);
 
             LoadProfilesAsync();
@@ -103,13 +115,13 @@ namespace S7_Csharp_Utility.ViewModels
         private void AddRegion()
         {
             if (SelectedProfile == null) return;
-            SelectedProfile.Regions.Add(new MemoryRegion());
+            SelectedProfile.Regions.Add(new MemoryRegion { Name = "New Region" });
         }
 
-        private void RemoveRegion(object? region)
+        private void RemoveRegion()
         {
-            if (SelectedProfile == null || !(region is MemoryRegion memoryRegion)) return;
-            SelectedProfile.Regions.Remove(memoryRegion);
+            if (SelectedProfile == null || SelectedRegion == null) return;
+            SelectedProfile.Regions.Remove(SelectedRegion);
         }
 
         private void SetActiveProfile()

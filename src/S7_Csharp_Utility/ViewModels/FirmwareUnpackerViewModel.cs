@@ -1,6 +1,7 @@
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Interfaces;
 using S7.Utils;
+using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -55,6 +56,28 @@ namespace S7_Csharp_Utility.ViewModels
                 _isUnpackButtonEnabled = value;
                 OnPropertyChanged();
                 ((AsyncRelayCommand)UnpackFirmwareCommand).RaiseCanExecuteChanged();
+            }
+        }
+
+        private bool _isUnpacking = false;
+        public bool IsUnpacking
+        {
+            get => _isUnpacking;
+            set
+            {
+                _isUnpacking = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private double _unpackProgress = 0;
+        public double UnpackProgress
+        {
+            get => _unpackProgress;
+            set
+            {
+                _unpackProgress = value;
+                OnPropertyChanged();
             }
         }
 
@@ -117,14 +140,23 @@ namespace S7_Csharp_Utility.ViewModels
             }
 
             string output = Path.Combine(destinationFolder, Path.GetFileName(FirmwarePath) + ".unpacked.bin");
+
+            IsUnpacking = true;
+            UnpackProgress = 0;
+            var progress = new Progress<double>(p => UnpackProgress = p);
+
             try
             {
-                await Task.Run(() => _unpacker.Unpack(FirmwarePath, output));
+                await Task.Run(() => _unpacker.Unpack(FirmwarePath, output, progress));
                 await _dialogService.ShowMessageAsync("Success", $"Unpacked to: {output}");
             }
             catch (System.Exception ex)
             {
                 await _dialogService.ShowMessageAsync("Error", $"Error: {ex.Message}");
+            }
+            finally
+            {
+                IsUnpacking = false;
             }
         }
     }

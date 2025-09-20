@@ -209,7 +209,8 @@ namespace S7.Utils
         /// </summary>
         /// <param name="inputPath">The path to the firmware file.</param>
         /// <param name="outputPath">The path to write the unpacked file to.</param>
-        public void Unpack(string inputPath, string outputPath)
+        /// <param name="progress">An optional progress reporter.</param>
+        public void Unpack(string inputPath, string outputPath, IProgress<double>? progress = null)
         {
             var metadata = ParseMetadata(inputPath);
             long currentOffset = FwHeaderSize + (FwNumEntries * Marshal.SizeOf(typeof(FwRawEntry)));
@@ -262,6 +263,7 @@ namespace S7.Utils
 
                     outFile.Write(decompressed, 0, decompressed.Length);
                     readBytes += compressedSize + sizeof(uint);
+                    progress?.Report((double)readBytes / targetEntry.Size * 100);
                 }
             }
         }

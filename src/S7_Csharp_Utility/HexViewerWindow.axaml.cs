@@ -267,20 +267,28 @@ namespace S7_Csharp_Utility
 
         private static long FindPattern(Stream stream, byte[] pattern)
         {
+            if (pattern.Length == 0) return -1;
+
             long position = -1;
-            int bufferSize = 4096;
+            const int bufferSize = 4096;
             byte[] buffer = new byte[bufferSize];
             int bytesRead;
             long streamPosition = 0;
 
+            byte[] searchBuffer = new byte[bufferSize + pattern.Length - 1];
+            int searchBufferOffset = pattern.Length - 1;
+
             while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
             {
-                for (int i = 0; i <= bytesRead - pattern.Length; i++)
+                Buffer.BlockCopy(buffer, 0, searchBuffer, searchBufferOffset, bytesRead);
+                int searchBufferLength = bytesRead + searchBufferOffset;
+
+                for (int i = 0; i <= searchBufferLength - pattern.Length; i++)
                 {
                     bool found = true;
                     for (int j = 0; j < pattern.Length; j++)
                     {
-                        if (buffer[i + j] != pattern[j])
+                        if (searchBuffer[i + j] != pattern[j])
                         {
                             found = false;
                             break;
@@ -289,19 +297,13 @@ namespace S7_Csharp_Utility
 
                     if (found)
                     {
-                        position = streamPosition + i;
+                        position = streamPosition - searchBufferOffset + i;
                         return position;
                     }
                 }
-                streamPosition += bytesRead;
 
-                // To handle patterns that span across buffer boundaries,
-                // we need to move the end of the buffer to the beginning of the next read.
-                if (bytesRead == bufferSize)
-                {
-                    stream.Position -= (pattern.Length - 1);
-                    streamPosition -= (pattern.Length - 1);
-                }
+                streamPosition += bytesRead;
+                Buffer.BlockCopy(buffer, bytesRead - searchBufferOffset, searchBuffer, 0, searchBufferOffset);
             }
 
             return position;
