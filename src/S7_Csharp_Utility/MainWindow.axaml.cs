@@ -58,7 +58,7 @@ namespace S7_Csharp_Utility
                 var vm = DataContext as ViewModels.MainWindowViewModel;
                 string extractionPath = vm?.ExtractionPath ?? "";
                 string resolvedPath = Models.ApplicationConfiguration.ResolvePath(extractionPath, Models.ApplicationConfiguration.GetDefaultExtractionPath());
-                new FirmwareUnpackerWindow(resolvedPath).Show();
+                new FirmwareUnpackerWindow(resolvedPath, this).Show();
             };
             MenuHexViewer.Click += async (s, e) =>
             {
@@ -69,8 +69,6 @@ namespace S7_Csharp_Utility
                 }
             };
             
-            MenuSaveConfig.Click += (s, e) => viewModel.SaveConfigurationCommand.Execute(null);
-            MenuLoadConfig.Click += (s, e) => viewModel.LoadConfigurationCommand.Execute(null);
             MenuExit.Click += (s, e) => Close();
 
             // --- Autoscroll Implementation ---

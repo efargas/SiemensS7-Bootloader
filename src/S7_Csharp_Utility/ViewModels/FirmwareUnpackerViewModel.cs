@@ -84,13 +84,13 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand SelectFirmwareCommand { get; }
         public ICommand UnpackFirmwareCommand { get; }
 
-        public FirmwareUnpackerViewModel(IDialogService dialogService, string? extractionPath)
+        public FirmwareUnpackerViewModel(IDialogService? dialogService, string? extractionPath)
         {
-            _dialogService = dialogService;
+            _dialogService = dialogService ?? new Services.DialogService(); // Fallback to a default implementation if null
             ExtractionPath = extractionPath ?? "";
 
-            SelectFirmwareCommand = new AsyncRelayCommand(SelectFirmwareAsync);
-            UnpackFirmwareCommand = new AsyncRelayCommand(UnpackFirmwareAsync, _ => IsUnpackButtonEnabled);
+            SelectFirmwareCommand = new AsyncRelayCommand(_ => SelectFirmwareAsync());
+            UnpackFirmwareCommand = new AsyncRelayCommand(_ => UnpackFirmwareAsync(), _ => IsUnpackButtonEnabled);
         }
 
         private async Task SelectFirmwareAsync()

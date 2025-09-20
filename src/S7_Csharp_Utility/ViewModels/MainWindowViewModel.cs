@@ -218,7 +218,7 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private readonly Interfaces.IDialogService _dialogService;
-        private readonly ConfigurationService _configService;
+        public ConfigurationService ConfigService { get; }
 
         private DeviceProfile? _loadedProfile;
         public DeviceProfile? LoadedProfile
@@ -232,7 +232,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        public ObservableCollection<MemoryRegion> MemoryRegions => new ObservableCollection<MemoryRegion>(LoadedProfile?.Regions ?? new List<MemoryRegion>());
+        public ObservableCollection<MemoryRegion> MemoryRegions => LoadedProfile?.Regions ?? new ObservableCollection<MemoryRegion>();
 
         private MemoryRegion? _selectedMemoryRegion;
         public MemoryRegion? SelectedMemoryRegion
@@ -256,7 +256,7 @@ namespace S7_Csharp_Utility.ViewModels
             SocatLogging = socatLoggerService;
             _payloadManager = payloadManager;
             _dialogService = dialogService;
-            _configService = configService;
+            ConfigService = configService;
 
             PlcConnectionViewModel = new PlcConnectionViewModel(socatService, dialogService, loggingService);
             ModbusPowerSupplyViewModel = new ModbusPowerSupplyViewModel(powerController, dialogService, loggingService);
@@ -300,7 +300,7 @@ namespace S7_Csharp_Utility.ViewModels
             var path = await _dialogService.ShowOpenFileDialogAsync("Load Profile", "json", "JSON Profiles");
             if (path != null)
             {
-                var profile = await _configService.LoadProfileAsync(path);
+                var profile = await ConfigService.LoadProfileAsync(path);
                 if (profile != null)
                 {
                     LoadedProfile = profile;
@@ -570,7 +570,7 @@ namespace S7_Csharp_Utility.ViewModels
                         LogsPath = this.LogsPath,
                         ExtractionPath = this.ExtractionPath
                     };
-                    await _configService.SaveConfiguration(config, path);
+                    await ConfigService.SaveConfiguration(config, path);
                 }
             });
         }
@@ -586,7 +586,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 if (path != null)
                 {
-                    var config = await _configService.LoadConfiguration(path);
+                    var config = await ConfigService.LoadConfiguration(path);
                     if (config != null)
                     {
                         Dispatcher.UIThread.Post(() =>

@@ -1,50 +1,95 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:S7_Csharp_Utility.ViewModels"
         x:Class="S7_Csharp_Utility.HexViewerWindow"
         Title="Hex Viewer"
-        Width="800"
-        Height="600"
-        MinWidth="600"
-        MinHeight="400">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        Width="1000"
+        Height="700"
+        MinWidth="800"
+        MinHeight="500">
+    <Window.DataContext>
+        <vm:HexViewerViewModel/>
+    </Window.DataContext>
+    <Grid ColumnDefinitions="*,300">
+        <DockPanel Grid.Column="0" LastChildFill="True">
+            <!-- Header -->
+            <Border DockPanel.Dock="Top" Background="{DynamicResource ApplicationPageBackgroundThemeBrush}" Padding="10">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock x:Name="FilePathText" FontWeight="Bold" Text="File: " Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                    <Button Content="Export Selection" Command="{Binding ExportSelectionCommand}"/>
+                    <TextBox Width="200" Text="{Binding SearchText}" Watermark="Hex pattern"/>
+                    <Button Content="Search" Command="{Binding SearchCommand}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Status Bar -->
+            <Border DockPanel.Dock="Bottom" Background="{DynamicResource ApplicationPageBackgroundThemeBrush}" Padding="5">
+                <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+            </Border>
+
+            <!-- Hex Content -->
+            <DataGrid ItemsSource="{Binding HexRows}"
+                      IsReadOnly="True"
+                      GridLinesVisibility="All"
+                      CanUserResizeColumns="True"
+                      FontFamily="Consolas,Monaco,monospace"
+                      FontSize="12"
+                      Margin="10"
+                      BorderThickness="1"
+                      BorderBrush="Gray"
+                      x:Name="HexDataGrid"
+                      SelectionUnit="Cell"
+                      SelectionMode="Extended">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Offset" Binding="{Binding Address}" />
+                    <DataGridTextColumn Header="Hex" Binding="{Binding Hex}" Width="*"/>
+                    <DataGridTextColumn Header="ASCII" Binding="{Binding Ascii}" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
         
-        <!-- Header -->
-        <Border Grid.Row="0" Background="{DynamicResource ApplicationPageBackgroundThemeBrush}" Padding="10">
-            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <TextBlock x:Name="FilePathText" FontWeight="Bold" Text="File: " Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
-                <Button Content="Export Selection" Command="{Binding ExportSelectionCommand}"/>
-                <TextBox Width="200" Text="{Binding SearchText}" Watermark="SHA1 Hash"/>
-                <Button Content="Search" Command="{Binding SearchCommand}"/>
-            </StackPanel>
-        </Border>
-        
-        <!-- Hex Content -->
-        <DataGrid Grid.Row="1"
-                  ItemsSource="{Binding HexData}"
-                  IsReadOnly="True"
-                  GridLinesVisibility="All"
-                  CanUserResizeColumns="True"
-                  FontFamily="Consolas,Monaco,monospace"
-                  FontSize="12"
-                  Margin="10"
-                  BorderThickness="1"
-                  BorderBrush="Gray"
-                  x:Name="HexContent">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Offset" Binding="{Binding Offset}" />
-                <DataGridTextColumn Header="Hex" Binding="{Binding Hex}" Width="*"/>
-                <DataGridTextColumn Header="ASCII" Binding="{Binding Ascii}" />
-            </DataGrid.Columns>
-        </DataGrid>
-        
-        <!-- Status Bar -->
-        <Border Grid.Row="2" Background="{DynamicResource ApplicationPageBackgroundThemeBrush}" Padding="5">
-            <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+        <!-- Inspector Panel -->
+        <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1,0,0,0" Padding="10">
+            <ScrollViewer>
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Data Inspector" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                    <CheckBox IsChecked="{Binding IsLittleEndian, Mode=TwoWay}" Content="Little Endian"/>
+                    <Separator Margin="0,5,0,5"/>
+
+                    <TextBlock Text="String (ASCII):" FontWeight="Bold"/>
+                    <TextBox Text="{Binding StringValue}" IsReadOnly="True" TextWrapping="Wrap"/>
+
+                    <TextBlock Text="Char:" FontWeight="Bold" Margin="0,10,0,0"/>
+                    <TextBox Text="{Binding CharValue}" IsReadOnly="True"/>
+
+                    <TextBlock Text="Integer Values:" FontWeight="Bold" Margin="0,10,0,0"/>
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,5,0,0">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Int8:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Int8Value}" IsReadOnly="True"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="UInt8:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding UInt8Value}" IsReadOnly="True"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Int16:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Int16Value}" IsReadOnly="True"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="UInt16:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding UInt16Value}" IsReadOnly="True"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Int32:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Int32Value}" IsReadOnly="True"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="UInt32:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding UInt32Value}" IsReadOnly="True"/>
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Int64:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Int64Value}" IsReadOnly="True"/>
+
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="UInt64:" Margin="0,0,10,0"/>
+                        <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding UInt64Value}" IsReadOnly="True"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </Window>
