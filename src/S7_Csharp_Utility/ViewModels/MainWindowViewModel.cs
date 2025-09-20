@@ -1,3 +1,4 @@
+#nullable enable
 using S7_Csharp_Utility.Services;
 using System.Windows.Input;
 using System.Threading.Tasks;
@@ -14,20 +15,48 @@ using S7_Csharp_Utility.Models;
 
 namespace S7_Csharp_Utility.ViewModels
 {
+    /// <summary>
+    /// The main view model for the application.
+    /// </summary>
     public class MainWindowViewModel : ViewModelBase
     {
         private const string ConfigFileName = "config.json";
 
-        public PlcConnectionViewModel PlcConnectionViewModel { get; private set; }
-        public ModbusPowerSupplyViewModel ModbusPowerSupplyViewModel { get; private set; }
+        /// <summary>
+        /// Gets the view model for the PLC connection.
+        /// </summary>
+        public PlcConnectionViewModel? PlcConnectionViewModel { get; private set; }
+
+        /// <summary>
+        /// Gets the view model for the Modbus power supply.
+        /// </summary>
+        public ModbusPowerSupplyViewModel? ModbusPowerSupplyViewModel { get; private set; }
+
+        /// <summary>
+        /// Gets the view model for the configuration.
+        /// </summary>
         public ConfigurationViewModel ConfigurationViewModel { get; }
+
+        /// <summary>
+        /// Gets the view model for the file comparison.
+        /// </summary>
         public FileCompareViewModel FileCompareViewModel { get; }
 
+        /// <summary>
+        /// Gets the logging service.
+        /// </summary>
         public LoggingService Logging { get; }
+
+        /// <summary>
+        /// Gets the socat logging service.
+        /// </summary>
         public SocatLoggerService SocatLogging { get; }
         private readonly S7.Net.PayloadManager _payloadManager;
 
         private string _dumpAddress = "0x691E28";
+        /// <summary>
+        /// Gets or sets the memory address to dump.
+        /// </summary>
         [Required]
         [RegularExpression(@"^0x[0-9a-fA-F]+$", ErrorMessage = "Must be a valid hex address (e.g., 0x10000000)")]
         public string DumpAddress
@@ -37,6 +66,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private uint _dumpLength = 16;
+        /// <summary>
+        /// Gets or sets the length of the memory to dump.
+        /// </summary>
         [Range(1, uint.MaxValue)]
         public uint DumpLength
         {
@@ -45,6 +77,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _isUploadingStager;
+        /// <summary>
+        /// Gets or sets a value indicating whether the stager is being uploaded.
+        /// </summary>
         public bool IsUploadingStager
         {
             get => _isUploadingStager;
@@ -58,6 +93,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _isDumpingMemory;
+        /// <summary>
+        /// Gets or sets a value indicating whether memory is being dumped.
+        /// </summary>
         public bool IsDumpingMemory
         {
             get => _isDumpingMemory;
@@ -74,6 +112,9 @@ namespace S7_Csharp_Utility.ViewModels
         private CancellationTokenSource? _dumpCancellationTokenSource;
 
         private bool _isComparing;
+        /// <summary>
+        /// Gets or sets a value indicating whether files are being compared.
+        /// </summary>
         public bool IsComparing
         {
             get => _isComparing;
@@ -89,6 +130,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private double _dumpProgressPercentage;
+        /// <summary>
+        /// Gets or sets the progress percentage of the memory dump.
+        /// </summary>
         public double DumpProgressPercentage
         {
             get => _dumpProgressPercentage;
@@ -96,6 +140,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _dumpProgressBytes = "Read: 0 / 0 bytes";
+        /// <summary>
+        /// Gets or sets the progress of the memory dump in bytes.
+        /// </summary>
         public string DumpProgressBytes
         {
             get => _dumpProgressBytes;
@@ -103,6 +150,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _dumpProgressTime = "Elapsed: 0s | Remaining: calculating...";
+        /// <summary>
+        /// Gets or sets the progress of the memory dump in time.
+        /// </summary>
         public string DumpProgressTime
         {
             get => _dumpProgressTime;
@@ -110,6 +160,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _stagerInstalled;
+        /// <summary>
+        /// Gets or sets a value indicating whether the stager is installed.
+        /// </summary>
         public bool StagerInstalled
         {
             get => _stagerInstalled;
@@ -121,6 +174,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets or sets the path to the payloads.
+        /// </summary>
         public string PayloadsPath
         {
             get => _payloadsPath;
@@ -128,15 +184,24 @@ namespace S7_Csharp_Utility.ViewModels
         }
         private string _payloadsPath = ApplicationConfiguration.GetPayloadsPath();
 
+        /// <summary>
+        /// Gets the discovered payloads.
+        /// </summary>
         public ObservableCollection<S7.Net.PayloadInfo> DiscoveredPayloads { get; } = new ObservableCollection<S7.Net.PayloadInfo>();
 
         private bool _isScanning;
+        /// <summary>
+        /// Gets or sets a value indicating whether payloads are being scanned.
+        /// </summary>
         public bool IsScanning
         {
             get => _isScanning;
             set { _isScanning = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// Gets or sets the path to the dumps.
+        /// </summary>
         public string DumpsPath
         {
             get => _dumpsPath;
@@ -144,6 +209,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
         private string _dumpsPath = ApplicationConfiguration.GetDefaultDumpsPath();
 
+        /// <summary>
+        /// Gets or sets the path to the logs.
+        /// </summary>
         public string LogsPath
         {
             get => _logsPath;
@@ -158,6 +226,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
         private string _logsPath = ApplicationConfiguration.GetDefaultLogsPath();
 
+        /// <summary>
+        /// Gets or sets the path to the extraction folder.
+        /// </summary>
         public string ExtractionPath
         {
             get => _extractionPath;
@@ -165,15 +236,33 @@ namespace S7_Csharp_Utility.ViewModels
         }
         private string _extractionPath = ApplicationConfiguration.GetDefaultExtractionPath();
 
+        /// <summary>
+        /// Gets the command to load a profile.
+        /// </summary>
         public ICommand LoadProfileCommand { get; }
+        /// <summary>
+        /// Gets the command to start the exploit sequence.
+        /// </summary>
         public ICommand StartExploitSequenceCommand { get; }
+        /// <summary>
+        /// Gets the command to dump memory.
+        /// </summary>
         public ICommand DumpMemoryCommand { get; }
+        /// <summary>
+        /// Gets the command to cancel the memory dump.
+        /// </summary>
         public ICommand CancelDumpCommand { get; }
 
         private readonly Interfaces.IDialogService _dialogService;
+        /// <summary>
+        /// Gets the configuration service.
+        /// </summary>
         public ConfigurationService ConfigService { get; }
 
         private DeviceProfile? _loadedProfile;
+        /// <summary>
+        /// Gets or sets the loaded device profile.
+        /// </summary>
         public DeviceProfile? LoadedProfile
         {
             get => _loadedProfile;
@@ -185,9 +274,15 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the memory regions of the loaded profile.
+        /// </summary>
         public ObservableCollection<MemoryRegion> MemoryRegions => LoadedProfile?.Regions ?? new ObservableCollection<MemoryRegion>();
 
         private MemoryRegion? _selectedMemoryRegion;
+        /// <summary>
+        /// Gets or sets the selected memory region.
+        /// </summary>
         public MemoryRegion? SelectedMemoryRegion
         {
             get => _selectedMemoryRegion;
@@ -203,18 +298,27 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService, SocatLoggerService socatLoggerService)
+        /// <summary>
+        /// Gets the view service.
+        /// </summary>
+        public Interfaces.IViewService ViewService { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MainWindowViewModel"/> class.
+        /// </summary>
+        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService, SocatLoggerService socatLoggerService, Interfaces.IViewService viewService)
         {
             Logging = loggingService;
             SocatLogging = socatLoggerService;
             _payloadManager = payloadManager;
             _dialogService = dialogService;
             ConfigService = configService;
+            ViewService = viewService;
 
             PlcConnectionViewModel = new PlcConnectionViewModel(socatService, dialogService, loggingService);
             ModbusPowerSupplyViewModel = new ModbusPowerSupplyViewModel(powerController, dialogService, loggingService);
             ConfigurationViewModel = new ConfigurationViewModel(this, dialogService, configService);
-            FileCompareViewModel = new FileCompareViewModel(this, dialogService, loggingService);
+            FileCompareViewModel = new FileCompareViewModel(this, dialogService, loggingService, viewService);
 
             if (PlcConnectionViewModel != null)
             {
@@ -444,7 +548,7 @@ namespace S7_Csharp_Utility.ViewModels
                 {
                     DumpProgressPercentage = percentage;
                     DumpProgressBytes = $"Read: {bytesRead} / {length} bytes";
-                    DumpProgressTime = $"Elapsed: {elapsed.TotalSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
+                    DumpProgressTime = $"Elapsed: {elapsed.TotalSeconds:F0}s | Remaining: {remainingSeconds:F0s}";
                 });
             });
 
@@ -459,18 +563,45 @@ namespace S7_Csharp_Utility.ViewModels
             Logging.Log($"Successfully dumped {dumpedData.Length} bytes to {fullPath} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
         }
 
+        /// <summary>
+        /// Loads the application configuration on startup.
+        /// </summary>
         public async Task LoadConfigurationOnStartup()
         {
             try
             {
                 var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-                if (System.IO.File.Exists(path))
+                var config = await ConfigService.LoadConfiguration(path);
+                if (config != null)
                 {
-                    await ConfigService.LoadConfiguration(this, path);
+                    PlcConnectionViewModel.PlcHost = config.PlcHost;
+                    PlcConnectionViewModel.PlcPort = config.PlcPort;
+                    ModbusPowerSupplyViewModel.ModbusHost = config.ModbusHost;
+                    ModbusPowerSupplyViewModel.ModbusPort = config.ModbusPort;
+                    ModbusPowerSupplyViewModel.ModbusCoil = config.ModbusCoil;
+                    ModbusPowerSupplyViewModel.DelaySeconds = config.DelaySeconds;
+                    DumpAddress = config.DumpAddress;
+                    DumpLength = config.DumpLength;
+                    FileCompareViewModel.CompareFolder = config.CompareFolder;
+                    FileCompareViewModel.CompareFile1 = config.CompareFile1;
+                    FileCompareViewModel.CompareFile2 = config.CompareFile2;
+                    PlcConnectionViewModel.SelectedSerialPort = config.SelectedSerialPort;
+                    PlcConnectionViewModel.SocatTcpPort = config.SocatTcpPort;
+                    PlcConnectionViewModel.SelectedBaudRate = config.SelectedBaudRate;
+                    PlcConnectionViewModel.SelectedParity = config.SelectedParity;
+                    PlcConnectionViewModel.SelectedStopBits = config.SelectedStopBits;
+                    PlcConnectionViewModel.SelectedFlowControl = config.SelectedFlowControl;
+                    PlcConnectionViewModel.SocatVerbose = config.SocatVerbose;
+                    PlcConnectionViewModel.SocatHexDump = config.SocatHexDump;
+                    PlcConnectionViewModel.SocatBlockSize = config.SocatBlockSize;
+                    ConfigurationViewModel.PayloadsPath = config.PayloadsPath;
+                    ConfigurationViewModel.DumpsPath = config.DumpsPath;
+                    ConfigurationViewModel.LogsPath = config.LogsPath;
+                    ConfigurationViewModel.ExtractionPath = config.ExtractionPath;
                 }
                 else
                 {
-                    await ConfigService.SaveConfiguration(this, path);
+                    await SaveConfigurationOnExit();
                     Logging.Log($"No configuration found. Created default configuration at {path}.", LogCategory.Info);
                 }
             }
@@ -484,12 +615,42 @@ namespace S7_Csharp_Utility.ViewModels
             SocatLogging.UpdateLogsPath(resolvedLogsPath);
         }
 
+        /// <summary>
+        /// Saves the application configuration on exit.
+        /// </summary>
         public async Task SaveConfigurationOnExit()
         {
             try
             {
                 var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-                await ConfigService.SaveConfiguration(this, path);
+                var config = new ApplicationConfiguration
+                {
+                    PlcHost = PlcConnectionViewModel.PlcHost,
+                    PlcPort = PlcConnectionViewModel.PlcPort,
+                    ModbusHost = ModbusPowerSupplyViewModel.ModbusHost,
+                    ModbusPort = ModbusPowerSupplyViewModel.ModbusPort,
+                    ModbusCoil = ModbusPowerSupplyViewModel.ModbusCoil,
+                    DelaySeconds = ModbusPowerSupplyViewModel.DelaySeconds,
+                    DumpAddress = DumpAddress,
+                    DumpLength = DumpLength,
+                    CompareFolder = FileCompareViewModel.CompareFolder,
+                    CompareFile1 = FileCompareViewModel.CompareFile1,
+                    CompareFile2 = FileCompareViewModel.CompareFile2,
+                    SelectedSerialPort = PlcConnectionViewModel.SelectedSerialPort,
+                    SocatTcpPort = PlcConnectionViewModel.SocatTcpPort,
+                    SelectedBaudRate = PlcConnectionViewModel.SelectedBaudRate,
+                    SelectedParity = PlcConnectionViewModel.SelectedParity,
+                    SelectedStopBits = PlcConnectionViewModel.SelectedStopBits,
+                    SelectedFlowControl = PlcConnectionViewModel.SelectedFlowControl,
+                    SocatVerbose = PlcConnectionViewModel.SocatVerbose,
+                    SocatHexDump = PlcConnectionViewModel.SocatHexDump,
+                    SocatBlockSize = PlcConnectionViewModel.SocatBlockSize,
+                    PayloadsPath = ConfigurationViewModel.PayloadsPath,
+                    DumpsPath = ConfigurationViewModel.DumpsPath,
+                    LogsPath = ConfigurationViewModel.LogsPath,
+                    ExtractionPath = ConfigurationViewModel.ExtractionPath
+                };
+                await ConfigService.SaveConfiguration(config, path);
             }
             catch (Exception ex)
             {

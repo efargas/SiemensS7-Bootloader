@@ -10,17 +10,17 @@ The vulnerability is tracked as SSA-686531 (CVE-2019-13945). Affected devices ar
 
 ## Building and Running the C# Utility
 
-This is a .NET 7 application built with the Avalonia UI framework, allowing it to run on both Windows and Linux.
+This is a .NET 8 application built with the Avalonia UI framework, allowing it to run on both Windows and Linux.
 
 ### 1. Prerequisites
-You need to have the [.NET 7 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/7.0) installed on your system.
+You need to have the [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) installed on your system.
 
 ### 2. Building the Application
-Open a terminal or command prompt, navigate to the `S7_Csharp_Utility` directory, and run the following command:
+Open a terminal or command prompt, navigate to the root of the repository, and run the following command:
 ```sh
-dotnet build --configuration Release
+dotnet build src/S7_Csharp_Utility/S7_Csharp_Utility.csproj --configuration Release
 ```
-This will compile the application. The output will be placed in the `S7_Csharp_Utility/bin/Release/net7.0` directory.
+This will compile the application. The output will be placed in the `src/S7_Csharp_Utility/bin/Release/net8.0` directory.
 
 ### 3. Running the Application
 After building, you can run the application from its output directory.
@@ -86,6 +86,7 @@ This tool requires the ability to power-cycle the PLC to catch the bootloader at
     *   This utility helps find identical dump files.
     *   Click "Select Folder & Compare Dumps" and choose the directory containing your `.bin` dump files.
     *   The application will calculate the MD5 hash of each file and display groups of identical files in the results box.
+    *   You can also compare two files directly using the "Compare Two Files" section. This will open a new window showing the differences between the two files.
 
 ---
 

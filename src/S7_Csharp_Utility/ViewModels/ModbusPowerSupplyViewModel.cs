@@ -1,3 +1,4 @@
+#nullable enable
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
@@ -9,15 +10,24 @@ using Avalonia.Threading;
 
 namespace S7_Csharp_Utility.ViewModels
 {
+    /// <summary>
+    /// The view model for the Modbus power supply.
+    /// </summary>
     public class ModbusPowerSupplyViewModel : ViewModelBase
     {
         private readonly PowerController _powerController;
         private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
 
+        /// <summary>
+        /// Occurs when the Modbus status changes.
+        /// </summary>
         public event Action<string>? ModbusStatusChanged;
 
         private string _modbusHost = "localhost";
+        /// <summary>
+        /// Gets or sets the Modbus host.
+        /// </summary>
         [Required]
         public string ModbusHost
         {
@@ -30,6 +40,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _modbusPort = 502;
+        /// <summary>
+        /// Gets or sets the Modbus port.
+        /// </summary>
         [Range(1, 65535)]
         public int ModbusPort
         {
@@ -42,6 +55,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private ushort _modbusCoil = 1;
+        /// <summary>
+        /// Gets or sets the Modbus coil.
+        /// </summary>
         [Range(1, 65535)]
         public ushort ModbusCoil
         {
@@ -54,6 +70,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private byte _modbusSlaveId = 1;
+        /// <summary>
+        /// Gets or sets the Modbus slave ID.
+        /// </summary>
         [Range(0, 255)]
         public byte ModbusSlaveId
         {
@@ -66,6 +85,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _delaySeconds = 1;
+        /// <summary>
+        /// Gets or sets the delay in seconds.
+        /// </summary>
         public int DelaySeconds
         {
             get => _delaySeconds;
@@ -77,6 +99,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _modbusStatus = "Disconnected";
+        /// <summary>
+        /// Gets or sets the Modbus status.
+        /// </summary>
         public string ModbusStatus
         {
             get => _modbusStatus;
@@ -93,13 +118,31 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether the Modbus is connected.
+        /// </summary>
         public bool IsConnected => ModbusStatus == "Connected";
 
+        /// <summary>
+        /// Gets the command to connect to Modbus.
+        /// </summary>
         public ICommand ConnectModbusCommand { get; }
+        /// <summary>
+        /// Gets the command to disconnect from Modbus.
+        /// </summary>
         public ICommand DisconnectModbusCommand { get; }
+        /// <summary>
+        /// Gets the command to power on.
+        /// </summary>
         public ICommand PowerOnCommand { get; }
+        /// <summary>
+        /// Gets the command to power off.
+        /// </summary>
         public ICommand PowerOffCommand { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ModbusPowerSupplyViewModel"/> class.
+        /// </summary>
         public ModbusPowerSupplyViewModel(PowerController powerController, IDialogService dialogService, LoggingService loggingService)
         {
             _powerController = powerController;
@@ -139,6 +182,10 @@ namespace S7_Csharp_Utility.ViewModels
             ModbusStatus = "Disconnected";
         }
 
+        /// <summary>
+        /// Sets the power of the PLC.
+        /// </summary>
+        /// <param name="on">True to turn on, false to turn off.</param>
         public async Task SetPowerAsync(bool on)
         {
             if (ModbusStatus != "Connected")
@@ -158,6 +205,10 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Power cycles the PLC.
+        /// </summary>
+        /// <param name="delaySeconds">The delay in seconds between turning off and on.</param>
         public async Task PowerCycleAsync(int delaySeconds)
         {
             _loggingService.Log("[POWER] Turning PLC power OFF...", LogCategory.Info);

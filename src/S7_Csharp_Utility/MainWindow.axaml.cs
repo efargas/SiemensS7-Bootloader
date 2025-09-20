@@ -16,7 +16,7 @@ namespace S7_Csharp_Utility
     /// <summary>
     /// The main window of the application.
     /// </summary>
-    public partial class MainWindow : Window, IDialogService
+    public partial class MainWindow : Window, IDialogService, IViewService
     {
         private readonly Services.PowerController _powerController;
 
@@ -35,7 +35,7 @@ namespace S7_Csharp_Utility
             var payloadManager = new S7.Net.PayloadManager(AppContext.BaseDirectory);
             var socatService = new Services.SocatService(_socatLoggerService);
             var configService = new Services.ConfigurationService();
-            var viewModel = new ViewModels.MainWindowViewModel(_loggingService, _powerController, payloadManager, this, socatService, configService, _socatLoggerService);
+            var viewModel = new ViewModels.MainWindowViewModel(_loggingService, _powerController, payloadManager, this, socatService, configService, _socatLoggerService, this);
             DataContext = viewModel;
 
             _ = InitializeAsync(viewModel);
@@ -250,5 +250,9 @@ namespace S7_Csharp_Utility
             await dialog.ShowDialog(this);
         }
 
+        public Window GetMainWindow()
+        {
+            return this;
+        }
     }
 }

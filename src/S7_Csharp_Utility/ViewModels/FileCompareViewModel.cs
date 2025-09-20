@@ -1,3 +1,4 @@
+#nullable enable
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Services;
 using System.Threading.Tasks;
@@ -5,13 +6,20 @@ using System.Windows.Input;
 
 namespace S7_Csharp_Utility.ViewModels
 {
+    /// <summary>
+    /// The view model for the file comparison.
+    /// </summary>
     public class FileCompareViewModel : ViewModelBase
     {
         private readonly MainWindowViewModel _mainViewModel;
         private readonly Interfaces.IDialogService _dialogService;
         private readonly LoggingService _loggingService;
+        private readonly Interfaces.IViewService _viewService;
 
         private string _compareFolder = string.Empty;
+        /// <summary>
+        /// Gets or sets the folder to compare.
+        /// </summary>
         public string CompareFolder
         {
             get => _compareFolder;
@@ -24,6 +32,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _compareFile1 = string.Empty;
+        /// <summary>
+        /// Gets or sets the first file to compare.
+        /// </summary>
         public string CompareFile1
         {
             get => _compareFile1;
@@ -36,6 +47,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _compareFile2 = string.Empty;
+        /// <summary>
+        /// Gets or sets the second file to compare.
+        /// </summary>
         public string CompareFile2
         {
             get => _compareFile2;
@@ -47,17 +61,36 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the command to browse for the folder to compare.
+        /// </summary>
         public ICommand BrowseCompareFolderCommand { get; }
+        /// <summary>
+        /// Gets the command to browse for the first file to compare.
+        /// </summary>
         public ICommand BrowseCompareFile1Command { get; }
+        /// <summary>
+        /// Gets the command to browse for the second file to compare.
+        /// </summary>
         public ICommand BrowseCompareFile2Command { get; }
+        /// <summary>
+        /// Gets the command to compare the dumps.
+        /// </summary>
         public ICommand CompareDumpsCommand { get; }
+        /// <summary>
+        /// Gets the command to compare two files.
+        /// </summary>
         public ICommand CompareTwoFilesCommand { get; }
 
-        public FileCompareViewModel(MainWindowViewModel mainViewModel, Interfaces.IDialogService dialogService, LoggingService loggingService)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FileCompareViewModel"/> class.
+        /// </summary>
+        public FileCompareViewModel(MainWindowViewModel mainViewModel, Interfaces.IDialogService dialogService, LoggingService loggingService, Interfaces.IViewService viewService)
         {
             _mainViewModel = mainViewModel;
             _dialogService = dialogService;
             _loggingService = loggingService;
+            _viewService = viewService;
 
             BrowseCompareFolderCommand = new RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if (result != null) CompareFolder = result; }, _ => CanExecute());
             BrowseCompareFile1Command = new RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if (result != null) CompareFile1 = result; }, _ => CanExecute());
@@ -110,26 +143,19 @@ namespace S7_Csharp_Utility.ViewModels
         {
             if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))
             {
-                await _dialogService.ShowMessageAsync("Error", "Please select a valid file.");
+                await _dialogService.ShowMessageAsync("Error", "Please select valid files.");
                 return;
             }
 
             _mainViewModel.IsComparing = true;
             try
             {
-                var comparer = new S7.Utils.DumpComparer();
-                string hashA = await comparer.ComputeFileHashAsync(CompareFile1);
-                string hashB = await comparer.ComputeFileHashAsync(CompareFile2);
-                bool match = hashA == hashB;
-                var sb = new System.Text.StringBuilder();
-                sb.AppendLine($"File 1: {System.IO.Path.GetFileName(CompareFile1)}");
-                sb.AppendLine($"MD5: {hashA}");
-                sb.AppendLine($"File 2: {System.IO.Path.GetFileName(CompareFile2)}");
-                sb.AppendLine($"MD5: {hashB}");
-                sb.AppendLine(match ? "=> MATCH" : "=> DIFFER");
-
-                await _dialogService.ShowMessageAsync("Comparison Result", sb.ToString());
-                _loggingService.Log("Comparison complete. See popup for detailed result.");
+                var diffViewModel = new DiffViewModel(CompareFile1, CompareFile2);
+                var diffView = new Views.DiffView
+                {
+                    DataContext = diffViewModel
+                };
+                await diffView.ShowDialog(_viewService.GetMainWindow());
             }
             catch (System.Exception ex)
             {

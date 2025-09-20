@@ -1,3 +1,4 @@
+#nullable enable
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
@@ -12,15 +13,24 @@ using Avalonia.Threading;
 
 namespace S7_Csharp_Utility.ViewModels
 {
+    /// <summary>
+    /// The view model for the PLC connection.
+    /// </summary>
     public class PlcConnectionViewModel : ViewModelBase
     {
         private readonly SocatService _socatService;
         private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
 
+        /// <summary>
+        /// Occurs when the socat status changes.
+        /// </summary>
         public event Action<string>? SocatStatusChanged;
 
         private string _plcHost = "localhost";
+        /// <summary>
+        /// Gets or sets the PLC host.
+        /// </summary>
         [Required]
         public string PlcHost
         {
@@ -33,6 +43,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _plcPort = 102;
+        /// <summary>
+        /// Gets or sets the PLC port.
+        /// </summary>
         [Range(1, 65535)]
         public int PlcPort
         {
@@ -44,8 +57,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the available communication modes.
+        /// </summary>
         public ObservableCollection<string> CommunicationModes { get; } = new ObservableCollection<string> { "TCP (socat)", "Serial" };
         private string? _selectedCommunicationMode = "TCP (socat)";
+        /// <summary>
+        /// Gets or sets the selected communication mode.
+        /// </summary>
         public string? SelectedCommunicationMode
         {
             get => _selectedCommunicationMode;
@@ -61,11 +80,23 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether the socat mode is selected.
+        /// </summary>
         public bool IsSocatModeSelected => _selectedCommunicationMode == "TCP (socat)";
+        /// <summary>
+        /// Gets a value indicating whether the serial mode is selected.
+        /// </summary>
         public bool IsSerialModeSelected => _selectedCommunicationMode == "Serial";
 
+        /// <summary>
+        /// Gets the available serial ports.
+        /// </summary>
         public ObservableCollection<string> AvailableSerialPorts { get; } = new ObservableCollection<string>();
         private string? _selectedSerialPort = string.Empty;
+        /// <summary>
+        /// Gets or sets the selected serial port.
+        /// </summary>
         public string? SelectedSerialPort
         {
             get => _selectedSerialPort;
@@ -77,6 +108,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _socatTcpPort = 1238;
+        /// <summary>
+        /// Gets or sets the socat TCP port.
+        /// </summary>
         public int SocatTcpPort
         {
             get => _socatTcpPort;
@@ -88,6 +122,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _socatVerbose = true;
+        /// <summary>
+        /// Gets or sets a value indicating whether socat verbose logging is enabled.
+        /// </summary>
         public bool SocatVerbose
         {
             get => _socatVerbose;
@@ -95,6 +132,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _socatHexDump = true;
+        /// <summary>
+        /// Gets or sets a value indicating whether socat hex dump is enabled.
+        /// </summary>
         public bool SocatHexDump
         {
             get => _socatHexDump;
@@ -102,6 +142,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private int _socatBlockSize = 4;
+        /// <summary>
+        /// Gets or sets the socat block size.
+        /// </summary>
         public int SocatBlockSize
         {
             get => _socatBlockSize;
@@ -113,6 +156,9 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _socatStatus = "Stopped";
+        /// <summary>
+        /// Gets or sets the socat status.
+        /// </summary>
         public string SocatStatus
         {
             get => _socatStatus;
@@ -126,8 +172,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the available baud rates.
+        /// </summary>
         public ObservableCollection<int> AvailableBaudRates { get; } = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
         private int _selectedBaudRate = 38400;
+        /// <summary>
+        /// Gets or sets the selected baud rate.
+        /// </summary>
         public int SelectedBaudRate
         {
             get => _selectedBaudRate;
@@ -138,8 +190,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the available parities.
+        /// </summary>
         public ObservableCollection<Parity> AvailableParities { get; } = new ObservableCollection<Parity>(Enum.GetValues(typeof(Parity)).Cast<Parity>());
         private Parity _selectedParity = Parity.Even;
+        /// <summary>
+        /// Gets or sets the selected parity.
+        /// </summary>
         public Parity SelectedParity
         {
             get => _selectedParity;
@@ -150,8 +208,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the available stop bits.
+        /// </summary>
         public ObservableCollection<StopBits> AvailableStopBits { get; } = new ObservableCollection<StopBits>(Enum.GetValues(typeof(StopBits)).Cast<StopBits>());
         private StopBits _selectedStopBits = StopBits.One;
+        /// <summary>
+        /// Gets or sets the selected stop bits.
+        /// </summary>
         public StopBits SelectedStopBits
         {
             get => _selectedStopBits;
@@ -162,8 +226,14 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the available flow controls.
+        /// </summary>
         public ObservableCollection<Handshake> AvailableFlowControls { get; } = new ObservableCollection<Handshake>(Enum.GetValues(typeof(Handshake)).Cast<Handshake>());
         private Handshake _selectedFlowControl = Handshake.None;
+        /// <summary>
+        /// Gets or sets the selected flow control.
+        /// </summary>
         public Handshake SelectedFlowControl
         {
             get => _selectedFlowControl;
@@ -174,13 +244,34 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        /// <summary>
+        /// Gets the command to start socat.
+        /// </summary>
         public ICommand StartSocatCommand { get; }
+        /// <summary>
+        /// Gets the command to stop socat.
+        /// </summary>
         public ICommand StopSocatCommand { get; }
+        /// <summary>
+        /// Gets the command to refresh the serial ports.
+        /// </summary>
         public ICommand RefreshSerialPortsCommand { get; }
+        /// <summary>
+        /// Gets the command to show the socat log.
+        /// </summary>
         public ICommand ShowSocatLogCommand { get; }
+        /// <summary>
+        /// Gets the command to check the socat processes.
+        /// </summary>
         public ICommand CheckSocatProcessesCommand { get; }
+        /// <summary>
+        /// Gets the command to kill the socat processes.
+        /// </summary>
         public ICommand KillSocatProcessesCommand { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PlcConnectionViewModel"/> class.
+        /// </summary>
         public PlcConnectionViewModel(SocatService socatService, IDialogService dialogService, LoggingService loggingService)
         {
             _socatService = socatService;
