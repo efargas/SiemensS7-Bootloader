@@ -14,24 +14,37 @@
         </Grid.RowDefinitions>
         
         <!-- Header -->
-        <Border Grid.Row="0" Background="#f0f0f0" Padding="10">
-            <TextBlock x:Name="FilePathText" FontWeight="Bold" Text="File: "/>
+        <Border Grid.Row="0" Background="{DynamicResource ApplicationPageBackgroundThemeBrush}" Padding="10">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <TextBlock x:Name="FilePathText" FontWeight="Bold" Text="File: " Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                <Button Content="Export Selection" Command="{Binding ExportSelectionCommand}"/>
+                <TextBox Width="200" Text="{Binding SearchText}" Watermark="SHA1 Hash"/>
+                <Button Content="Search" Command="{Binding SearchCommand}"/>
+            </StackPanel>
         </Border>
         
         <!-- Hex Content -->
-        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-            <TextBlock x:Name="HexContent" 
-                       FontFamily="Consolas,Monaco,monospace" 
-                       FontSize="12" 
-                       Margin="10"
-                       Background="White"
-                       Foreground="Black"
-                       TextWrapping="NoWrap"/>
-        </ScrollViewer>
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding HexData}"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All"
+                  CanUserResizeColumns="True"
+                  FontFamily="Consolas,Monaco,monospace"
+                  FontSize="12"
+                  Margin="10"
+                  BorderThickness="1"
+                  BorderBrush="Gray"
+                  x:Name="HexContent">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Offset" Binding="{Binding Offset}" />
+                <DataGridTextColumn Header="Hex" Binding="{Binding Hex}" Width="*"/>
+                <DataGridTextColumn Header="ASCII" Binding="{Binding Ascii}" />
+            </DataGrid.Columns>
+        </DataGrid>
         
         <!-- Status Bar -->
-        <Border Grid.Row="2" Background="#f0f0f0" Padding="5">
-            <TextBlock x:Name="StatusText" Text="Ready"/>
+        <Border Grid.Row="2" Background="{DynamicResource ApplicationPageBackgroundThemeBrush}" Padding="5">
+            <TextBlock x:Name="StatusText" Text="Ready" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
         </Border>
     </Grid>
 </Window>
