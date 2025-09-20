@@ -29,13 +29,13 @@
                 <TabControl HorizontalAlignment="Stretch">
                     <TabItem Header="Connection Parameters">
                         <Grid ColumnDefinitions="2*,2*" HorizontalAlignment="Stretch">
-                            <Border Grid.Column="0" Margin="0,0,8,0" BorderBrush="#B0B0B0" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
+                            <Border Grid.Column="0" Margin="0,0,8,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
                                 <StackPanel>
                                     <TextBlock Text="PLC Connection" FontWeight="Bold" Margin="0,0,0,8" />
                                     <TextBlock Text="Connection Mode:" />
                                     <ComboBox ItemsSource="{Binding CommunicationModes}" SelectedItem="{Binding SelectedCommunicationMode, Mode=TwoWay}"/>
 
-                                    <Border BorderBrush="Gray" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSocatModeSelected}">
+                                    <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSocatModeSelected}">
                                         <StackPanel>
                                             <TextBlock Text="TCP (socat) Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
                                             <TextBlock Text="Host:" />
@@ -76,7 +76,7 @@
                                         </StackPanel>
                                         </Border>
 
-                                    <Border BorderBrush="Gray" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSerialModeSelected}">
+                                    <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSerialModeSelected}">
                                         <StackPanel>
                                             <TextBlock Text="Serial Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Stretch">
@@ -96,7 +96,7 @@
                                     </Border>
                                 </StackPanel>
                             </Border>
-                            <Border Grid.Column="1" Margin="8,0,0,0" BorderBrush="#B0B0B0" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
+                            <Border Grid.Column="1" Margin="8,0,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
                                 <StackPanel>
                                     <TextBlock Text="Modbus Power Supply" FontWeight="Bold" Margin="0,0,0,8" />
                                     <TextBlock Text="IP Address:" />
@@ -149,11 +149,11 @@
                             </StackPanel>
                             
                             <!-- Discovered Payloads Section -->
-                            <Border Grid.Row="1" Margin="0,16,0,0" BorderBrush="#B0B0B0" BorderThickness="1" CornerRadius="4" Padding="8">
+                            <Border Grid.Row="1" Margin="0,16,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8">
                                 <Grid RowDefinitions="Auto,*">
                                     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
                                         <TextBlock Text="Discovered Payloads:" FontWeight="Bold" />
-                                        <TextBlock Text="{Binding DiscoveredPayloads.Count, StringFormat='({0} files)'}" Foreground="Gray" />
+                                        <TextBlock Text="{Binding DiscoveredPayloads.Count, StringFormat='({0} files)'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                         <TextBlock Text="Scanning..." IsVisible="{Binding IsScanning}" Foreground="Orange" />
                                     </StackPanel>
                                     <DataGrid Grid.Row="1" 
@@ -191,7 +191,7 @@
                             <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             
                             <!-- Progress Section -->
-                            <Border BorderBrush="Gray" BorderThickness="1" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
+                            <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
                                 <StackPanel>
                                     <TextBlock Text="Memory Dump Progress:" FontWeight="Bold" Margin="0,0,0,4" />
                                     <ProgressBar Name="DumpProgressBar" 
@@ -269,25 +269,25 @@
                 <Button Name="PowerOffButton" Content="Power OFF" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding PowerOffCommand}" />
                 <Button Name="StartExploitSequenceButton" Content="Start Exploit Sequence" Grid.Column="2" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding StartExploitSequenceCommand}" />
             </Grid>
-            <Border Grid.Row="3" Margin="0,12,0,0" Padding="8" BorderBrush="#808080" BorderThickness="1" CornerRadius="6" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+            <Border Grid.Row="3" Margin="0,12,0,0" Padding="8" BorderBrush="{DynamicResource ControlStrokeColorSecondaryBrush}" BorderThickness="1" CornerRadius="6" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                 <!-- Responsive log area - side by side loggers for Main and Socat logs -->
                 <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="*,*">
                     <!-- Log Categories Main / Socat Side by Side -->
                     <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <TextBlock Text="Log Categories:" FontWeight="Bold" FontSize="13" Margin="0,0,8,0" />
-                        <CheckBox Name="FilterInfoCheckBox" IsChecked="{Binding Logging.FilterInfo, Mode=TwoWay}">
+                        <CheckBox Name="FilterInfoCheckBox" IsChecked="{Binding FilterInfo, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[i]" Margin="0,0,5,0" />
                                 <TextBlock Text="Info" />
                             </StackPanel>
                         </CheckBox>
-                        <CheckBox Name="FilterErrorCheckBox" IsChecked="{Binding Logging.FilterError, Mode=TwoWay}">
+                        <CheckBox Name="FilterErrorCheckBox" IsChecked="{Binding FilterError, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[!]" Margin="0,0,5,0" />
                                 <TextBlock Text="Error" />
                             </StackPanel>
                         </CheckBox>
-                        <CheckBox Name="FilterDebugCheckBox" IsChecked="{Binding Logging.FilterDebug, Mode=TwoWay}">
+                        <CheckBox Name="FilterDebugCheckBox" IsChecked="{Binding FilterDebug, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[d]" Margin="0,0,5,0" />
                                 <TextBlock Text="Debug" />
@@ -301,8 +301,8 @@
 
                     <!-- Action Buttons Main / Socat (only main has currently) -->
                     <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                        <Button Name="ClearLogButton" Content="Clear Log" Width="110" Command="{Binding Logging.ClearLogCommand}"/>
-                        <Button Name="ExportLogButton" Content="Export..." Width="110" Command="{Binding Logging.ExportLogCommand}"/>
+                        <Button Name="ClearLogButton" Content="Clear Log" Width="110" Command="{Binding ClearLogCommand}"/>
+                        <Button Name="ExportLogButton" Content="Export..." Width="110" Command="{Binding ExportLogCommand}"/>
                         <Button Name="ScrollToEndButton" Content="Scroll to End" Width="110" Command="{Binding Logging.ScrollToEndCommand}"/>
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
@@ -314,13 +314,13 @@
                     <!-- Log Viewers, Side by Side -->
                     <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <TextBlock Grid.Row="0" Text="Main Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="LogListBox" Grid.Row="1" ItemsSource="{Binding Logging.LogMessages}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#171A1F" BorderBrush="#233A53" BorderThickness="1" MinHeight="120">
+                        <ListBox Name="LogListBox" Grid.Row="1" ItemsSource="{Binding Logging.LogMessages}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" MinHeight="120">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="#E3E6EB" FontFamily="Consolas,Monospace" />
+                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Consolas,Monospace" />
                                         <TextBlock Text="{Binding Category, StringFormat='[{0}]'}" Foreground="{Binding Category, Converter={StaticResource LogCategoryToColorConverter}}" FontWeight="Bold" FontFamily="Consolas,Monospace" />
-                                        <TextBlock Text="{Binding Message}" Foreground="#E3E6EB" FontFamily="Consolas,Monospace" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Message}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Consolas,Monospace" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -328,12 +328,12 @@
                     </Grid>
                     <Grid Grid.Row="2" Grid.Column="1" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <TextBlock Grid.Row="0" Text="Socat Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="SocatLogListBox" Grid.Row="1" ItemsSource="{Binding SocatLogging.LogEntries}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#272F1F" BorderBrush="#235333" BorderThickness="1" MinHeight="120">
+                        <ListBox Name="SocatLogListBox" Grid.Row="1" ItemsSource="{Binding SocatLogging.LogEntries}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" MinHeight="120">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="#F5ECD7" FontFamily="Consolas,Monospace" />
-                                        <TextBlock Text="{Binding Message}" Foreground="#F5ECD7" FontFamily="Consolas,Monospace" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Consolas,Monospace" />
+                                        <TextBlock Text="{Binding Message}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Consolas,Monospace" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>

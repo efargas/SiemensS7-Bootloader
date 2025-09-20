@@ -41,10 +41,6 @@ namespace S7_Csharp_Utility
             viewModel.LoadConfigurationOnStartup();
             Closing += (s, e) => viewModel.SaveConfigurationOnExit();
 
-            FilterInfoCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterInfo = cb.IsChecked ?? false; };
-            FilterErrorCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterError = cb.IsChecked ?? false; };
-            FilterDebugCheckBox.IsCheckedChanged += (s, e) => { if(s is CheckBox cb) _loggingService.FilterDebug = cb.IsChecked ?? false; };
-
             MenuProfileManagement.Click += (s, e) =>
             {
                 var vm = DataContext as ViewModels.MainWindowViewModel;
@@ -76,9 +72,6 @@ namespace S7_Csharp_Utility
             MenuSaveConfig.Click += (s, e) => viewModel.SaveConfigurationCommand.Execute(null);
             MenuLoadConfig.Click += (s, e) => viewModel.LoadConfigurationCommand.Execute(null);
             MenuExit.Click += (s, e) => Close();
-
-            ClearLogButton.Click += (s, e) => _loggingService.Clear();
-            ExportLogButton.Click += async (s, e) => await ExportLogToFileAsync(_loggingService.LogText, "Export Main Log");
 
             // --- Autoscroll Implementation ---
             var logListBox = this.FindControl<ListBox>("LogListBox");
@@ -254,28 +247,5 @@ namespace S7_Csharp_Utility
             await dialog.ShowDialog(this);
         }
 
-        /// <summary>
-        /// Exports the log content to a file.
-        /// </summary>
-        /// <param name="logContent">The content to export.</param>
-        /// <param name="dialogTitle">The title of the save file dialog.</param>
-        private async Task ExportLogToFileAsync(string logContent, string dialogTitle)
-        {
-            var topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel == null) return;
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-            {
-                Title = dialogTitle,
-                DefaultExtension = "txt",
-                FileTypeChoices = new[] { new FilePickerFileType("Text Files") { Patterns = new[] { "*.txt" } } }
-            });
-
-            if (file is not null)
-            {
-                await using var stream = await file.OpenWriteAsync();
-                using var writer = new StreamWriter(stream);
-                await writer.WriteAsync(logContent);
-            }
-        }
     }
 }

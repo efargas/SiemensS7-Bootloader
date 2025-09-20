@@ -566,6 +566,8 @@ namespace S7_Csharp_Utility.ViewModels
         /// Command to load a configuration from a file.
         /// </summary>
         public ICommand LoadConfigurationCommand { get; }
+        public ICommand ClearLogCommand { get; }
+        public ICommand ExportLogCommand { get; }
 
         /// <summary>
         /// A collection of available communication modes.
@@ -726,6 +728,36 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ConfigurationService ConfigService { get; }
 
+        public bool FilterInfo
+        {
+            get => Logging.FilterInfo;
+            set
+            {
+                Logging.FilterInfo = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool FilterError
+        {
+            get => Logging.FilterError;
+            set
+            {
+                Logging.FilterError = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool FilterDebug
+        {
+            get => Logging.FilterDebug;
+            set
+            {
+                Logging.FilterDebug = value;
+                OnPropertyChanged();
+            }
+        }
+
         private DeviceProfile? _loadedProfile;
         public DeviceProfile? LoadedProfile
         {
@@ -805,6 +837,9 @@ namespace S7_Csharp_Utility.ViewModels
             LoadConfigurationCommand = new Commands.RelayCommand(_ => LoadConfiguration());
             SavePathsCommand = new Commands.RelayCommand(_ => SaveConfiguration(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
             LoadDefaultPathsCommand = new Commands.RelayCommand(_ => LoadDefaultPaths(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+
+            ClearLogCommand = new Commands.RelayCommand(_ => Logging.Clear());
+            ExportLogCommand = new Commands.AsyncRelayCommand(async _ => await ExportLogAsync());
 
             RefreshSerialPorts();
 
@@ -1557,6 +1592,23 @@ namespace S7_Csharp_Utility.ViewModels
             finally
             {
                 IsScanning = false;
+            }
+        }
+
+        private async Task ExportLogAsync()
+        {
+            var filePath = await _dialogService.ShowSaveFileDialogAsync("Export Log", "txt", "Text Files");
+            if (filePath != null)
+            {
+                try
+                {
+                    await System.IO.File.WriteAllTextAsync(filePath, Logging.LogText);
+                    Logging.Log($"Log exported to {filePath}", LogCategory.Info);
+                }
+                catch (Exception ex)
+                {
+                    Logging.Log($"Error exporting log: {ex.Message}", LogCategory.Error);
+                }
             }
         }
     }
