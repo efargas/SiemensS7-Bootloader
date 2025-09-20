@@ -1,16 +1,21 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:S7_Csharp_Utility.ViewModels"
+        xmlns:views="using:S7_Csharp_Utility.Views"
         x:Class="S7_Csharp_Utility.MainWindow"
         Title="S7 Bootloader Utility (Cross-Platform)"
         Width="900" Height="600"
         MinWidth="700" MinHeight="400"
         CanResize="True"
         WindowStartupLocation="CenterScreen">
+    <Window.DataContext>
+        <vm:MainWindowViewModel/>
+    </Window.DataContext>
     <DockPanel LastChildFill="True">
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="File">
-                <MenuItem Header="Save Configuration" Name="MenuSaveConfig" />
-                <MenuItem Header="Load Configuration" Name="MenuLoadConfig" />
+                <MenuItem Header="Save Configuration" Command="{Binding SaveConfigurationCommand}" />
+                <MenuItem Header="Load Configuration" Command="{Binding LoadConfigurationCommand}" />
                 <Separator/>
                 <MenuItem Header="Exit" Name="MenuExit" />
             </MenuItem>
@@ -23,104 +28,17 @@
             <MenuItem Header="Help" />
         </Menu>
         
-        <!-- MAIN CONTENT ANCHORED GRID -->
         <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="*">
             <Expander x:Name="ConfigExpander" Header="Configuration" IsExpanded="True" HorizontalAlignment="Stretch" VerticalAlignment="Top" Grid.Row="0">
                 <TabControl HorizontalAlignment="Stretch">
                     <TabItem Header="Connection Parameters">
                         <Grid ColumnDefinitions="2*,2*" HorizontalAlignment="Stretch">
-                            <Border Grid.Column="0" Margin="0,0,8,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
-                                <StackPanel>
-                                    <TextBlock Text="PLC Connection" FontWeight="Bold" Margin="0,0,0,8" />
-                                    <TextBlock Text="Connection Mode:" />
-                                    <ComboBox ItemsSource="{Binding CommunicationModes}" SelectedItem="{Binding SelectedCommunicationMode, Mode=TwoWay}"/>
-
-                                    <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSocatModeSelected}">
-                                        <StackPanel>
-                                            <TextBlock Text="TCP (socat) Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
-                                            <TextBlock Text="Host:" />
-                                            <TextBox Name="PlcHostTextBox" Text="{Binding PlcHost, Mode=TwoWay}" />
-                                            <TextBlock Text="Port:" />
-                                            <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding PlcPort, Mode=TwoWay}" />
-
-                                            <!-- Socat specific parameters -->
-                                            <TextBlock Text="Serial Port:" Margin="0,8,0,0" />
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SelectedSerialPort, Mode=TwoWay}" Width="180"/>
-                                                <Button Content="Refresh" Command="{Binding RefreshSerialPortsCommand}" Width="80"/>
-                                            </StackPanel>
-
-                                            <TextBlock Text="Socat TCP Port:" />
-                                            <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding SocatTcpPort, Mode=TwoWay}" />
-
-                                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
-                                                <CheckBox Content="Verbose (-v)" IsChecked="{Binding SocatVerbose, Mode=TwoWay}"/>
-                                                <CheckBox Content="Hex Dump (-x)" IsChecked="{Binding SocatHexDump, Mode=TwoWay}"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="Block Size (-b):" VerticalAlignment="Center"/>
-                                                    <NumericUpDown Minimum="1" Maximum="65536" Value="{Binding SocatBlockSize, Mode=TwoWay}" Width="100"/>
-                                                </StackPanel>
-                                            </StackPanel>
-
-                                            <TextBlock Text="{Binding SocatStatus, StringFormat='Status: {0}'}" Margin="0,8,0,0" />
-
-                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-                                                <Button Content="Start Socat" Command="{Binding StartSocatCommand}" Width="100"/>
-                                                <Button Content="Stop Socat" Command="{Binding StopSocatCommand}" Width="100"/>
-                                                <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Width="100"/>
-                                            </StackPanel>
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,16,0,0" Spacing="8">
-                                        <Button Content="Check Socat Processes" Command="{Binding CheckSocatProcessesCommand}" />
-                                        <Button Content="Kill Socat Processes" Command="{Binding KillSocatProcessesCommand}" />
-                                        </StackPanel>
-                                        </StackPanel>
-                                        </Border>
-
-                                    <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSerialModeSelected}">
-                                        <StackPanel>
-                                            <TextBlock Text="Serial Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Stretch">
-                                                <TextBlock Text="Port:" VerticalAlignment="Center"/>
-                                                <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SelectedSerialPort, Mode=TwoWay}" Width="100"/>
-                                                <Button Content="Refresh" Command="{Binding RefreshSerialPortsCommand}" Margin="0,0,8,0" Width="70"/>
-                                                <TextBlock Text="Baud:" VerticalAlignment="Center"/>
-                                                <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding SelectedBaudRate, Mode=TwoWay}" Width="85"/>
-                                                <TextBlock Text="Parity:" VerticalAlignment="Center"/>
-                                                <ComboBox ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding SelectedParity, Mode=TwoWay}" Width="75"/>
-                                                <TextBlock Text="Stop:" VerticalAlignment="Center"/>
-                                                <ComboBox ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding SelectedStopBits, Mode=TwoWay}" Width="60"/>
-                                                <TextBlock Text="Flow:" VerticalAlignment="Center"/>
-                                                <ComboBox ItemsSource="{Binding AvailableFlowControls}" SelectedItem="{Binding SelectedFlowControl, Mode=TwoWay}" Width="90"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="1" Margin="8,0,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
-                                <StackPanel>
-                                    <TextBlock Text="Modbus Power Supply" FontWeight="Bold" Margin="0,0,0,8" />
-                                    <TextBlock Text="IP Address:" />
-                                    <TextBox Name="ModbusHostTextBox" Text="{Binding ModbusHost, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Text="Port:" />
-                                    <NumericUpDown Name="ModbusPortNumeric" Minimum="1" Maximum="65535" Value="{Binding ModbusPort, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Text="Coil Addr:" />
-                                    <NumericUpDown Name="ModbusCoilNumeric" Minimum="1" Maximum="65535" Value="{Binding ModbusCoil, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Text="Slave ID:" />
-                                    <NumericUpDown Name="ModbusSlaveIdNumeric" Minimum="0" Maximum="255" Value="{Binding ModbusSlaveId, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Text="Power-On Delay (s):" />
-                                    <NumericUpDown Name="DelayNumericUpDown" Minimum="0" Maximum="120" Value="{Binding DelaySeconds, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-                                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-                                        <Button Content="Connect" Command="{Binding ConnectModbusCommand}"/>
-                                        <Button Content="Disconnect" Command="{Binding DisconnectModbusCommand}"/>
-                                        <TextBlock Text="{Binding ModbusStatus}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
+                            <views:PlcConnectionView Grid.Column="0" DataContext="{Binding PlcConnectionViewModel}" Margin="0,0,8,0" />
+                            <views:ModbusPowerSupplyView Grid.Column="1" DataContext="{Binding ModbusPowerSupplyViewModel}" Margin="8,0,0,0" />
                         </Grid>
                     </TabItem>
                     <TabItem Header="Folders &amp; Paths">
                         <Grid RowDefinitions="Auto,*" HorizontalAlignment="Stretch">
-                            <!-- Path Configuration Section -->
                             <StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                     <TextBlock Text="Payloads Folder:" Width="120" />
@@ -148,7 +66,6 @@
                                 </StackPanel>
                             </StackPanel>
                             
-                            <!-- Discovered Payloads Section -->
                             <Border Grid.Row="1" Margin="0,16,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8">
                                 <Grid RowDefinitions="Auto,*">
                                     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
@@ -178,7 +95,7 @@
                     </TabItem>
                 </TabControl>
             </Expander>
-                        <Expander Header="Memory &amp; Compare" IsExpanded="True" Name="MemCompareExpander" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+            <Expander Header="Memory &amp; Compare" IsExpanded="True" Name="MemCompareExpander" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
                 <TabControl Margin="0,8,0,0">
                     <TabItem Header="Memory Dump">
                         <StackPanel Margin="12">
@@ -190,7 +107,6 @@
                             <TextBlock Text="Length (bytes):" />
                             <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             
-                            <!-- Progress Section -->
                             <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
                                 <StackPanel>
                                     <TextBlock Text="Memory Dump Progress:" FontWeight="Bold" Margin="0,0,0,4" />
@@ -213,7 +129,6 @@
                                 </StackPanel>
                             </Border>
                             
-                            <!-- Action Buttons -->
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <Button Name="DumpMemoryButton" 
                                         Content="Dump Memory" 
@@ -259,35 +174,29 @@
                     </TabItem>
                 </TabControl>
             </Expander>
-                        <Grid Grid.Row="2" Margin="0,8,0,0" Height="54" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+            <Grid Grid.Row="2" Margin="0,8,0,0" Height="54" VerticalAlignment="Top" HorizontalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button Name="PowerOnButton" Content="Power ON" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding PowerOnCommand}" />
-                <Button Name="PowerOffButton" Content="Power OFF" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding PowerOffCommand}" />
-                <Button Name="StartExploitSequenceButton" Content="Start Exploit Sequence" Grid.Column="2" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding StartExploitSequenceCommand}" />
+                <Button Name="StartExploitSequenceButton" Content="Start Exploit Sequence" Grid.Column="0" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding StartExploitSequenceCommand}" />
             </Grid>
             <Border Grid.Row="3" Margin="0,12,0,0" Padding="8" BorderBrush="{DynamicResource ControlStrokeColorSecondaryBrush}" BorderThickness="1" CornerRadius="6" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-                <!-- Responsive log area - side by side loggers for Main and Socat logs -->
                 <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="*,*">
-                    <!-- Log Categories Main / Socat Side by Side -->
                     <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <TextBlock Text="Log Categories:" FontWeight="Bold" FontSize="13" Margin="0,0,8,0" />
-                        <CheckBox Name="FilterInfoCheckBox" IsChecked="{Binding FilterInfo, Mode=TwoWay}">
+                        <CheckBox Name="FilterInfoCheckBox" IsChecked="{Binding Logging.FilterInfo, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[i]" Margin="0,0,5,0" />
                                 <TextBlock Text="Info" />
                             </StackPanel>
                         </CheckBox>
-                        <CheckBox Name="FilterErrorCheckBox" IsChecked="{Binding FilterError, Mode=TwoWay}">
+                        <CheckBox Name="FilterErrorCheckBox" IsChecked="{Binding Logging.FilterError, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[!]" Margin="0,0,5,0" />
                                 <TextBlock Text="Error" />
                             </StackPanel>
                         </CheckBox>
-                        <CheckBox Name="FilterDebugCheckBox" IsChecked="{Binding FilterDebug, Mode=TwoWay}">
+                        <CheckBox Name="FilterDebugCheckBox" IsChecked="{Binding Logging.FilterDebug, Mode=TwoWay}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="[d]" Margin="0,0,5,0" />
                                 <TextBlock Text="Debug" />
@@ -296,13 +205,10 @@
                     </StackPanel>
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <TextBlock Text="Socat Log" FontWeight="Bold" FontSize="13" Margin="0,0,8,0" />
-                        <!-- Add relevant socat log controls if needed -->
                     </StackPanel>
-
-                    <!-- Action Buttons Main / Socat (only main has currently) -->
                     <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                        <Button Name="ClearLogButton" Content="Clear Log" Width="110" Command="{Binding ClearLogCommand}"/>
-                        <Button Name="ExportLogButton" Content="Export..." Width="110" Command="{Binding ExportLogCommand}"/>
+                        <Button Name="ClearLogButton" Content="Clear Log" Width="110" Command="{Binding Logging.ClearLogCommand}"/>
+                        <Button Name="ExportLogButton" Content="Export..." Width="110" Command="{Binding Logging.ExportLogCommand}"/>
                         <Button Name="ScrollToEndButton" Content="Scroll to End" Width="110" Command="{Binding Logging.ScrollToEndCommand}"/>
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
@@ -310,8 +216,6 @@
                         <Button Name="ExportSocatLogButton" Content="Export..." Command="{Binding SocatLogging.ExportLogCommand}"/>
                         <Button Name="SocatScrollToEndButton" Content="Scroll to End" Command="{Binding SocatLogging.ScrollToEndCommand}"/>
                     </StackPanel>
-
-                    <!-- Log Viewers, Side by Side -->
                     <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <TextBlock Grid.Row="0" Text="Main Logger" FontWeight="DemiBold" FontSize="12" Margin="0,0,0,4" />
                         <ListBox Name="LogListBox" Grid.Row="1" ItemsSource="{Binding Logging.LogMessages}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" MinHeight="120">
@@ -319,7 +223,7 @@
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBlock Text="{Binding Timestamp, StringFormat='[{0:yyyy-MM-dd HH:mm:ss}]'}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Consolas,Monospace" />
-                                        <TextBlock Text="{Binding Category, StringFormat='[{0}]'}" Foreground="{Binding Category, Converter={StaticResource LogCategoryToColorConverter}}" FontWeight="Bold" FontFamily="Consolas,Monospace" />
+                                        <TextBlock Text="{Binding Category, StringFormat='[{0}]'}" Foreground="{Binding Category, ConverterParameter=Color, Converter={StaticResource LogCategoryToColorConverter}}" FontWeight="Bold" FontFamily="Consolas,Monospace" />
                                         <TextBlock Text="{Binding Message}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Consolas,Monospace" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </DataTemplate>

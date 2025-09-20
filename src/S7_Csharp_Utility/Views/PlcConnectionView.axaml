@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="S7_Csharp_Utility.Views.PlcConnectionView">
+    <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
+        <StackPanel>
+            <TextBlock Text="PLC Connection" FontWeight="Bold" Margin="0,0,0,8" />
+            <TextBlock Text="Connection Mode:" />
+            <ComboBox ItemsSource="{Binding CommunicationModes}" SelectedItem="{Binding SelectedCommunicationMode, Mode=TwoWay}"/>
+
+            <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSocatModeSelected}">
+                <StackPanel>
+                    <TextBlock Text="TCP (socat) Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBlock Text="Host:" />
+                    <TextBox Text="{Binding PlcHost, Mode=TwoWay}" />
+                    <TextBlock Text="Port:" />
+                    <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding PlcPort, Mode=TwoWay}" />
+
+                    <!-- Socat specific parameters -->
+                    <TextBlock Text="Serial Port:" Margin="0,8,0,0" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SelectedSerialPort, Mode=TwoWay}" Width="180"/>
+                        <Button Content="Refresh" Command="{Binding RefreshSerialPortsCommand}" Width="80"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Socat TCP Port:" />
+                    <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding SocatTcpPort, Mode=TwoWay}" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                        <CheckBox Content="Verbose (-v)" IsChecked="{Binding SocatVerbose, Mode=TwoWay}"/>
+                        <CheckBox Content="Hex Dump (-x)" IsChecked="{Binding SocatHexDump, Mode=TwoWay}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="Block Size (-b):" VerticalAlignment="Center"/>
+                            <NumericUpDown Minimum="1" Maximum="65536" Value="{Binding SocatBlockSize, Mode=TwoWay}" Width="100"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding SocatStatus, StringFormat='Status: {0}'}" Margin="0,8,0,0" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                        <Button Content="Start Socat" Command="{Binding StartSocatCommand}" Width="100"/>
+                        <Button Content="Stop Socat" Command="{Binding StopSocatCommand}" Width="100"/>
+                        <Button Content="Socat Log" Command="{Binding ShowSocatLogCommand}" Width="100"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,16,0,0" Spacing="8">
+                        <Button Content="Check Socat Processes" Command="{Binding CheckSocatProcessesCommand}" />
+                        <Button Content="Kill Socat Processes" Command="{Binding KillSocatProcessesCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" Padding="5" Margin="0,10,0,0" IsVisible="{Binding IsSerialModeSelected}">
+                <StackPanel>
+                    <TextBlock Text="Serial Parameters" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                        <TextBlock Text="Port:" VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SelectedSerialPort, Mode=TwoWay}" Width="100"/>
+                        <Button Content="Refresh" Command="{Binding RefreshSerialPortsCommand}" Margin="0,0,8,0" Width="70"/>
+                        <TextBlock Text="Baud:" VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding SelectedBaudRate, Mode=TwoWay}" Width="85"/>
+                        <TextBlock Text="Parity:" VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding SelectedParity, Mode=TwoWay}" Width="75"/>
+                        <TextBlock Text="Stop:" VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding SelectedStopBits, Mode=TwoWay}" Width="60"/>
+                        <TextBlock Text="Flow:" VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding AvailableFlowControls}" SelectedItem="{Binding SelectedFlowControl, Mode=TwoWay}" Width="90"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>
