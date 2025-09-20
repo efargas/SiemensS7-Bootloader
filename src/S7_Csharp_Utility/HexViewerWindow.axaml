@@ -15,6 +15,7 @@
             <!-- Header -->
             <Border DockPanel.Dock="Top" Background="{DynamicResource ApplicationPageBackgroundThemeBrush}" Padding="10">
                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button Content="Load Second File" Command="{Binding LoadSecondFileCommand}"/>
                     <TextBlock x:Name="FilePathText" FontWeight="Bold" Text="File: " Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
                     <Button Content="Export Selection" Command="{Binding ExportSelectionCommand}"/>
                     <TextBox Width="200" Text="{Binding SearchText}" Watermark="Hex pattern"/>
@@ -28,24 +29,43 @@
             </Border>
 
             <!-- Hex Content -->
-            <DataGrid ItemsSource="{Binding HexRows}"
-                      IsReadOnly="True"
-                      GridLinesVisibility="All"
-                      CanUserResizeColumns="True"
-                      FontFamily="Consolas,Monaco,monospace"
-                      FontSize="12"
-                      Margin="10"
-                      BorderThickness="1"
-                      BorderBrush="Gray"
-                      x:Name="HexDataGrid"
-                      SelectionUnit="Cell"
-                      SelectionMode="Extended">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Offset" Binding="{Binding Address}" />
-                    <DataGridTextColumn Header="Hex" Binding="{Binding Hex}" Width="*"/>
-                    <DataGridTextColumn Header="ASCII" Binding="{Binding Ascii}" />
-                </DataGrid.Columns>
-            </DataGrid>
+            <Grid ColumnDefinitions="*,*" >
+                <DataGrid Grid.Column="0" ItemsSource="{Binding HexRows1}"
+                          IsReadOnly="True"
+                          GridLinesVisibility="All"
+                          CanUserResizeColumns="True"
+                          FontFamily="Consolas,Monaco,monospace"
+                          FontSize="12"
+                          Margin="10"
+                          BorderThickness="1"
+                          BorderBrush="Gray"
+                          x:Name="HexDataGrid1"
+                          SelectionMode="Extended">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Offset" Binding="{Binding Address}" />
+                        <DataGridTextColumn Header="Hex" Binding="{Binding Hex}" Width="*"/>
+                        <DataGridTextColumn Header="ASCII" Binding="{Binding Ascii}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <DataGrid Grid.Column="1" ItemsSource="{Binding HexRows2}"
+                          IsReadOnly="True"
+                          GridLinesVisibility="All"
+                          CanUserResizeColumns="True"
+                          FontFamily="Consolas,Monaco,monospace"
+                          FontSize="12"
+                          Margin="10"
+                          BorderThickness="1"
+                          BorderBrush="Gray"
+                          x:Name="HexDataGrid2"
+                          SelectionMode="Extended">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Offset" Binding="{Binding Address}" />
+                        <DataGridTextColumn Header="Hex" Binding="{Binding Hex}" Width="*"/>
+                        <DataGridTextColumn Header="ASCII" Binding="{Binding Ascii}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
         </DockPanel>
         
         <!-- Inspector Panel -->

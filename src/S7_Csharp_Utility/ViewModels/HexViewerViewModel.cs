@@ -5,12 +5,19 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
+using S7_Csharp_Utility.Commands;
+using S7_Csharp_Utility.Interfaces;
+using S7_Csharp_Utility.Services;
 
 namespace S7_Csharp_Utility.ViewModels
 {
     public class HexViewerViewModel : ViewModelBase
     {
-        public ObservableCollection<HexRow> HexRows { get; } = new ObservableCollection<HexRow>();
+        public ObservableCollection<HexRow> HexRows1 { get; } = new ObservableCollection<HexRow>();
+        public ObservableCollection<HexRow> HexRows2 { get; } = new ObservableCollection<HexRow>();
+        public ICommand LoadSecondFileCommand { get; }
+        private readonly IDialogService _dialogService;
 
         private bool _isLittleEndian = true;
         public bool IsLittleEndian
@@ -70,11 +77,16 @@ namespace S7_Csharp_Utility.ViewModels
         public ulong UInt64Value { get => _uint64Value; set => SetProperty(ref _uint64Value, value); }
         #endregion
 
-        public HexViewerViewModel() { }
-
-        public async Task LoadFileAsync(string filePath)
+        public HexViewerViewModel()
         {
-            HexRows.Clear();
+            _dialogService = new DialogService(); // Use a default implementation
+            LoadSecondFileCommand = new AsyncRelayCommand(async _ => await LoadSecondFile());
+        }
+
+        public async Task LoadFileAsync(string filePath, int gridNumber = 1)
+        {
+            var collection = gridNumber == 1 ? HexRows1 : HexRows2;
+            collection.Clear();
             if (!File.Exists(filePath)) return;
 
             await Task.Run(() =>
@@ -89,9 +101,18 @@ namespace S7_Csharp_Utility.ViewModels
                         Hex = string.Join(" ", slice.Select(b => b.ToString("X2"))),
                         Ascii = new string(slice.Select(b => (char.IsControl((char)b) ? '.' : (char)b)).ToArray())
                     };
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => HexRows.Add(row));
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => collection.Add(row));
                 }
             });
+        }
+
+        private async Task LoadSecondFile()
+        {
+            var filePath = await _dialogService.ShowOpenFileDialogAsync("Select Second File", "*", "All Files");
+            if (filePath != null)
+            {
+                await LoadFileAsync(filePath, 2);
+            }
         }
 
         private void UpdateInspectorPanel()
