@@ -74,20 +74,9 @@ namespace S7_Csharp_Utility.ViewModels
                 {
                     _selectedCommunicationMode = value;
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(IsSocatModeSelected));
-                    OnPropertyChanged(nameof(IsSerialModeSelected));
                 }
             }
         }
-
-        /// <summary>
-        /// Gets a value indicating whether the socat mode is selected.
-        /// </summary>
-        public bool IsSocatModeSelected => _selectedCommunicationMode == "TCP (socat)";
-        /// <summary>
-        /// Gets a value indicating whether the serial mode is selected.
-        /// </summary>
-        public bool IsSerialModeSelected => _selectedCommunicationMode == "Serial";
 
         /// <summary>
         /// Gets the available serial ports.
@@ -278,8 +267,8 @@ namespace S7_Csharp_Utility.ViewModels
             _dialogService = dialogService;
             _loggingService = loggingService;
 
-            StartSocatCommand = new AsyncRelayCommand(_ => StartSocatAsync(), _ => IsSocatModeSelected && SocatStatus != "Running");
-            StopSocatCommand = new AsyncRelayCommand(_ => StopSocatAsync(), _ => IsSocatModeSelected && SocatStatus == "Running");
+            StartSocatCommand = new AsyncRelayCommand(_ => StartSocatAsync(), _ => SocatStatus != "Running");
+            StopSocatCommand = new AsyncRelayCommand(_ => StopSocatAsync(), _ => SocatStatus == "Running");
             RefreshSerialPortsCommand = new RelayCommand(_ => RefreshSerialPorts());
             ShowSocatLogCommand = new RelayCommand(_ => _dialogService.ShowSocatLogWindow());
             CheckSocatProcessesCommand = new RelayCommand(_ => CheckSocatProcesses(), _ => true);

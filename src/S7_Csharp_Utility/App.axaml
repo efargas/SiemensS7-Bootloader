@@ -9,8 +9,11 @@
 
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <StyleInclude Source="/ApplicationStyles.axaml"/>
     </Application.Styles>
     <Application.Resources>
         <converters:LogCategoryToColorConverter x:Key="LogCategoryToColorConverter"/>
+        <converters:EnumToTabIndexConverter x:Key="EnumToTabIndexConverter"/>
     </Application.Resources>
 </Application>

@@ -4,7 +4,8 @@
         x:Class="S7_Csharp_Utility.ProfileManagementWindow"
         Title="Profile Management"
         Width="800" Height="500"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="#1A1A1A">
     <Grid ColumnDefinitions="2*,3*" Margin="8">
         <!-- Left Column: Profiles List -->
         <DockPanel Grid.Column="0" Margin="0,0,8,0">
@@ -30,9 +31,9 @@
             </StackPanel>
 
             <Grid DockPanel.Dock="Top" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
-                <TextBlock Text="Model Name:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Text="Model Name:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" Classes="LabelText"/>
                 <TextBox Text="{Binding SelectedProfile.ModelName, Mode=TwoWay}" Grid.Row="0" Grid.Column="1" />
-                <TextBlock Text="Firmware Version:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Text="Firmware Version:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" Classes="LabelText"/>
                 <TextBox Text="{Binding SelectedProfile.FirmwareVersion, Mode=TwoWay}" Grid.Row="1" Grid.Column="1" />
             </Grid>
 

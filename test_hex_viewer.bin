@@ -1,0 +1,5 @@
+HELLO WORLD! This is a test file for the hex viewer.
+It contains ASCII text and some binary data:
+0123456789ABCDEF
+The hex viewer should display this content in a nice table format with address, hex, and ASCII columns.
+End of test file.

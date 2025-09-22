@@ -11,26 +11,16 @@ using System.Threading;
 namespace S7.Net
 {
     /// <summary>
-    /// The main client for communicating with the PLC.
+    /// The main client for communicating with Siemens S7 PLCs using the undocumented bootloader protocol.
+    /// Provides methods for handshake, stager installation, memory operations, and payload management.
     /// </summary>
-    public class PlcClient
+    public sealed class PlcClient(ICommunicationChannel channel, Action<string> logger)
     {
-        private readonly ICommunicationChannel _channel;
-        private readonly PlcProtocol _protocol;
-        private readonly Action<string> _log;
-        private uint nextPayloadLocation = PlcConstants.DUMPER_PAYLOAD_LOCATION;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PlcClient"/> class.
-        /// </summary>
-        /// <param name="channel">The communication channel to use.</param>
-        /// <param name="logger">The logging action.</param>
-        public PlcClient(ICommunicationChannel channel, Action<string> logger)
-        {
-            _channel = channel;
-            _log = logger;
-            _protocol = new PlcProtocol(channel, logger);
-        }
+        private readonly ICommunicationChannel _channel = channel ?? throw new ArgumentNullException(nameof(channel));
+        private readonly PlcProtocol _protocol = new(channel ?? throw new ArgumentNullException(nameof(channel)), 
+                                                     logger ?? throw new ArgumentNullException(nameof(logger)));
+        private readonly Action<string> _log = logger ?? throw new ArgumentNullException(nameof(logger));
+        private uint _nextPayloadLocation = PlcConstants.DUMPER_PAYLOAD_LOCATION;
 
         /// <summary>
         /// Indicates whether the client is connected to the PLC.
@@ -477,12 +467,12 @@ namespace S7.Net
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
 
             _log("Installing memory dumper payload...");
-            await InstallAddHookViaStager(nextPayloadLocation, dumpMemPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND);
-            nextPayloadLocation += (uint)dumpMemPayload.Length;
+            await InstallAddHookViaStager(_nextPayloadLocation, dumpMemPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND);
+            _nextPayloadLocation += (uint)dumpMemPayload.Length;
             // Align to next 4-byte boundary
-            if (nextPayloadLocation % 4 != 0)
+            if (_nextPayloadLocation % 4 != 0)
             {
-                nextPayloadLocation = nextPayloadLocation - (nextPayloadLocation % 4) + 4;
+                _nextPayloadLocation = _nextPayloadLocation - (_nextPayloadLocation % 4) + 4;
             }
             _log("Memory dumper payload installed.");
 

@@ -1,0 +1,51 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="S7_Csharp_Utility.Views.MemoryDumpView">
+    <StackPanel Margin="12">
+        <Button Content="Load Profile" Command="{Binding LoadProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+            <TextBlock Text="Select Region:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <ComboBox Name="RegionComboBox" ItemsSource="{Binding MemoryRegions}" SelectedItem="{Binding SelectedMemoryRegion, Mode=TwoWay}" DisplayMemberBinding="{Binding Name}" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+            <TextBlock Text="Address (hex):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox Name="DumpAddressTextBox" Text="{Binding DumpAddress, Mode=TwoWay}" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" />
+            <TextBlock Text="Length (bytes):" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" />
+        </Grid>
+        
+        <Border Classes="InfoPanel" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
+            <StackPanel>
+                <TextBlock Text="Memory Dump Progress:" FontWeight="Bold" Margin="0,0,0,4" />
+                <ProgressBar Name="DumpProgressBar" 
+                             Value="{Binding DumpProgressPercentage}" 
+                             Minimum="0" 
+                             Maximum="100" 
+                             HorizontalAlignment="Stretch" 
+                             Height="20" />
+                <TextBlock Name="DumpPercentLabel" 
+                           Text="{Binding DumpProgressPercentage, StringFormat={}{0:F1}%}" 
+                           HorizontalAlignment="Center" 
+                           Margin="0,2,0,0" />
+                <TextBlock Name="DumpBytesLabel" 
+                           Text="{Binding DumpProgressBytes}" 
+                           HorizontalAlignment="Center" />
+                <TextBlock Name="DumpTimeLabel" 
+                           Text="{Binding DumpProgressTime}" 
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
+        
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
+            <Button Name="DumpMemoryButton" 
+                    Content="Dump Memory" 
+                    Command="{Binding DumpMemoryCommand}" 
+                    IsVisible="{Binding !IsDumpingMemory}"
+                    HorizontalAlignment="Stretch" />
+            <Button Name="CancelDumpButton" 
+                    Content="Cancel Dump" 
+                    Command="{Binding CancelDumpCommand}" 
+                    IsVisible="{Binding IsDumpingMemory}"
+                    Background="DarkRed"
+                    HorizontalAlignment="Stretch" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

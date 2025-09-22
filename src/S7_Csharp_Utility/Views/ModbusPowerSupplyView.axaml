@@ -1,23 +1,23 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="S7_Csharp_Utility.Views.ModbusPowerSupplyView">
-    <Border BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="8" HorizontalAlignment="Stretch">
+    <Border Classes="InfoPanel" Padding="8" HorizontalAlignment="Stretch">
         <StackPanel>
-            <TextBlock Text="Modbus Power Supply" FontWeight="Bold" Margin="0,0,0,8" />
-            <TextBlock Text="IP Address:" />
+            <TextBlock Text="Modbus Power Supply" Classes="HeaderText" Margin="0,0,0,8" />
+            <TextBlock Text="IP Address:" Classes="LabelText"/>
             <TextBox Text="{Binding ModbusHost, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-            <TextBlock Text="Port:" />
+            <TextBlock Text="Port:" Classes="LabelText"/>
             <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding ModbusPort, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-            <TextBlock Text="Coil Addr:" />
+            <TextBlock Text="Coil Addr:" Classes="LabelText"/>
             <NumericUpDown Minimum="1" Maximum="65535" Value="{Binding ModbusCoil, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-            <TextBlock Text="Slave ID:" />
+            <TextBlock Text="Slave ID:" Classes="LabelText"/>
             <NumericUpDown Minimum="0" Maximum="255" Value="{Binding ModbusSlaveId, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-            <TextBlock Text="Power-On Delay (s):" />
+            <TextBlock Text="Power-On Delay (s):" Classes="LabelText"/>
             <NumericUpDown Minimum="0" Maximum="120" Value="{Binding DelaySeconds, Mode=TwoWay}" HorizontalAlignment="Stretch" />
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
                 <Button Content="Connect" Command="{Binding ConnectModbusCommand}"/>
                 <Button Content="Disconnect" Command="{Binding DisconnectModbusCommand}"/>
-                <TextBlock Text="{Binding ModbusStatus}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding ModbusStatus}" VerticalAlignment="Center" Classes="StatusText"/>
             </StackPanel>
         </StackPanel>
     </Border>

@@ -60,13 +60,11 @@ namespace S7_Csharp_Utility
                 string resolvedPath = Models.ApplicationConfiguration.ResolvePath(extractionPath, Models.ApplicationConfiguration.GetDefaultExtractionPath());
                 new FirmwareUnpackerWindow(resolvedPath, this).Show();
             };
-            MenuHexViewer.Click += async (s, e) =>
+            MenuHexViewer.Click += (s, e) =>
             {
-                var filePath = await OpenFilePickerAsync("Open file");
-                if (!string.IsNullOrEmpty(filePath))
-                {
-                    new HexViewerWindow(filePath).Show();
-                }
+                // Open hex viewer without requiring file selection first
+                // User can load files from within the hex viewer
+                new HexViewerWindow().Show();
             };
             
             MenuExit.Click += (s, e) => Close();

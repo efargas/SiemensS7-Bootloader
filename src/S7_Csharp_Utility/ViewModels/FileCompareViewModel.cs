@@ -92,9 +92,9 @@ namespace S7_Csharp_Utility.ViewModels
             _loggingService = loggingService;
             _viewService = viewService;
 
-            BrowseCompareFolderCommand = new RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if (result != null) CompareFolder = result; }, _ => CanExecute());
-            BrowseCompareFile1Command = new RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if (result != null) CompareFile1 = result; }, _ => CanExecute());
-            BrowseCompareFile2Command = new RelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if (result != null) CompareFile2 = result; }, _ => CanExecute());
+            BrowseCompareFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if (result != null) CompareFolder = result; }, _ => CanExecute(), HandleException);
+            BrowseCompareFile1Command = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if (result != null) CompareFile1 = result; }, _ => CanExecute(), HandleException);
+            BrowseCompareFile2Command = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if (result != null) CompareFile2 = result; }, _ => CanExecute(), HandleException);
             CompareDumpsCommand = new AsyncRelayCommand(_ => CompareDumpsAsync(), _ => CanExecute() && !string.IsNullOrWhiteSpace(CompareFolder), HandleException);
             CompareTwoFilesCommand = new AsyncRelayCommand(_ => CompareTwoFilesAsync(), _ => CanExecute() && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2), HandleException);
         }
@@ -150,12 +150,19 @@ namespace S7_Csharp_Utility.ViewModels
             _mainViewModel.IsComparing = true;
             try
             {
+                _loggingService.Log($"Starting optimized comparison of files:", LogCategory.Info);
+                _loggingService.Log($"  File 1: {CompareFile1}", LogCategory.Info);
+                _loggingService.Log($"  File 2: {CompareFile2}", LogCategory.Info);
+
                 var diffViewModel = new DiffViewModel(CompareFile1, CompareFile2);
                 var diffView = new Views.DiffView
                 {
                     DataContext = diffViewModel
                 };
                 await diffView.ShowDialog(_viewService.GetMainWindow());
+                
+                // Clean up the ViewModel when dialog closes
+                diffViewModel.Dispose();
             }
             catch (System.Exception ex)
             {

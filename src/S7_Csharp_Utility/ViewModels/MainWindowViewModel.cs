@@ -322,14 +322,14 @@ namespace S7_Csharp_Utility.ViewModels
 
             if (PlcConnectionViewModel != null)
             {
-                PlcConnectionViewModel.SocatStatusChanged += (status) =>
+                PlcConnectionViewModel.SocatStatusChanged += (string status) =>
                 {
                     ((Commands.AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
                 };
             }
             if (ModbusPowerSupplyViewModel != null)
             {
-                ModbusPowerSupplyViewModel.ModbusStatusChanged += (status) =>
+                ModbusPowerSupplyViewModel.ModbusStatusChanged += (string status) =>
                 {
                     ((Commands.AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
                 };
@@ -338,7 +338,7 @@ namespace S7_Csharp_Utility.ViewModels
             StartExploitSequenceCommand = new Commands.AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => PlcConnectionViewModel?.SocatStatus == "Running" && ModbusPowerSupplyViewModel?.ModbusStatus == "Connected" && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
             DumpMemoryCommand = new Commands.AsyncRelayCommand(_ => DumpMemoryAsync(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
             CancelDumpCommand = new Commands.RelayCommand(_ => CancelDump(), _ => IsDumpingMemory);
-            LoadProfileCommand = new Commands.RelayCommand(async _ => await LoadProfile(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing);
+            LoadProfileCommand = new Commands.AsyncRelayCommand(_ => LoadProfileAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
             
             _ = ScanPayloadsAsync();
         }
@@ -349,12 +349,12 @@ namespace S7_Csharp_Utility.ViewModels
             _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
         }
 
-        private async Task LoadProfile()
+        private async Task LoadProfileAsync()
         {
-            var path = await _dialogService.ShowOpenFileDialogAsync("Load Profile", "json", "JSON Profiles");
+            var path = await _dialogService.ShowOpenFileDialogAsync("Load Profile", "json", "JSON Profiles").ConfigureAwait(false);
             if (path != null)
             {
-                var profile = await ConfigService.LoadProfileAsync(path);
+                var profile = await ConfigService.LoadProfileAsync(path).ConfigureAwait(false);
                 if (profile != null)
                 {
                     LoadedProfile = profile;
@@ -366,7 +366,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             if (PlcConnectionViewModel?.SelectedCommunicationMode == "TCP (socat)")
             {
-                return new S7.Net.Channels.TcpChannel(PlcConnectionViewModel.PlcHost, PlcConnectionViewModel.PlcPort);
+                return new S7.Net.Channels.TcpChannel(PlcConnectionViewModel.PlcHost ?? "localhost", PlcConnectionViewModel.PlcPort);
             }
             else if (PlcConnectionViewModel?.SelectedCommunicationMode == "Serial" && PlcConnectionViewModel.SelectedSerialPort != null)
             {
@@ -571,21 +571,21 @@ namespace S7_Csharp_Utility.ViewModels
             try
             {
                 var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-                var config = await ConfigService.LoadConfiguration(path);
-                if (config != null)
+                var config = await ConfigService.LoadConfigurationAsync(path);
+                if (config != null && PlcConnectionViewModel != null && ModbusPowerSupplyViewModel != null)
                 {
-                    PlcConnectionViewModel.PlcHost = config.PlcHost;
+                    PlcConnectionViewModel.PlcHost = config.PlcHost ?? "localhost";
                     PlcConnectionViewModel.PlcPort = config.PlcPort;
-                    ModbusPowerSupplyViewModel.ModbusHost = config.ModbusHost;
+                    ModbusPowerSupplyViewModel.ModbusHost = config.ModbusHost ?? "localhost";
                     ModbusPowerSupplyViewModel.ModbusPort = config.ModbusPort;
                     ModbusPowerSupplyViewModel.ModbusCoil = config.ModbusCoil;
                     ModbusPowerSupplyViewModel.DelaySeconds = config.DelaySeconds;
-                    DumpAddress = config.DumpAddress;
+                    DumpAddress = config.DumpAddress ?? "0x691E28";
                     DumpLength = config.DumpLength;
-                    FileCompareViewModel.CompareFolder = config.CompareFolder;
-                    FileCompareViewModel.CompareFile1 = config.CompareFile1;
-                    FileCompareViewModel.CompareFile2 = config.CompareFile2;
-                    PlcConnectionViewModel.SelectedSerialPort = config.SelectedSerialPort;
+                    FileCompareViewModel.CompareFolder = config.CompareFolder ?? string.Empty;
+                    FileCompareViewModel.CompareFile1 = config.CompareFile1 ?? string.Empty;
+                    FileCompareViewModel.CompareFile2 = config.CompareFile2 ?? string.Empty;
+                    PlcConnectionViewModel.SelectedSerialPort = config.SelectedSerialPort ?? string.Empty;
                     PlcConnectionViewModel.SocatTcpPort = config.SocatTcpPort;
                     PlcConnectionViewModel.SelectedBaudRate = config.SelectedBaudRate;
                     PlcConnectionViewModel.SelectedParity = config.SelectedParity;
@@ -594,10 +594,10 @@ namespace S7_Csharp_Utility.ViewModels
                     PlcConnectionViewModel.SocatVerbose = config.SocatVerbose;
                     PlcConnectionViewModel.SocatHexDump = config.SocatHexDump;
                     PlcConnectionViewModel.SocatBlockSize = config.SocatBlockSize;
-                    ConfigurationViewModel.PayloadsPath = config.PayloadsPath;
-                    ConfigurationViewModel.DumpsPath = config.DumpsPath;
-                    ConfigurationViewModel.LogsPath = config.LogsPath;
-                    ConfigurationViewModel.ExtractionPath = config.ExtractionPath;
+                    ConfigurationViewModel.PayloadsPath = config.PayloadsPath ?? ApplicationConfiguration.GetPayloadsPath();
+                    ConfigurationViewModel.DumpsPath = config.DumpsPath ?? ApplicationConfiguration.GetDefaultDumpsPath();
+                    ConfigurationViewModel.LogsPath = config.LogsPath ?? ApplicationConfiguration.GetDefaultLogsPath();
+                    ConfigurationViewModel.ExtractionPath = config.ExtractionPath ?? ApplicationConfiguration.GetDefaultExtractionPath();
                 }
                 else
                 {
@@ -622,12 +622,18 @@ namespace S7_Csharp_Utility.ViewModels
         {
             try
             {
+                if (PlcConnectionViewModel == null || ModbusPowerSupplyViewModel == null)
+                {
+                    Logging.Log("Cannot save configuration: ViewModels are not initialized.", LogCategory.Warning);
+                    return;
+                }
+
                 var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
                 var config = new ApplicationConfiguration
                 {
-                    PlcHost = PlcConnectionViewModel.PlcHost,
+                    PlcHost = PlcConnectionViewModel.PlcHost ?? "localhost",
                     PlcPort = PlcConnectionViewModel.PlcPort,
-                    ModbusHost = ModbusPowerSupplyViewModel.ModbusHost,
+                    ModbusHost = ModbusPowerSupplyViewModel.ModbusHost ?? "localhost",
                     ModbusPort = ModbusPowerSupplyViewModel.ModbusPort,
                     ModbusCoil = ModbusPowerSupplyViewModel.ModbusCoil,
                     DelaySeconds = ModbusPowerSupplyViewModel.DelaySeconds,
@@ -636,7 +642,7 @@ namespace S7_Csharp_Utility.ViewModels
                     CompareFolder = FileCompareViewModel.CompareFolder,
                     CompareFile1 = FileCompareViewModel.CompareFile1,
                     CompareFile2 = FileCompareViewModel.CompareFile2,
-                    SelectedSerialPort = PlcConnectionViewModel.SelectedSerialPort,
+                    SelectedSerialPort = PlcConnectionViewModel.SelectedSerialPort ?? string.Empty,
                     SocatTcpPort = PlcConnectionViewModel.SocatTcpPort,
                     SelectedBaudRate = PlcConnectionViewModel.SelectedBaudRate,
                     SelectedParity = PlcConnectionViewModel.SelectedParity,
@@ -650,7 +656,7 @@ namespace S7_Csharp_Utility.ViewModels
                     LogsPath = ConfigurationViewModel.LogsPath,
                     ExtractionPath = ConfigurationViewModel.ExtractionPath
                 };
-                await ConfigService.SaveConfiguration(config, path);
+                await ConfigService.SaveConfigurationAsync(config, path);
             }
             catch (Exception ex)
             {

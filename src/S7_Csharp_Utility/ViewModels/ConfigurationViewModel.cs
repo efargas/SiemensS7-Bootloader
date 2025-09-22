@@ -96,14 +96,14 @@ namespace S7_Csharp_Utility.ViewModels
             _dialogService = dialogService;
             _configService = configService;
 
-            BrowsePayloadsFolderCommand = new RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if (result != null) PayloadsPath = result; }, _ => CanExecute());
-            BrowseDumpsFolderCommand = new RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Dumps Folder"); if (result != null) DumpsPath = result; }, _ => CanExecute());
-            BrowseLogsFolderCommand = new RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Logs Folder"); if (result != null) LogsPath = result; }, _ => CanExecute());
-            BrowseExtractionFolderCommand = new RelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Extraction Folder"); if (result != null) ExtractionPath = result; }, _ => CanExecute());
+            BrowsePayloadsFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if (result != null) PayloadsPath = result; }, _ => CanExecute(), HandleException);
+            BrowseDumpsFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Dumps Folder"); if (result != null) DumpsPath = result; }, _ => CanExecute(), HandleException);
+            BrowseLogsFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Logs Folder"); if (result != null) LogsPath = result; }, _ => CanExecute(), HandleException);
+            BrowseExtractionFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Extraction Folder"); if (result != null) ExtractionPath = result; }, _ => CanExecute(), HandleException);
 
-            SaveConfigurationCommand = new RelayCommand(_ => SaveConfiguration());
-            LoadConfigurationCommand = new RelayCommand(_ => LoadConfiguration());
-            SavePathsCommand = new RelayCommand(_ => SaveConfiguration(), _ => CanExecute());
+            SaveConfigurationCommand = new AsyncRelayCommand(_ => SaveConfigurationAsync(), null, HandleException);
+            LoadConfigurationCommand = new AsyncRelayCommand(_ => LoadConfigurationAsync(), null, HandleException);
+            SavePathsCommand = new AsyncRelayCommand(_ => SaveConfigurationAsync(), _ => CanExecute(), HandleException);
             LoadDefaultPathsCommand = new RelayCommand(_ => LoadDefaultPaths(), _ => CanExecute());
         }
 
@@ -112,9 +112,15 @@ namespace S7_Csharp_Utility.ViewModels
             return !_mainViewModel.IsUploadingStager && !_mainViewModel.IsDumpingMemory && !_mainViewModel.IsComparing;
         }
 
-        private async void SaveConfiguration()
+        private void HandleException(System.Exception ex)
         {
-            var path = await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Files");
+            _mainViewModel.Logging.Log($"An unexpected error occurred: {ex.ToString()}", LogCategory.Error);
+            _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
+        }
+
+        private async Task SaveConfigurationAsync()
+        {
+            var path = await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Files").ConfigureAwait(false);
             if (path != null)
             {
                 if (_mainViewModel.PlcConnectionViewModel == null || _mainViewModel.ModbusPowerSupplyViewModel == null || _mainViewModel.FileCompareViewModel == null)
@@ -148,20 +154,20 @@ namespace S7_Csharp_Utility.ViewModels
                     LogsPath = LogsPath,
                     ExtractionPath = ExtractionPath
                 };
-                await _configService.SaveConfiguration(config, path);
+                await _configService.SaveConfigurationAsync(config, path).ConfigureAwait(false);
             }
         }
 
-        private async void LoadConfiguration()
+        private async Task LoadConfigurationAsync()
         {
-            var path = await _dialogService.ShowOpenFileDialogAsync("Load Configuration", "json", "JSON Files");
+            var path = await _dialogService.ShowOpenFileDialogAsync("Load Configuration", "json", "JSON Files").ConfigureAwait(false);
             if (path != null)
             {
                 if (_mainViewModel.PlcConnectionViewModel == null || _mainViewModel.ModbusPowerSupplyViewModel == null || _mainViewModel.FileCompareViewModel == null)
                 {
                     return;
                 }
-                var config = await _configService.LoadConfiguration(path);
+                var config = await _configService.LoadConfigurationAsync(path).ConfigureAwait(false);
                 if (config != null)
                 {
                     _mainViewModel.PlcConnectionViewModel.PlcHost = config.PlcHost;
