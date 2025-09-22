@@ -16,6 +16,10 @@ namespace S7_Csharp_Utility
     public partial class App : Application
     {
         /// <summary>
+        /// Flag to indicate if we should test the hex viewer
+        /// </summary>
+        public static bool TestHexViewer { get; set; } = false;
+        /// <summary>
         /// Initializes the application by loading XAML resources.
         /// </summary>
         public override void Initialize()
@@ -31,9 +35,17 @@ namespace S7_Csharp_Utility
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // For now, keep the existing MainWindow creation pattern
-                // TODO: Implement full dependency injection in a future update
-                desktop.MainWindow = new MainWindow();
+                // Check if we should test the hex viewer
+                if (TestHexViewer)
+                {
+                    desktop.MainWindow = new TestHexViewerWindow();
+                }
+                else
+                {
+                    // For now, keep the existing MainWindow creation pattern
+                    // TODO: Implement full dependency injection in a future update
+                    desktop.MainWindow = new MainWindow();
+                }
 
                 // Handle application exit
                 desktop.Exit += OnApplicationExit;

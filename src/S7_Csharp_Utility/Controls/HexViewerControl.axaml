@@ -1,0 +1,265 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="S7_Csharp_Utility.Controls.HexViewerControl"
+             Background="#1A202C">
+    
+    <UserControl.Styles>
+        <!-- Hex Cell Button Styles -->
+        <Style Selector="Button.HexCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="FontFamily" Value="Consolas,Monaco,monospace"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="MinWidth" Value="24"/>
+            <Setter Property="MinHeight" Value="18"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="1"/>
+        </Style>
+        <Style Selector="Button.HexCell:pointerover">
+            <Setter Property="Background" Value="#374151"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+        </Style>
+        <Style Selector="Button.HexCell:pressed">
+            <Setter Property="Background" Value="#2D3748"/>
+        </Style>
+        <Style Selector="Button.HexCell.Selected">
+            <Setter Property="Background" Value="#4C51BF"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.HexCell.RangeSelected">
+            <Setter Property="Background" Value="#6B73FF"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.HexCell.SearchResult">
+            <Setter Property="Background" Value="#F59E0B"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="BorderBrush" Value="#D97706"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+        
+        <!-- Offset Text Style -->
+        <Style Selector="TextBlock.OffsetText">
+            <Setter Property="Foreground" Value="#A0AEC0"/>
+            <Setter Property="FontFamily" Value="Consolas,Monaco,monospace"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        
+        <!-- ASCII Text Style -->
+        <Style Selector="TextBlock.AsciiText">
+            <Setter Property="Foreground" Value="#CBD5E0"/>
+            <Setter Property="FontFamily" Value="Consolas,Monaco,monospace"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+        
+        <!-- Header Text Style -->
+        <Style Selector="TextBlock.HeaderText">
+            <Setter Property="Foreground" Value="#F7FAFC"/>
+            <Setter Property="FontFamily" Value="Consolas,Monaco,monospace"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="1"/>
+        </Style>
+    </UserControl.Styles>
+    
+    <ScrollViewer x:Name="HexScrollViewer" 
+                  HorizontalScrollBarVisibility="Auto" 
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="HexContainer" Orientation="Vertical">
+            <!-- Header Row -->
+            <Grid x:Name="HeaderGrid" Height="24" Background="#374151">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70"/>  <!-- Offset -->
+                    <ColumnDefinition Width="24"/>  <!-- 00 -->
+                    <ColumnDefinition Width="24"/>  <!-- 01 -->
+                    <ColumnDefinition Width="24"/>  <!-- 02 -->
+                    <ColumnDefinition Width="24"/>  <!-- 03 -->
+                    <ColumnDefinition Width="24"/>  <!-- 04 -->
+                    <ColumnDefinition Width="24"/>  <!-- 05 -->
+                    <ColumnDefinition Width="24"/>  <!-- 06 -->
+                    <ColumnDefinition Width="24"/>  <!-- 07 -->
+                    <ColumnDefinition Width="8"/>   <!-- Separator -->
+                    <ColumnDefinition Width="24"/>  <!-- 08 -->
+                    <ColumnDefinition Width="24"/>  <!-- 09 -->
+                    <ColumnDefinition Width="24"/>  <!-- 0A -->
+                    <ColumnDefinition Width="24"/>  <!-- 0B -->
+                    <ColumnDefinition Width="24"/>  <!-- 0C -->
+                    <ColumnDefinition Width="24"/>  <!-- 0D -->
+                    <ColumnDefinition Width="24"/>  <!-- 0E -->
+                    <ColumnDefinition Width="24"/>  <!-- 0F -->
+                    <ColumnDefinition Width="16"/>  <!-- Separator -->
+                    <ColumnDefinition Width="*"/>   <!-- ASCII -->
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="Offset" Classes="HeaderText"/>
+                <TextBlock Grid.Column="1" Text="00" Classes="HeaderText"/>
+                <TextBlock Grid.Column="2" Text="01" Classes="HeaderText"/>
+                <TextBlock Grid.Column="3" Text="02" Classes="HeaderText"/>
+                <TextBlock Grid.Column="4" Text="03" Classes="HeaderText"/>
+                <TextBlock Grid.Column="5" Text="04" Classes="HeaderText"/>
+                <TextBlock Grid.Column="6" Text="05" Classes="HeaderText"/>
+                <TextBlock Grid.Column="7" Text="06" Classes="HeaderText"/>
+                <TextBlock Grid.Column="8" Text="07" Classes="HeaderText"/>
+                <TextBlock Grid.Column="10" Text="08" Classes="HeaderText"/>
+                <TextBlock Grid.Column="11" Text="09" Classes="HeaderText"/>
+                <TextBlock Grid.Column="12" Text="0A" Classes="HeaderText"/>
+                <TextBlock Grid.Column="13" Text="0B" Classes="HeaderText"/>
+                <TextBlock Grid.Column="14" Text="0C" Classes="HeaderText"/>
+                <TextBlock Grid.Column="15" Text="0D" Classes="HeaderText"/>
+                <TextBlock Grid.Column="16" Text="0E" Classes="HeaderText"/>
+                <TextBlock Grid.Column="17" Text="0F" Classes="HeaderText"/>
+                <TextBlock Grid.Column="19" Text="ASCII" Classes="HeaderText"/>
+            </Grid>
+            
+            <!-- Data Rows Container -->
+            <ItemsControl x:Name="HexRowsContainer" ItemsSource="{Binding $parent[UserControl].HexRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="20" Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>  <!-- Offset -->
+                                <ColumnDefinition Width="24"/>  <!-- 00 -->
+                                <ColumnDefinition Width="24"/>  <!-- 01 -->
+                                <ColumnDefinition Width="24"/>  <!-- 02 -->
+                                <ColumnDefinition Width="24"/>  <!-- 03 -->
+                                <ColumnDefinition Width="24"/>  <!-- 04 -->
+                                <ColumnDefinition Width="24"/>  <!-- 05 -->
+                                <ColumnDefinition Width="24"/>  <!-- 06 -->
+                                <ColumnDefinition Width="24"/>  <!-- 07 -->
+                                <ColumnDefinition Width="8"/>   <!-- Separator -->
+                                <ColumnDefinition Width="24"/>  <!-- 08 -->
+                                <ColumnDefinition Width="24"/>  <!-- 09 -->
+                                <ColumnDefinition Width="24"/>  <!-- 0A -->
+                                <ColumnDefinition Width="24"/>  <!-- 0B -->
+                                <ColumnDefinition Width="24"/>  <!-- 0C -->
+                                <ColumnDefinition Width="24"/>  <!-- 0D -->
+                                <ColumnDefinition Width="24"/>  <!-- 0E -->
+                                <ColumnDefinition Width="24"/>  <!-- 0F -->
+                                <ColumnDefinition Width="16"/>  <!-- Separator -->
+                                <ColumnDefinition Width="*"/>   <!-- ASCII -->
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- Offset -->
+                            <TextBlock Grid.Column="0" Text="{Binding Address}" Classes="OffsetText"/>
+                            
+                            <!-- Hex Bytes -->
+                            <Button Grid.Column="1" Content="{Binding Bytes[0]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[0]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="2" Content="{Binding Bytes[1]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[1]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="3" Content="{Binding Bytes[2]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[2]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="4" Content="{Binding Bytes[3]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[3]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="5" Content="{Binding Bytes[4]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[4]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="6" Content="{Binding Bytes[5]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[5]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="7" Content="{Binding Bytes[6]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[6]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="8" Content="{Binding Bytes[7]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[7]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            
+                            <Button Grid.Column="10" Content="{Binding Bytes[8]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[8]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="11" Content="{Binding Bytes[9]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[9]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="12" Content="{Binding Bytes[10]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[10]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="13" Content="{Binding Bytes[11]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[11]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="14" Content="{Binding Bytes[12]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[12]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="15" Content="{Binding Bytes[13]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[13]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="16" Content="{Binding Bytes[14]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[14]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            <Button Grid.Column="17" Content="{Binding Bytes[15]}" 
+                                    Command="{Binding $parent[UserControl].HexCellClickCommand}"
+                                    CommandParameter="{Binding Offsets[15]}"
+                                    Classes="HexCell"
+                                    PointerEntered="HexCell_PointerEntered"
+                                    PointerReleased="HexCell_PointerReleased"/>
+                            
+                            <!-- ASCII -->
+                            <TextBlock Grid.Column="19" Text="{Binding Ascii}" Classes="AsciiText"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

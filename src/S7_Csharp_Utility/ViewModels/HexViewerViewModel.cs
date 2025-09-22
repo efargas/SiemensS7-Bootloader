@@ -36,7 +36,6 @@ namespace S7_Csharp_Utility.ViewModels
         private bool _shiftKeyPressed = false;
         private bool _ctrlKeyPressed = false;
         private readonly HashSet<long> _multiSelection = new();
-        private bool _isMultiSelectionMode = false;
 
         #region Properties
 
@@ -296,6 +295,20 @@ namespace S7_Csharp_Utility.ViewModels
             return offset >= start && offset <= end;
         }
 
+        private List<long> _searchResults = new();
+        /// <summary>
+        /// Gets or sets the list of search result offsets.
+        /// </summary>
+        public List<long> SearchResults
+        {
+            get => _searchResults;
+            set
+            {
+                _searchResults = value;
+                OnPropertyChanged();
+            }
+        }
+
         #region Inspector Properties
         private string _asciiValue = string.Empty;
         public string AsciiValue { get => _asciiValue; set => SetProperty(ref _asciiValue, value); }
@@ -441,6 +454,7 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ICommand UpdateKeyboardModifiersCommand { get; }
 
+        
         #endregion
 
         /// <summary>
@@ -626,6 +640,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
+                    SearchResults = results;
                     if (results.Count > 0)
                     {
                         StatusText = $"✅ Found {results.Count} matches";

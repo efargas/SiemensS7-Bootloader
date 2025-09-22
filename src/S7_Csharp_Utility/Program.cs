@@ -16,8 +16,16 @@ namespace S7_Csharp_Utility
         /// </summary>
         /// <param name="args">Command line arguments passed to the application.</param>
         [STAThread]
-        public static void Main(string[] args) => BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        public static void Main(string[] args)
+        {
+            // Check for test hex viewer argument
+            if (args.Length > 0 && args[0] == "--test-hex-viewer")
+            {
+                App.TestHexViewer = true;
+            }
+            
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
 
         /// <summary>
         /// Builds and configures the Avalonia application with platform detection and logging.
