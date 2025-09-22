@@ -12,6 +12,7 @@ using System.IO.Ports;
 using System.Threading;
 using Avalonia.Threading;
 using S7_Csharp_Utility.Models;
+using S7_Csharp_Utility.Interfaces;
 
 namespace S7_Csharp_Utility.ViewModels
 {
@@ -22,64 +23,32 @@ namespace S7_Csharp_Utility.ViewModels
     {
         private const string ConfigFileName = "config.json";
 
-        /// <summary>
-        /// Gets the view model for the PLC connection.
-        /// </summary>
-        public PlcConnectionViewModel? PlcConnectionViewModel { get; private set; }
-
-        /// <summary>
-        /// Gets the view model for the Modbus power supply.
-        /// </summary>
-        public ModbusPowerSupplyViewModel? ModbusPowerSupplyViewModel { get; private set; }
-
-        /// <summary>
-        /// Gets the view model for the configuration.
-        /// </summary>
+        public PlcConnectionViewModel PlcConnectionViewModel { get; }
+        public ModbusPowerSupplyViewModel ModbusPowerSupplyViewModel { get; }
         public ConfigurationViewModel ConfigurationViewModel { get; }
-
-        /// <summary>
-        /// Gets the view model for the file comparison.
-        /// </summary>
         public FileCompareViewModel FileCompareViewModel { get; }
-
-        /// <summary>
-        /// Gets the logging service.
-        /// </summary>
         public LoggingService Logging { get; }
-
-        /// <summary>
-        /// Gets the socat logging service.
-        /// </summary>
         public SocatLoggerService SocatLogging { get; }
-        private readonly S7.Net.PayloadManager _payloadManager;
+        private readonly PayloadManager _payloadManager;
 
         private string _dumpAddress = "0x691E28";
-        /// <summary>
-        /// Gets or sets the memory address to dump.
-        /// </summary>
         [Required]
         [RegularExpression(@"^0x[0-9a-fA-F]+$", ErrorMessage = "Must be a valid hex address (e.g., 0x10000000)")]
         public string DumpAddress
         {
             get => _dumpAddress;
-            set { _dumpAddress = value; OnPropertyChanged(); }
+            set => SetProperty(ref _dumpAddress, value);
         }
 
         private uint _dumpLength = 16;
-        /// <summary>
-        /// Gets or sets the length of the memory to dump.
-        /// </summary>
         [Range(1, uint.MaxValue)]
         public uint DumpLength
         {
             get => _dumpLength;
-            set { _dumpLength = value; OnPropertyChanged(); }
+            set => SetProperty(ref _dumpLength, value);
         }
 
         private bool _isUploadingStager;
-        /// <summary>
-        /// Gets or sets a value indicating whether the stager is being uploaded.
-        /// </summary>
         public bool IsUploadingStager
         {
             get => _isUploadingStager;
@@ -87,15 +56,12 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isUploadingStager = value;
                 OnPropertyChanged();
-                ((Commands.AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
-                ((Commands.AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
             }
         }
 
         private bool _isDumpingMemory;
-        /// <summary>
-        /// Gets or sets a value indicating whether memory is being dumped.
-        /// </summary>
         public bool IsDumpingMemory
         {
             get => _isDumpingMemory;
@@ -103,18 +69,15 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isDumpingMemory = value;
                 OnPropertyChanged();
-                ((Commands.AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
-                ((Commands.RelayCommand)CancelDumpCommand).RaiseCanExecuteChanged();
-                ((Commands.AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)CancelDumpCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
             }
         }
 
         private CancellationTokenSource? _dumpCancellationTokenSource;
 
         private bool _isComparing;
-        /// <summary>
-        /// Gets or sets a value indicating whether files are being compared.
-        /// </summary>
         public bool IsComparing
         {
             get => _isComparing;
@@ -122,47 +85,35 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isComparing = value;
                 OnPropertyChanged();
-                ((Commands.AsyncRelayCommand)FileCompareViewModel.CompareDumpsCommand).RaiseCanExecuteChanged();
-                ((Commands.AsyncRelayCommand)FileCompareViewModel.CompareTwoFilesCommand).RaiseCanExecuteChanged();
-                ((Commands.AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
-                ((Commands.AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)FileCompareViewModel.CompareDumpsCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)FileCompareViewModel.CompareTwoFilesCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
             }
         }
 
         private double _dumpProgressPercentage;
-        /// <summary>
-        /// Gets or sets the progress percentage of the memory dump.
-        /// </summary>
         public double DumpProgressPercentage
         {
             get => _dumpProgressPercentage;
-            set { _dumpProgressPercentage = value; OnPropertyChanged(); }
+            set => SetProperty(ref _dumpProgressPercentage, value);
         }
 
         private string _dumpProgressBytes = "Read: 0 / 0 bytes";
-        /// <summary>
-        /// Gets or sets the progress of the memory dump in bytes.
-        /// </summary>
         public string DumpProgressBytes
         {
             get => _dumpProgressBytes;
-            set { _dumpProgressBytes = value; OnPropertyChanged(); }
+            set => SetProperty(ref _dumpProgressBytes, value);
         }
 
         private string _dumpProgressTime = "Elapsed: 0s | Remaining: calculating...";
-        /// <summary>
-        /// Gets or sets the progress of the memory dump in time.
-        /// </summary>
         public string DumpProgressTime
         {
             get => _dumpProgressTime;
-            set { _dumpProgressTime = value; OnPropertyChanged(); }
+            set => SetProperty(ref _dumpProgressTime, value);
         }
 
         private bool _stagerInstalled;
-        /// <summary>
-        /// Gets or sets a value indicating whether the stager is installed.
-        /// </summary>
         public bool StagerInstalled
         {
             get => _stagerInstalled;
@@ -170,99 +121,33 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _stagerInstalled = value;
                 OnPropertyChanged();
-                ((Commands.AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
             }
         }
 
-        /// <summary>
-        /// Gets or sets the path to the payloads.
-        /// </summary>
-        public string PayloadsPath
-        {
-            get => _payloadsPath;
-            set { _payloadsPath = value; OnPropertyChanged(); _ = ScanPayloadsAsync(); }
-        }
-        private string _payloadsPath = ApplicationConfiguration.GetPayloadsPath();
-
-        /// <summary>
-        /// Gets the discovered payloads.
-        /// </summary>
-        public ObservableCollection<S7.Net.PayloadInfo> DiscoveredPayloads { get; } = new ObservableCollection<S7.Net.PayloadInfo>();
+        public ObservableCollection<PayloadInfo> DiscoveredPayloads { get; } = new ObservableCollection<PayloadInfo>();
 
         private bool _isScanning;
-        /// <summary>
-        /// Gets or sets a value indicating whether payloads are being scanned.
-        /// </summary>
         public bool IsScanning
         {
             get => _isScanning;
-            set { _isScanning = value; OnPropertyChanged(); }
+            set => SetProperty(ref _isScanning, value);
         }
 
-        /// <summary>
-        /// Gets or sets the path to the dumps.
-        /// </summary>
-        public string DumpsPath
-        {
-            get => _dumpsPath;
-            set { _dumpsPath = value; OnPropertyChanged(); }
-        }
-        private string _dumpsPath = ApplicationConfiguration.GetDefaultDumpsPath();
-
-        /// <summary>
-        /// Gets or sets the path to the logs.
-        /// </summary>
-        public string LogsPath
-        {
-            get => _logsPath;
-            set
-            {
-                _logsPath = value;
-                OnPropertyChanged();
-                string resolvedPath = ApplicationConfiguration.ResolvePath(value, ApplicationConfiguration.GetDefaultLogsPath());
-                Logging.UpdateLogsPath(resolvedPath);
-                SocatLogging.UpdateLogsPath(resolvedPath);
-            }
-        }
-        private string _logsPath = ApplicationConfiguration.GetDefaultLogsPath();
-
-        /// <summary>
-        /// Gets or sets the path to the extraction folder.
-        /// </summary>
-        public string ExtractionPath
-        {
-            get => _extractionPath;
-            set { _extractionPath = value; OnPropertyChanged(); }
-        }
-        private string _extractionPath = ApplicationConfiguration.GetDefaultExtractionPath();
-
-        /// <summary>
-        /// Gets the command to load a profile.
-        /// </summary>
         public ICommand LoadProfileCommand { get; }
-        /// <summary>
-        /// Gets the command to start the exploit sequence.
-        /// </summary>
         public ICommand StartExploitSequenceCommand { get; }
-        /// <summary>
-        /// Gets the command to dump memory.
-        /// </summary>
         public ICommand DumpMemoryCommand { get; }
-        /// <summary>
-        /// Gets the command to cancel the memory dump.
-        /// </summary>
         public ICommand CancelDumpCommand { get; }
+        public ICommand ShowProfileManagementCommand { get; }
+        public ICommand ShowFirmwareUnpackerCommand { get; }
+        public ICommand ShowHexViewerCommand { get; }
+        public ICommand SaveConfigurationCommand { get; }
+        public ICommand ExitCommand { get; }
 
-        private readonly Interfaces.IDialogService _dialogService;
-        /// <summary>
-        /// Gets the configuration service.
-        /// </summary>
+        private readonly IDialogService _dialogService;
         public ConfigurationService ConfigService { get; }
 
         private DeviceProfile? _loadedProfile;
-        /// <summary>
-        /// Gets or sets the loaded device profile.
-        /// </summary>
         public DeviceProfile? LoadedProfile
         {
             get => _loadedProfile;
@@ -274,15 +159,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Gets the memory regions of the loaded profile.
-        /// </summary>
         public ObservableCollection<MemoryRegion> MemoryRegions => LoadedProfile?.Regions ?? new ObservableCollection<MemoryRegion>();
 
         private MemoryRegion? _selectedMemoryRegion;
-        /// <summary>
-        /// Gets or sets the selected memory region.
-        /// </summary>
         public MemoryRegion? SelectedMemoryRegion
         {
             get => _selectedMemoryRegion;
@@ -298,15 +177,19 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Gets the view service.
-        /// </summary>
-        public Interfaces.IViewService ViewService { get; }
+        public IViewService ViewService { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MainWindowViewModel"/> class.
-        /// </summary>
-        public MainWindowViewModel(LoggingService loggingService, PowerController powerController, S7.Net.PayloadManager payloadManager, Interfaces.IDialogService dialogService, SocatService socatService, ConfigurationService configService, SocatLoggerService socatLoggerService, Interfaces.IViewService viewService)
+        public MainWindowViewModel(
+            LoggingService loggingService,
+            SocatLoggerService socatLoggerService,
+            PayloadManager payloadManager,
+            IDialogService dialogService,
+            ConfigurationService configService,
+            IViewService viewService,
+            PlcConnectionViewModel plcConnectionViewModel,
+            ModbusPowerSupplyViewModel modbusPowerSupplyViewModel,
+            ConfigurationViewModel configurationViewModel,
+            FileCompareViewModel fileCompareViewModel)
         {
             Logging = loggingService;
             SocatLogging = socatLoggerService;
@@ -314,31 +197,24 @@ namespace S7_Csharp_Utility.ViewModels
             _dialogService = dialogService;
             ConfigService = configService;
             ViewService = viewService;
+            PlcConnectionViewModel = plcConnectionViewModel;
+            ModbusPowerSupplyViewModel = modbusPowerSupplyViewModel;
+            ConfigurationViewModel = configurationViewModel;
+            FileCompareViewModel = fileCompareViewModel;
 
-            PlcConnectionViewModel = new PlcConnectionViewModel(socatService, dialogService, loggingService);
-            ModbusPowerSupplyViewModel = new ModbusPowerSupplyViewModel(powerController, dialogService, loggingService);
-            ConfigurationViewModel = new ConfigurationViewModel(this, dialogService, configService);
-            FileCompareViewModel = new FileCompareViewModel(this, dialogService, loggingService, viewService);
+            PlcConnectionViewModel.SocatStatusChanged += (string status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
+            ModbusPowerSupplyViewModel.ModbusStatusChanged += (string status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
 
-            if (PlcConnectionViewModel != null)
-            {
-                PlcConnectionViewModel.SocatStatusChanged += (string status) =>
-                {
-                    ((Commands.AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
-                };
-            }
-            if (ModbusPowerSupplyViewModel != null)
-            {
-                ModbusPowerSupplyViewModel.ModbusStatusChanged += (string status) =>
-                {
-                    ((Commands.AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
-                };
-            }
+            StartExploitSequenceCommand = new AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => PlcConnectionViewModel?.SocatStatus == "Running" && ModbusPowerSupplyViewModel?.ModbusStatus == "Connected" && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
+            DumpMemoryCommand = new AsyncRelayCommand(_ => DumpMemoryAsync(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
+            CancelDumpCommand = new RelayCommand(_ => CancelDump(), _ => IsDumpingMemory);
+            LoadProfileCommand = new AsyncRelayCommand(_ => LoadProfileAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
+            SaveConfigurationCommand = new AsyncRelayCommand(_ => SaveConfigurationOnExit(), _ => true, HandleException);
 
-            StartExploitSequenceCommand = new Commands.AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => PlcConnectionViewModel?.SocatStatus == "Running" && ModbusPowerSupplyViewModel?.ModbusStatus == "Connected" && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
-            DumpMemoryCommand = new Commands.AsyncRelayCommand(_ => DumpMemoryAsync(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
-            CancelDumpCommand = new Commands.RelayCommand(_ => CancelDump(), _ => IsDumpingMemory);
-            LoadProfileCommand = new Commands.AsyncRelayCommand(_ => LoadProfileAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
+            ShowProfileManagementCommand = new RelayCommand(ShowProfileManagement);
+            ShowFirmwareUnpackerCommand = new RelayCommand(ShowFirmwareUnpacker);
+            ShowHexViewerCommand = new RelayCommand(ShowHexViewer);
+            ExitCommand = new RelayCommand(Exit);
             
             _ = ScanPayloadsAsync();
         }
@@ -348,6 +224,11 @@ namespace S7_Csharp_Utility.ViewModels
             Logging.Log($"An unexpected error occurred: {ex.ToString()}", LogCategory.Error);
             _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
         }
+
+        private void ShowProfileManagement() => ViewService.ShowProfileManagementWindow(ConfigService, profile => LoadedProfile = profile);
+        private void ShowFirmwareUnpacker() => ViewService.ShowFirmwareUnpackerWindow(ConfigurationViewModel.ExtractionPath);
+        private void ShowHexViewer() => ViewService.ShowHexViewerWindow();
+        private void Exit() => ViewService.Exit();
 
         private async Task LoadProfileAsync()
         {
@@ -362,25 +243,23 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private S7.Net.Interfaces.ICommunicationChannel? CreateCommunicationChannel()
+        private ICommunicationChannel? CreateCommunicationChannel()
         {
             if (PlcConnectionViewModel?.SelectedCommunicationMode == "TCP (socat)")
             {
-                return new S7.Net.Channels.TcpChannel(PlcConnectionViewModel.PlcHost ?? "localhost", PlcConnectionViewModel.PlcPort);
+                return new TcpChannel(PlcConnectionViewModel.PlcHost ?? "localhost", PlcConnectionViewModel.PlcPort);
             }
             else if (PlcConnectionViewModel?.SelectedCommunicationMode == "Serial" && PlcConnectionViewModel.SelectedSerialPort != null)
             {
-                return new S7.Net.Channels.SerialChannel(PlcConnectionViewModel.SelectedSerialPort, PlcConnectionViewModel.SelectedBaudRate, PlcConnectionViewModel.SelectedParity, PlcConnectionViewModel.SelectedStopBits, PlcConnectionViewModel.SelectedFlowControl);
+                return new SerialChannel(PlcConnectionViewModel.SelectedSerialPort, PlcConnectionViewModel.SelectedBaudRate, PlcConnectionViewModel.SelectedParity, PlcConnectionViewModel.SelectedStopBits, PlcConnectionViewModel.SelectedFlowControl);
             }
             return null;
         }
         
         private async Task StartExploitSequenceAsync()
         {
-            if (ModbusPowerSupplyViewModel == null || PlcConnectionViewModel == null) return;
-
             IsUploadingStager = true;
-            S7.Net.Interfaces.ICommunicationChannel? channel = null;
+            ICommunicationChannel? channel = null;
             try
             {
                 Logging.Log("[EXPLOIT] Starting exploit sequence...", LogCategory.Info);
@@ -390,69 +269,37 @@ namespace S7_Csharp_Utility.ViewModels
                 Logging.Log("[CONNECTION] Creating communication channel...", LogCategory.Info);
                 channel = CreateCommunicationChannel();
 
-                if (channel == null)
-                {
-                    throw new Exception("Could not create communication channel. PLC Connection View Model is not initialized.");
-                }
+                if (channel == null) throw new Exception("Could not create communication channel. PLC Connection View Model is not initialized.");
 
                 Logging.Log($"[CONNECTION] Connecting to PLC at {PlcConnectionViewModel.PlcHost}:{PlcConnectionViewModel.PlcPort}...", LogCategory.Info);
                 await channel.ConnectAsync();
 
-                if (!channel.IsConnected)
-                {
-                    throw new Exception("Failed to establish connection to PLC");
-                }
+                if (!channel.IsConnected) throw new Exception("Failed to establish connection to PLC");
 
                 Logging.Log("[CONNECTION] ✅ Connected to PLC successfully", LogCategory.Info);
-                var plcClient = new S7.Net.PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
+                var plcClient = new PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
                 await RunStagerSequenceAsync(plcClient);
             }
-            catch (TimeoutException timeoutEx)
+            catch (Exception ex) when (ex is TimeoutException || ex is System.IO.IOException)
             {
-                Logging.Log($"[ERROR] ⏱️ Timeout during stager sequence: {timeoutEx.ToString()}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Timeout Error",
-                    $"The operation timed out. This may happen if:\n" +
-                    $"• Socat is not running or has stopped\n" +
-                    $"• PLC is not responding\n" +
-                    $"• Network connection issues\n\n" +
-                    $"Error: {timeoutEx.Message}");
-            }
-            catch (System.IO.IOException ioEx)
-            {
-                Logging.Log($"[ERROR] 🔌 Connection error during stager sequence: {ioEx.ToString()}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Connection Error",
-                    $"Connection to PLC was lost. This may happen if:\n" +
-                    $"• Socat process was stopped\n" +
-                    $"• Network connection was interrupted\n" +
-                    $"• PLC stopped responding\n\n" +
-                    $"Error: {ioEx.Message}");
+                var errorType = ex is TimeoutException ? "Timeout" : "Connection";
+                Logging.Log($"[ERROR] ⏱️ {errorType} during stager sequence: {ex}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync($"{errorType} Error", $"The operation timed out. Error: {ex.Message}");
             }
             catch (Exception ex)
             {
-                Logging.Log($"[ERROR] ❌ Unexpected error during stager sequence: {ex.ToString()}", LogCategory.Error);
-                if (ex.InnerException != null)
-                {
-                    Logging.Log($"[ERROR] Inner exception: {ex.InnerException.ToString()}", LogCategory.Error);
-                }
+                Logging.Log($"[ERROR] ❌ Unexpected error during stager sequence: {ex}", LogCategory.Error);
+                if (ex.InnerException != null) Logging.Log($"[ERROR] Inner exception: {ex.InnerException}", LogCategory.Error);
                 await _dialogService.ShowMessageAsync("Error", $"An error occurred during the stager sequence: {ex.Message}");
             }
             finally
             {
-                try
-                {
-                    channel?.Disconnect();
-                    Logging.Log("[CONNECTION] Disconnected from PLC", LogCategory.Debug);
-                }
-                catch (Exception disconnectEx)
-                {
-                    Logging.Log($"[WARNING] Error during disconnect: {disconnectEx.Message}", LogCategory.Warning);
-                }
+                channel?.Disconnect();
                 IsUploadingStager = false;
-                Logging.Log("[EXPLOIT] Exploit sequence completed", LogCategory.Info);
             }
         }
 
-        private async Task RunStagerSequenceAsync(S7.Net.PlcClient plcClient)
+        private async Task RunStagerSequenceAsync(PlcClient plcClient)
         {
             StagerInstalled = false;
             if (!plcClient.IsConnected) return;
@@ -460,10 +307,8 @@ namespace S7_Csharp_Utility.ViewModels
             if (await plcClient.PerformHandshakeAsync())
             {
                 await plcClient.GetVersion();
-
-                byte[] stagerPayload = await _payloadManager.GetStagerPayloadAsync(PayloadsPath);
-                Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
-
+                byte[] stagerPayload = await _payloadManager.GetStagerPayloadAsync(ConfigurationViewModel.PayloadsPath);
+                Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes) from {ConfigurationViewModel.PayloadsPath}.", LogCategory.Info);
                 await plcClient.InstallStager(stagerPayload);
                 StagerInstalled = true;
                 Logging.Log("Stager is installed and ready.", LogCategory.Info);
@@ -475,34 +320,20 @@ namespace S7_Csharp_Utility.ViewModels
             IsDumpingMemory = true;
             using (_dumpCancellationTokenSource = new CancellationTokenSource())
             {
-                S7.Net.Interfaces.ICommunicationChannel? channel = null;
-
-                DumpProgressPercentage = 0;
-                DumpProgressBytes = "Read: 0 / 0 bytes";
-                DumpProgressTime = "Elapsed: 0s | Remaining: calculating...";
-
+                ICommunicationChannel? channel = null;
                 try
                 {
-                    if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.CurrentCulture, out uint address))
+                    if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out uint address))
                     {
-                        Logging.Log("Error: Invalid dump address. Must be a valid hex number (e.g., 0x10000000).", LogCategory.Error);
-                        await _dialogService.ShowMessageAsync("Validation Error", "Invalid dump address. Must be a valid hex number (e.g., 0x10000000).");
-                        return;
-                    }
-                    if (DumpLength == 0)
-                    {
-                        Logging.Log("Error: Invalid dump length. Must be a positive number.", LogCategory.Error);
-                        await _dialogService.ShowMessageAsync("Validation Error", "Invalid dump length. Must be a positive number.");
+                        await _dialogService.ShowMessageAsync("Validation Error", "Invalid dump address.");
                         return;
                     }
 
                     channel = CreateCommunicationChannel();
-                    if (channel == null)
-                    {
-                        throw new Exception("Could not create communication channel. PLC Connection View Model is not initialized.");
-                    }
+                    if (channel == null) throw new Exception("Could not create communication channel.");
+
                     await channel.ConnectAsync();
-                    var plcClient = new S7.Net.PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
+                    var plcClient = new PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
                     await RunDumpSequenceAsync(plcClient, address, DumpLength, _dumpCancellationTokenSource.Token);
                 }
                 catch (OperationCanceledException)
@@ -511,9 +342,8 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    var errorMessage = $"An error occurred during the dump sequence: {ex.Message}";
-                    Logging.Log(errorMessage + Environment.NewLine + ex.ToString(), LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Error", errorMessage);
+                    Logging.Log($"An error occurred during the dump sequence: {ex}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", ex.Message);
                 }
                 finally
                 {
@@ -524,18 +354,13 @@ namespace S7_Csharp_Utility.ViewModels
             _dumpCancellationTokenSource = null;
         }
 
-        private void CancelDump()
-        {
-            _dumpCancellationTokenSource?.Cancel();
-        }
+        private void CancelDump() => _dumpCancellationTokenSource?.Cancel();
 
-        private async Task RunDumpSequenceAsync(S7.Net.PlcClient plcClient, uint address, uint length, CancellationToken cancellationToken)
+        private async Task RunDumpSequenceAsync(PlcClient plcClient, uint address, uint length, CancellationToken cancellationToken)
         {
             Logging.Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
-
-            byte[] dumperPayload = await _payloadManager.GetMemoryDumperPayloadAsync(PayloadsPath);
-            Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes) from {PayloadsPath}.", LogCategory.Info);
-
+            byte[] dumperPayload = await _payloadManager.GetMemoryDumperPayloadAsync(ConfigurationViewModel.PayloadsPath);
+            Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes) from {ConfigurationViewModel.PayloadsPath}.", LogCategory.Info);
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var progress = new Progress<long>(bytesRead =>
             {
@@ -552,27 +377,22 @@ namespace S7_Csharp_Utility.ViewModels
                 });
             });
 
-            var dumpedData = await plcClient.DumpMemoryAsync(address, length, dumperPayload, progress);
+            var dumpedData = await plcClient.DumpMemoryAsync(address, length, dumperPayload, progress, cancellationToken);
             stopwatch.Stop();
-
-            string resolvedDumpsPath = ApplicationConfiguration.ResolvePath(DumpsPath, ApplicationConfiguration.GetDefaultDumpsPath());
+            string resolvedDumpsPath = ApplicationConfiguration.ResolvePath(ConfigurationViewModel.DumpsPath, ApplicationConfiguration.GetDefaultDumpsPath());
             string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";
             string fullPath = System.IO.Path.Combine(resolvedDumpsPath, outFilename);
-            
             await System.IO.File.WriteAllBytesAsync(fullPath, dumpedData, cancellationToken);
             Logging.Log($"Successfully dumped {dumpedData.Length} bytes to {fullPath} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
         }
 
-        /// <summary>
-        /// Loads the application configuration on startup.
-        /// </summary>
         public async Task LoadConfigurationOnStartup()
         {
             try
             {
                 var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
                 var config = await ConfigService.LoadConfigurationAsync(path);
-                if (config != null && PlcConnectionViewModel != null && ModbusPowerSupplyViewModel != null)
+                if (config != null)
                 {
                     PlcConnectionViewModel.PlcHost = config.PlcHost ?? "localhost";
                     PlcConnectionViewModel.PlcPort = config.PlcPort;
@@ -610,30 +430,21 @@ namespace S7_Csharp_Utility.ViewModels
                 Logging.Log($"Could not load or create configuration: {ex.ToString()}", LogCategory.Warning);
             }
 
-            string resolvedLogsPath = ApplicationConfiguration.ResolvePath(LogsPath, ApplicationConfiguration.GetDefaultLogsPath());
+            string resolvedLogsPath = ApplicationConfiguration.ResolvePath(ConfigurationViewModel.LogsPath, ApplicationConfiguration.GetDefaultLogsPath());
             Logging.UpdateLogsPath(resolvedLogsPath);
             SocatLogging.UpdateLogsPath(resolvedLogsPath);
         }
 
-        /// <summary>
-        /// Saves the application configuration on exit.
-        /// </summary>
         public async Task SaveConfigurationOnExit()
         {
             try
             {
-                if (PlcConnectionViewModel == null || ModbusPowerSupplyViewModel == null)
-                {
-                    Logging.Log("Cannot save configuration: ViewModels are not initialized.", LogCategory.Warning);
-                    return;
-                }
-
                 var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
                 var config = new ApplicationConfiguration
                 {
-                    PlcHost = PlcConnectionViewModel.PlcHost ?? "localhost",
+                    PlcHost = PlcConnectionViewModel.PlcHost,
                     PlcPort = PlcConnectionViewModel.PlcPort,
-                    ModbusHost = ModbusPowerSupplyViewModel.ModbusHost ?? "localhost",
+                    ModbusHost = ModbusPowerSupplyViewModel.ModbusHost,
                     ModbusPort = ModbusPowerSupplyViewModel.ModbusPort,
                     ModbusCoil = ModbusPowerSupplyViewModel.ModbusCoil,
                     DelaySeconds = ModbusPowerSupplyViewModel.DelaySeconds,
@@ -642,7 +453,7 @@ namespace S7_Csharp_Utility.ViewModels
                     CompareFolder = FileCompareViewModel.CompareFolder,
                     CompareFile1 = FileCompareViewModel.CompareFile1,
                     CompareFile2 = FileCompareViewModel.CompareFile2,
-                    SelectedSerialPort = PlcConnectionViewModel.SelectedSerialPort ?? string.Empty,
+                    SelectedSerialPort = PlcConnectionViewModel.SelectedSerialPort,
                     SocatTcpPort = PlcConnectionViewModel.SocatTcpPort,
                     SelectedBaudRate = PlcConnectionViewModel.SelectedBaudRate,
                     SelectedParity = PlcConnectionViewModel.SelectedParity,
@@ -666,14 +477,14 @@ namespace S7_Csharp_Utility.ViewModels
 
         private async Task ScanPayloadsAsync()
         {
-            if (IsScanning || string.IsNullOrWhiteSpace(PayloadsPath))
+            if (IsScanning || string.IsNullOrWhiteSpace(ConfigurationViewModel.PayloadsPath))
                 return;
 
             IsScanning = true;
             
             try
             {
-                var payloads = await Task.Run(() => _payloadManager.ScanPayloads(PayloadsPath));
+                var payloads = await Task.Run(() => _payloadManager.ScanPayloads(ConfigurationViewModel.PayloadsPath));
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -684,7 +495,7 @@ namespace S7_Csharp_Utility.ViewModels
                     }
                 });
 
-                Logging.Log($"Payload scan completed. Found {payloads.Count} payload files in {PayloadsPath}", LogCategory.Info);
+                Logging.Log($"Payload scan completed. Found {payloads.Count} payload files in {ConfigurationViewModel.PayloadsPath}", LogCategory.Info);
 
                 foreach (var payload in payloads)
                 {

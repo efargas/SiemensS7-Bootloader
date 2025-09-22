@@ -15,11 +15,6 @@ namespace S7_Csharp_Utility.Services
         {
         }
 
-        public DialogService(Window mainWindow)
-        {
-            _mainWindow = mainWindow;
-        }
-
         private Window GetMainWindow()
         {
             if (_mainWindow != null)

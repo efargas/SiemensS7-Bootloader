@@ -1,20 +1,21 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="S7_Csharp_Utility.Views.MemoryDumpView">
-    <StackPanel Margin="12">
-        <Button Content="Load Profile" Command="{Binding LoadProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,0,0,8">
-            <TextBlock Text="Select Region:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
-            <ComboBox Name="RegionComboBox" ItemsSource="{Binding MemoryRegions}" SelectedItem="{Binding SelectedMemoryRegion, Mode=TwoWay}" DisplayMemberBinding="{Binding Name}" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
-            <TextBlock Text="Address (hex):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
-            <TextBox Name="DumpAddressTextBox" Text="{Binding DumpAddress, Mode=TwoWay}" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" />
-            <TextBlock Text="Length (bytes):" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
-            <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" />
-        </Grid>
+    <StackPanel Spacing="8" Margin="12">
+        <Button Content="Load Profile" Command="{Binding LoadProfileCommand}" HorizontalAlignment="Stretch" Classes="ActionButton" />
+
+        <TextBlock Text="Select Region:" Classes="LabelText" />
+        <ComboBox Name="RegionComboBox" ItemsSource="{Binding MemoryRegions}" SelectedItem="{Binding SelectedMemoryRegion, Mode=TwoWay}" DisplayMemberBinding="{Binding Name}" HorizontalAlignment="Stretch" />
+
+        <TextBlock Text="Address (hex):" Classes="LabelText" />
+        <TextBox Name="DumpAddressTextBox" Text="{Binding DumpAddress, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+
+        <TextBlock Text="Length (bytes):" Classes="LabelText" />
+        <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" HorizontalAlignment="Stretch" />
         
         <Border Classes="InfoPanel" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
             <StackPanel>
-                <TextBlock Text="Memory Dump Progress:" FontWeight="Bold" Margin="0,0,0,4" />
+                <TextBlock Text="Memory Dump Progress:" Classes="HeaderText" Margin="0,0,0,4" />
                 <ProgressBar Name="DumpProgressBar" 
                              Value="{Binding DumpProgressPercentage}" 
                              Minimum="0" 
@@ -39,13 +40,15 @@
                     Content="Dump Memory" 
                     Command="{Binding DumpMemoryCommand}" 
                     IsVisible="{Binding !IsDumpingMemory}"
-                    HorizontalAlignment="Stretch" />
+                    HorizontalAlignment="Stretch"
+                    Classes="ActionButton" />
             <Button Name="CancelDumpButton" 
                     Content="Cancel Dump" 
                     Command="{Binding CancelDumpCommand}" 
                     IsVisible="{Binding IsDumpingMemory}"
                     Background="DarkRed"
-                    HorizontalAlignment="Stretch" />
+                    HorizontalAlignment="Stretch"
+                    Classes="ActionButton" />
         </StackPanel>
     </StackPanel>
 </UserControl>

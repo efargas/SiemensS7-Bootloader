@@ -1,0 +1,63 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+
+    <!-- Main Window -->
+    <system:String x:Key="MainWindowTitle">S7 Bootloader Utility (Cross-Platform)</system:String>
+    <system:String x:Key="FileMenuHeader">_File</system:String>
+    <system:String x:Key="SaveConfigurationMenuHeader">_Save Configuration</system:String>
+    <system:String x:Key="LoadConfigurationMenuHeader">_Load Configuration</system:String>
+    <system:String x:Key="ExitMenuHeader">_Exit</system:String>
+    <system:String x:Key="PreferencesMenuHeader">_Preferences</system:String>
+    <system:String x:Key="ToolsMenuHeader">_Tools</system:String>
+    <system:String x:Key="ProfileManagementMenuHeader">_Profile Management</system:String>
+    <system:String x:Key="FirmwareUnpackerMenuHeader">_Firmware Unpacker</system:String>
+    <system:String x:Key="HexViewerMenuHeader">_Hex Viewer</system:String>
+    <system:String x:Key="HelpMenuHeader">_Help</system:String>
+
+    <!-- Configuration Section -->
+    <system:String x:Key="ConfigurationHeader">Configuration</system:String>
+    <system:String x:Key="ConnectionParametersHeader">Connection Parameters</system:String>
+    <system:String x:Key="FoldersAndPathsHeader">Folders &amp; Paths</system:String>
+    <system:String x:Key="PayloadsFolderLabel">Payloads Folder:</system:String>
+    <system:String x:Key="DumpsFolderLabel">Dumps Folder:</system:String>
+    <system:String x:Key="LogsFolderLabel">Logs Folder:</system:String>
+    <system:String x:Key="ExtractionFolderLabel">Extraction Folder:</system:String>
+    <system:String x:Key="BrowseButtonContent">Browse</system:String>
+    <system:String x:Key="SaveSettingsButtonContent">Save Settings</system:String>
+    <system:String x:Key="LoadDefaultsButtonContent">Load Defaults</system:String>
+    <system:String x:Key="DiscoveredPayloadsHeader">Discovered Payloads:</system:String>
+    <system:String x:Key="ScanningLabel">Scanning...</system:String>
+
+    <!-- Memory & Compare Section -->
+    <system:String x:Key="MemoryAndCompareHeader">Memory &amp; Compare</system:String>
+    <system:String x:Key="MemoryDumpHeader">Memory Dump</system:String>
+    <system:String x:Key="LoadProfileButtonContent">Load Profile</system:String>
+    <system:String x:Key="SelectRegionLabel">Select Region:</system:String>
+    <system:String x:Key="AddressLabel">Address (hex):</system:String>
+    <system:String x:Key="LengthLabel">Length (bytes):</system:String>
+    <system:String x:Key="MemoryDumpProgressHeader">Memory Dump Progress:</system:String>
+    <system:String x:Key="DumpMemoryButtonContent">Dump Memory</system:String>
+    <system:String x:Key="CancelDumpButtonContent">Cancel Dump</system:String>
+    <system:String x:Key="DumpComparisonHeader">Dump Comparison</system:String>
+    <system:String x:Key="CompareFolderHeader">Compare Folder</system:String>
+    <system:String x:Key="CompareFilesHeader">Compare Files</system:String>
+    <system:String x:Key="StartComparisonButtonContent">Start Comparison</system:String>
+    <system:String x:Key="CompareTheseFilesButtonContent">Compare These Files</system:String>
+
+    <!-- Main Action Button -->
+    <system:String x:Key="StartExploitSequenceButtonContent">Start Exploit Sequence</system:String>
+
+    <!-- Log Section -->
+    <system:String x:Key="LogCategoriesHeader">Log Categories:</system:String>
+    <system:String x:Key="InfoLogLevel">[i] Info</system:String>
+    <system:String x:Key="ErrorLogLevel">[!] Error</system:String>
+    <system:String x:Key="DebugLogLevel">[d] Debug</system:String>
+    <system:String x:Key="SocatLogHeader">Socat Log</system:String>
+    <system:String x:Key="ClearLogButtonContent">Clear Log</system:String>
+    <system:String x:Key="ExportLogButtonContent">Export...</system:String>
+    <system:String x:Key="ScrollToEndButtonContent">Scroll to End</system:String>
+    <system:String x:Key="MainLoggerHeader">Main Logger</system:String>
+    <system:String x:Key="SocatLoggerHeader">Socat Logger</system:String>
+
+</ResourceDictionary>

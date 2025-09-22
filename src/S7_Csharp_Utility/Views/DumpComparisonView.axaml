@@ -3,22 +3,28 @@
              x:Class="S7_Csharp_Utility.Views.DumpComparisonView">
     <TabControl>
         <TabItem Header="Compare Folder">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="8">
-                <TextBox Name="CompareFolderTextBox" Watermark="Select folder to compare..." Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFolder, Mode=TwoWay}" />
-                <Button Name="BrowseCompareFolderButton" Content="Browse" Grid.Row="0" Grid.Column="1" Command="{Binding BrowseCompareFolderCommand}" />
-                <Button Name="CompareDumpsButton" Content="Start Comparison" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Stretch" Command="{Binding CompareDumpsCommand}" Margin="0,8,0,0" />
-                <ListBox Name="ComparisonResultsListBox" Height="100" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Stretch" Margin="0,8,0,0" />
-            </Grid>
+            <StackPanel Spacing="8" Margin="8">
+                <Grid ColumnDefinitions="*,Auto" Gap="8">
+                    <TextBox Name="CompareFolderTextBox" Watermark="Select folder to compare..." Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFolder, Mode=TwoWay}" />
+                    <Button Name="BrowseCompareFolderButton" Content="Browse" Grid.Column="1" Command="{Binding BrowseCompareFolderCommand}" />
+                </Grid>
+                <Button Name="CompareDumpsButton" Content="Start Comparison" HorizontalAlignment="Stretch" Command="{Binding CompareDumpsCommand}" Classes="ActionButton" />
+                <ListBox Name="ComparisonResultsListBox" Height="100" HorizontalAlignment="Stretch" />
+            </StackPanel>
         </TabItem>
         <TabItem Header="Compare Files">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" Margin="8">
-                <TextBox Name="CompareFile1TextBox" Watermark="Select file 1..." Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFile1, Mode=TwoWay}" />
-                <Button Name="BrowseCompareFile1Button" Content="Browse" Grid.Row="0" Grid.Column="1" Command="{Binding BrowseCompareFile1Command}" />
-                <TextBox Name="CompareFile2TextBox" Watermark="Select file 2..." Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFile2, Mode=TwoWay}" Margin="0,8,0,0" />
-                <Button Name="BrowseCompareFile2Button" Content="Browse" Grid.Row="1" Grid.Column="1" Command="{Binding BrowseCompareFile2Command}" Margin="0,8,0,0" />
-                <Button Name="CompareTwoFilesButton" Content="Compare These Files" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Stretch" Command="{Binding CompareTwoFilesCommand}" Margin="0,8,0,0" />
-                <ListBox Name="FileCompareResultsListBox" Height="100" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Stretch" Margin="0,8,0,0" />
-            </Grid>
+            <StackPanel Spacing="8" Margin="8">
+                <Grid ColumnDefinitions="*,Auto" Gap="8">
+                    <TextBox Name="CompareFile1TextBox" Watermark="Select file 1..." Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFile1, Mode=TwoWay}" />
+                    <Button Name="BrowseCompareFile1Button" Content="Browse" Grid.Column="1" Command="{Binding BrowseCompareFile1Command}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" Gap="8">
+                    <TextBox Name="CompareFile2TextBox" Watermark="Select file 2..." Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFile2, Mode=TwoWay}" />
+                    <Button Name="BrowseCompareFile2Button" Content="Browse" Grid.Column="1" Command="{Binding BrowseCompareFile2Command}" />
+                </Grid>
+                <Button Name="CompareTwoFilesButton" Content="Compare These Files" HorizontalAlignment="Stretch" Command="{Binding CompareTwoFilesCommand}" Classes="ActionButton" />
+                <ListBox Name="FileCompareResultsListBox" Height="100" HorizontalAlignment="Stretch" />
+            </StackPanel>
         </TabItem>
     </TabControl>
 </UserControl>

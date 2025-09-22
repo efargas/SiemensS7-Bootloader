@@ -711,7 +711,7 @@ namespace S7_Csharp_Utility.ViewModels
                 if (SelectionLength > 0)
                 {
                     analyzeOffset = Math.Min(SelectionStartOffset, SelectionEndOffset);
-                    analyzeLength = Math.Min((int)SelectionLength, 16); // Limit to 16 bytes for performance
+                    analyzeLength = (int)SelectionLength;
                 }
 
                 var analysis = await _hexViewerService.AnalyzeDataAsync(File1Path, analyzeOffset, analyzeLength, IsLittleEndian, _cancellationTokenSource.Token).ConfigureAwait(false);

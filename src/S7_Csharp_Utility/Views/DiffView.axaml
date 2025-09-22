@@ -2,12 +2,17 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="using:S7_Csharp_Utility.Converters"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="S7_Csharp_Utility.Views.DiffView"
-        Title="Binary File Comparison - Siemens S7 Bootloader Utility"
+        Title="File Comparison"
         MinWidth="900" MinHeight="700" Background="#1A1A1A">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+    <Window.Resources>
+        <converters:DiffLineTypeToBrushConverter x:Key="DiffLineTypeToBrushConverter"/>
+    </Window.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*">
 
         <!-- Header with Status and Progress -->
         <Border Grid.Row="0" Classes="ToolbarPanel" Padding="20,16">
@@ -21,9 +26,6 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                     <Button Content="🔄 Refresh Comparison"
                             Command="{Binding RefreshCommand}"
-                            IsEnabled="{Binding NotLoading}"/>
-                    <Button Content="📄 Export Report"
-                            Command="{Binding ExportCommand}"
                             IsEnabled="{Binding NotLoading}"/>
                 </StackPanel>
             </Grid>
@@ -56,68 +58,17 @@
             </Grid>
         </Border>
 
-        <!-- Comparison Result Indicator -->
-        <Border Grid.Row="2" Classes="StatusPanel" BorderThickness="0,1,0,1" Padding="20,12">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Grid.Column="0" Text="Binary Content Comparison"
-                           Classes="SubHeaderText" VerticalAlignment="Center"/>
-
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16">
-                    <TextBlock Text="🔄 Processing..."
-                               IsVisible="{Binding IsLoading}"/>
-                    <TextBlock Text="✅ Files Identical"
-                               IsVisible="{Binding FilesAreIdentical}"/>
-                    <TextBlock Text="⚠️ Files Different"
-                               IsVisible="{Binding NotFilesAreIdentical}"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- File Content Comparison -->
-        <Grid Grid.Row="3" ColumnDefinitions="*,2,*" Margin="20,16,20,0">
-            <Border Grid.Column="0" Classes="ContentPanel">
-                <Grid RowDefinitions="Auto,*">
-                    <Border Grid.Row="0" Classes="ToolbarPanel" BorderThickness="0,0,0,1" Padding="12,8">
-                        <TextBlock Text="File 1 - Hex Content" Classes="SubHeaderText"/>
-                    </Border>
-                    <ScrollViewer Grid.Row="1" Padding="12">
-                        <TextBox Text="{Binding File1Text}"
-                                 IsReadOnly="True"
-                                 AcceptsReturn="True"/>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
-
-            <!-- Separator -->
-            <Border Grid.Column="1" Background="#374151" CornerRadius="1"/>
-
-            <Border Grid.Column="2" Classes="ContentPanel">
-                <Grid RowDefinitions="Auto,*">
-                    <Border Grid.Row="0" Classes="ToolbarPanel" BorderThickness="0,0,0,1" Padding="12,8">
-                        <TextBlock Text="File 2 - Hex Content" Classes="SubHeaderText"/>
-                    </Border>
-                    <ScrollViewer Grid.Row="1" Padding="12">
-                        <TextBox Text="{Binding File2Text}"
-                                 IsReadOnly="True"
-                                 AcceptsReturn="True"/>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
-        </Grid>
-
-        <!-- Status Bar -->
-        <Border Grid.Row="4" Classes="StatusPanel" Padding="20,12">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Grid.Column="0" Text="{Binding ComparisonStatus}" VerticalAlignment="Center"/>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="20">
-                    <TextBlock Text="{Binding LoadingProgress, StringFormat='Progress: {0:F0}%'}"
-                               VerticalAlignment="Center"
-                               IsVisible="{Binding IsLoading}"/>
-                    <TextBlock Text="Ready" VerticalAlignment="Center"
-                               IsVisible="{Binding NotLoading}"/>
-                </StackPanel>
-            </Grid>
-        </Border>
+        <!-- Diff Content -->
+        <ListBox Grid.Row="2" ItemsSource="{Binding DiffLines}" Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="Auto,*" Background="{Binding Type, Converter={StaticResource DiffLineTypeToBrushConverter}}">
+                        <TextBlock Text="{Binding Position}" FontFamily="Consolas,Monaco,monospace" FontSize="10" Foreground="Gray" Margin="5,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas,Monaco,monospace" FontSize="12" TextWrapping="Wrap"/>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
     </Grid>
 </Window>

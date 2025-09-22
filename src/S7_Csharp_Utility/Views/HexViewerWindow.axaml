@@ -308,10 +308,7 @@
                     <TextBlock Text="🔍 Data Inspector" Classes="HeaderText" FontSize="16" Margin="0,0,0,5"/>
                     
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <CheckBox IsChecked="{Binding IsLittleEndian}" Content="Little Endian" 
-                                  Classes="DarkCheckBox"/>
-                        <Button Content="⇔ Toggle" Command="{Binding ToggleInspectorCommand}"
-                                Classes="DarkButton SecondaryButton" Padding="6,3" FontSize="10"/>
+                        <ToggleSwitch IsChecked="{Binding IsLittleEndian}" OnContent="Little Endian" OffContent="Big Endian" />
                     </StackPanel>
                     
                     <!-- Selection Actions -->

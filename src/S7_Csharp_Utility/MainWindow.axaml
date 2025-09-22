@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:S7_Csharp_Utility.ViewModels"
         xmlns:views="using:S7_Csharp_Utility.Views"
+        xmlns:behaviors="using:S7_Csharp_Utility.Behaviors"
         x:Class="S7_Csharp_Utility.MainWindow"
         Title="S7 Bootloader Utility (Cross-Platform)"
         Width="900" Height="600"
@@ -15,65 +16,65 @@
 
     <DockPanel LastChildFill="True">
         <Menu DockPanel.Dock="Top">
-            <MenuItem Header="File">
-                <MenuItem Header="Save Configuration" Command="{Binding SaveConfigurationCommand}" />
-                <MenuItem Header="Load Configuration" Command="{Binding LoadConfigurationCommand}" />
+            <MenuItem Header="{DynamicResource FileMenuHeader}">
+                <MenuItem Header="{DynamicResource SaveConfigurationMenuHeader}" Command="{Binding SaveConfigurationCommand}" />
+                <MenuItem Header="{DynamicResource LoadConfigurationMenuHeader}" Command="{Binding LoadConfigurationCommand}" />
                 <Separator/>
-                <MenuItem Header="Exit" Name="MenuExit" />
+                <MenuItem Header="{DynamicResource ExitMenuHeader}" Command="{Binding ExitCommand}" />
             </MenuItem>
-            <MenuItem Header="Preferences" />
-            <MenuItem Header="Tools">
-                <MenuItem Header="Profile Management" Name="MenuProfileManagement" />
-                <MenuItem Header="Firmware Unpacker" Name="MenuFirmwareUnpacker" />
-                <MenuItem Header="Hex Viewer" Name="MenuHexViewer" />
+            <MenuItem Header="{DynamicResource PreferencesMenuHeader}" />
+            <MenuItem Header="{DynamicResource ToolsMenuHeader}">
+                <MenuItem Header="{DynamicResource ProfileManagementMenuHeader}" Command="{Binding ShowProfileManagementCommand}" />
+                <MenuItem Header="{DynamicResource FirmwareUnpackerMenuHeader}" Command="{Binding ShowFirmwareUnpackerCommand}" />
+                <MenuItem Header="{DynamicResource HexViewerMenuHeader}" Command="{Binding ShowHexViewerCommand}" />
             </MenuItem>
-            <MenuItem Header="Help" />
+            <MenuItem Header="{DynamicResource HelpMenuHeader}" />
         </Menu>
         
         <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,Auto,*" ColumnDefinitions="*">
-            <Expander x:Name="ConfigExpander" Header="Configuration" IsExpanded="True" HorizontalAlignment="Stretch" VerticalAlignment="Top" Grid.Row="0">
+            <Expander x:Name="ConfigExpander" Header="{DynamicResource ConfigurationHeader}" IsExpanded="True" HorizontalAlignment="Stretch" VerticalAlignment="Top" Grid.Row="0" Classes="ContentPanel">
                 <TabControl HorizontalAlignment="Stretch">
-                    <TabItem Header="Connection Parameters">
+                    <TabItem Header="{DynamicResource ConnectionParametersHeader}">
                         <Grid ColumnDefinitions="2*,2*" HorizontalAlignment="Stretch">
                             <views:PlcConnectionView Grid.Column="0" DataContext="{Binding PlcConnectionViewModel}" Margin="0,0,8,0" />
                             <views:ModbusPowerSupplyView Grid.Column="1" DataContext="{Binding ModbusPowerSupplyViewModel}" Margin="8,0,0,0" />
                         </Grid>
                     </TabItem>
-                    <TabItem Header="Folders &amp; Paths">
+                    <TabItem Header="{DynamicResource FoldersAndPathsHeader}">
                         <Grid RowDefinitions="Auto,*" HorizontalAlignment="Stretch">
                             <StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
-                                    <TextBlock Text="Payloads Folder:" Width="120" />
+                                    <TextBlock Text="{DynamicResource PayloadsFolderLabel}" Width="120" Classes="LabelText" />
                                     <TextBox Name="PayloadsPathTextBox" HorizontalAlignment="Stretch" Text="{Binding ConfigurationViewModel.PayloadsPath, Mode=TwoWay}" />
-                                    <Button Content="Browse" Name="BrowsePayloadsFolderButton" Command="{Binding ConfigurationViewModel.BrowsePayloadsFolderCommand}" />
+                                    <Button Content="{DynamicResource BrowseButtonContent}" Name="BrowsePayloadsFolderButton" Command="{Binding ConfigurationViewModel.BrowsePayloadsFolderCommand}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
-                                    <TextBlock Text="Dumps Folder:" Width="120" />
+                                    <TextBlock Text="{DynamicResource DumpsFolderLabel}" Width="120" Classes="LabelText" />
                                     <TextBox Name="DumpsPathTextBox" HorizontalAlignment="Stretch" Text="{Binding ConfigurationViewModel.DumpsPath, Mode=TwoWay}" />
-                                    <Button Content="Browse" Name="BrowseDumpsFolderButton" Command="{Binding ConfigurationViewModel.BrowseDumpsFolderCommand}" />
+                                    <Button Content="{DynamicResource BrowseButtonContent}" Name="BrowseDumpsFolderButton" Command="{Binding ConfigurationViewModel.BrowseDumpsFolderCommand}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
-                                    <TextBlock Text="Logs Folder:" Width="120" />
+                                    <TextBlock Text="{DynamicResource LogsFolderLabel}" Width="120" Classes="LabelText" />
                                     <TextBox Name="LogsPathTextBox" HorizontalAlignment="Stretch" Text="{Binding ConfigurationViewModel.LogsPath, Mode=TwoWay}" />
-                                    <Button Content="Browse" Name="BrowseLogsFolderButton" Command="{Binding ConfigurationViewModel.BrowseLogsFolderCommand}" />
+                                    <Button Content="{DynamicResource BrowseButtonContent}" Name="BrowseLogsFolderButton" Command="{Binding ConfigurationViewModel.BrowseLogsFolderCommand}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
-                                    <TextBlock Text="Extraction Folder:" Width="120" />
+                                    <TextBlock Text="{DynamicResource ExtractionFolderLabel}" Width="120" Classes="LabelText" />
                                     <TextBox Name="ExtractionPathTextBox" HorizontalAlignment="Stretch" Text="{Binding ConfigurationViewModel.ExtractionPath, Mode=TwoWay}" />
-                                    <Button Content="Browse" Name="BrowseExtractionFolderButton" Command="{Binding ConfigurationViewModel.BrowseExtractionFolderCommand}" />
+                                    <Button Content="{DynamicResource BrowseButtonContent}" Name="BrowseExtractionFolderButton" Command="{Binding ConfigurationViewModel.BrowseExtractionFolderCommand}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left" Margin="0,8,0,0">
-                                    <Button Content="Save Settings" Name="SavePathsButton" Command="{Binding ConfigurationViewModel.SavePathsCommand}" />
-                                    <Button Content="Load Defaults" Name="LoadDefaultPathsButton" Command="{Binding ConfigurationViewModel.LoadDefaultPathsCommand}" />
+                                    <Button Content="{DynamicResource SaveSettingsButtonContent}" Name="SavePathsButton" Command="{Binding ConfigurationViewModel.SavePathsCommand}" Classes="ActionButton" />
+                                    <Button Content="{DynamicResource LoadDefaultsButtonContent}" Name="LoadDefaultPathsButton" Command="{Binding ConfigurationViewModel.LoadDefaultPathsCommand}" />
                                 </StackPanel>
                             </StackPanel>
                             
                             <Border Grid.Row="1" Margin="0,16,0,0" Classes="ContentPanel" Padding="8">
                                 <Grid RowDefinitions="Auto,*">
                                     <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                                        <TextBlock Text="Discovered Payloads:" FontWeight="Bold" />
+                                        <TextBlock Text="{DynamicResource DiscoveredPayloadsHeader}" Classes="HeaderText" />
                                         <TextBlock Text="{Binding DiscoveredPayloads.Count, StringFormat='({0} files)'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Text="Scanning..." IsVisible="{Binding IsScanning}" Foreground="Orange" />
+                                        <TextBlock Text="{DynamicResource ScanningLabel}" IsVisible="{Binding IsScanning}" Foreground="Orange" />
                                     </StackPanel>
                                     <DataGrid Grid.Row="1" 
                                               Name="PayloadsDataGrid"
@@ -97,21 +98,21 @@
                     </TabItem>
                 </TabControl>
             </Expander>
-            <Expander Header="Memory &amp; Compare" IsExpanded="True" Name="MemCompareExpander" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+            <Expander Header="{DynamicResource MemoryAndCompareHeader}" IsExpanded="True" Name="MemCompareExpander" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top" Classes="ContentPanel">
                 <TabControl Margin="0,8,0,0">
-                    <TabItem Header="Memory Dump">
-                        <StackPanel Margin="12">
-                            <Button Content="Load Profile" Command="{Binding LoadProfileCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
-                            <TextBlock Text="Select Region:" />
+                    <TabItem Header="{DynamicResource MemoryDumpHeader}">
+                        <StackPanel Margin="12" Spacing="8">
+                            <Button Content="{DynamicResource LoadProfileButtonContent}" Command="{Binding LoadProfileCommand}" HorizontalAlignment="Stretch" Classes="ActionButton" />
+                            <TextBlock Text="{DynamicResource SelectRegionLabel}" Classes="LabelText" />
                             <ComboBox Name="RegionComboBox" ItemsSource="{Binding MemoryRegions}" SelectedItem="{Binding SelectedMemoryRegion, Mode=TwoWay}" DisplayMemberBinding="{Binding Name}" HorizontalAlignment="Stretch" />
-                            <TextBlock Text="Address (hex):" />
+                            <TextBlock Text="{DynamicResource AddressLabel}" Classes="LabelText" />
                             <TextBox Name="DumpAddressTextBox" Text="{Binding DumpAddress, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-                            <TextBlock Text="Length (bytes):" />
+                            <TextBlock Text="{DynamicResource LengthLabel}" Classes="LabelText" />
                             <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" HorizontalAlignment="Stretch" />
                             
                             <Border Classes="InfoPanel" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
                                 <StackPanel>
-                                    <TextBlock Text="Memory Dump Progress:" FontWeight="Bold" Margin="0,0,0,4" />
+                                    <TextBlock Text="{DynamicResource MemoryDumpProgressHeader}" Classes="HeaderText" Margin="0,0,0,4" />
                                     <ProgressBar Name="DumpProgressBar" 
                                                  Value="{Binding DumpProgressPercentage}" 
                                                  Minimum="0" 
@@ -133,42 +134,44 @@
                             
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <Button Name="DumpMemoryButton" 
-                                        Content="Dump Memory" 
+                                        Content="{DynamicResource DumpMemoryButtonContent}"
                                         Command="{Binding DumpMemoryCommand}" 
                                         IsVisible="{Binding !IsDumpingMemory}"
-                                        HorizontalAlignment="Stretch" />
+                                        HorizontalAlignment="Stretch"
+                                        Classes="ActionButton" />
                                 <Button Name="CancelDumpButton" 
-                                        Content="Cancel Dump" 
+                                        Content="{DynamicResource CancelDumpButtonContent}"
                                         Command="{Binding CancelDumpCommand}" 
                                         IsVisible="{Binding IsDumpingMemory}"
                                         Background="DarkRed"
-                                        HorizontalAlignment="Stretch" />
+                                        HorizontalAlignment="Stretch"
+                                        Classes="ActionButton" />
                             </StackPanel>
                         </StackPanel>
                     </TabItem>
-                    <TabItem Header="Dump Comparison">
+                    <TabItem Header="{DynamicResource DumpComparisonHeader}">
                         <TabControl>
-                            <TabItem Header="Compare Folder">
+                            <TabItem Header="{DynamicResource CompareFolderHeader}">
                                 <StackPanel Spacing="8">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBox Name="CompareFolderTextBox" Watermark="Select folder to compare..." HorizontalAlignment="Stretch" Text="{Binding FileCompareViewModel.CompareFolder, Mode=TwoWay}" />
-                                        <Button Name="BrowseCompareFolderButton" Content="Browse" Command="{Binding FileCompareViewModel.BrowseCompareFolderCommand}" />
+                                        <Button Name="BrowseCompareFolderButton" Content="{DynamicResource BrowseButtonContent}" Command="{Binding FileCompareViewModel.BrowseCompareFolderCommand}" />
                                     </StackPanel>
-                                    <Button Name="CompareDumpsButton" Content="Start Comparison" HorizontalAlignment="Stretch" Command="{Binding FileCompareViewModel.CompareDumpsCommand}" />
+                                    <Button Name="CompareDumpsButton" Content="{DynamicResource StartComparisonButtonContent}" HorizontalAlignment="Stretch" Command="{Binding FileCompareViewModel.CompareDumpsCommand}" />
                                     <ListBox Name="ComparisonResultsListBox" Height="100" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                             </TabItem>
-                            <TabItem Header="Compare Files">
+                            <TabItem Header="{DynamicResource CompareFilesHeader}">
                                 <StackPanel Spacing="8">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBox Name="CompareFile1TextBox" Watermark="Select file 1..." HorizontalAlignment="Stretch" Text="{Binding FileCompareViewModel.CompareFile1, Mode=TwoWay}" />
-                                        <Button Name="BrowseCompareFile1Button" Content="Browse" Command="{Binding FileCompareViewModel.BrowseCompareFile1Command}" />
+                                        <Button Name="BrowseCompareFile1Button" Content="{DynamicResource BrowseButtonContent}" Command="{Binding FileCompareViewModel.BrowseCompareFile1Command}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBox Name="CompareFile2TextBox" Watermark="Select file 2..." HorizontalAlignment="Stretch" Text="{Binding FileCompareViewModel.CompareFile2, Mode=TwoWay}" />
-                                        <Button Name="BrowseCompareFile2Button" Content="Browse" Command="{Binding FileCompareViewModel.BrowseCompareFile2Command}" />
+                                        <Button Name="BrowseCompareFile2Button" Content="{DynamicResource BrowseButtonContent}" Command="{Binding FileCompareViewModel.BrowseCompareFile2Command}" />
                                     </StackPanel>
-                                    <Button Name="CompareTwoFilesButton" Content="Compare These Files" HorizontalAlignment="Stretch" Command="{Binding FileCompareViewModel.CompareTwoFilesCommand}" />
+                                    <Button Name="CompareTwoFilesButton" Content="{DynamicResource CompareTheseFilesButtonContent}" HorizontalAlignment="Stretch" Command="{Binding FileCompareViewModel.CompareTwoFilesCommand}" />
                                     <ListBox Name="FileCompareResultsListBox" Height="100" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                             </TabItem>
@@ -180,47 +183,33 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button Name="StartExploitSequenceButton" Content="Start Exploit Sequence" Grid.Column="0" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding StartExploitSequenceCommand}" />
+                <Button Name="StartExploitSequenceButton" Content="{DynamicResource StartExploitSequenceButtonContent}" Grid.Column="0" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding StartExploitSequenceCommand}" Classes="ActionButton" />
             </Grid>
-            <Border Grid.Row="3" Margin="0,12,0,0" Padding="8" Classes="InfoPanel" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+            <Border Grid.Row="3" Margin="0,12,0,0" Padding="8" Classes="ContentPanel" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                 <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="*,*">
                     <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Text="Log Categories:" Classes="HeaderText" FontSize="13" Margin="0,0,8,0" />
-                        <CheckBox Name="FilterInfoCheckBox" IsChecked="{Binding Logging.FilterInfo, Mode=TwoWay}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="[i]" Margin="0,0,5,0" />
-                                <TextBlock Text="Info" />
-                            </StackPanel>
-                        </CheckBox>
-                        <CheckBox Name="FilterErrorCheckBox" IsChecked="{Binding Logging.FilterError, Mode=TwoWay}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="[!]" Margin="0,0,5,0" />
-                                <TextBlock Text="Error" />
-                            </StackPanel>
-                        </CheckBox>
-                        <CheckBox Name="FilterDebugCheckBox" IsChecked="{Binding Logging.FilterDebug, Mode=TwoWay}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="[d]" Margin="0,0,5,0" />
-                                <TextBlock Text="Debug" />
-                            </StackPanel>
-                        </CheckBox>
+                        <TextBlock Text="{DynamicResource LogCategoriesHeader}" Classes="HeaderText" FontSize="13" Margin="0,0,8,0" />
+                        <CheckBox Name="FilterInfoCheckBox" Content="{DynamicResource InfoLogLevel}" IsChecked="{Binding Logging.FilterInfo, Mode=TwoWay}" />
+                        <CheckBox Name="FilterErrorCheckBox" Content="{DynamicResource ErrorLogLevel}" IsChecked="{Binding Logging.FilterError, Mode=TwoWay}" />
+                        <CheckBox Name="FilterDebugCheckBox" Content="{DynamicResource DebugLogLevel}" IsChecked="{Binding Logging.FilterDebug, Mode=TwoWay}" />
                     </StackPanel>
                     <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Text="Socat Log" Classes="HeaderText" FontSize="13" Margin="0,0,8,0" />
+                        <TextBlock Text="{DynamicResource SocatLogHeader}" Classes="HeaderText" FontSize="13" Margin="0,0,8,0" />
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                        <Button Name="ClearLogButton" Content="Clear Log" Width="110" Command="{Binding Logging.ClearLogCommand}"/>
-                        <Button Name="ExportLogButton" Content="Export..." Width="110" Command="{Binding Logging.ExportLogCommand}"/>
-                        <Button Name="ScrollToEndButton" Content="Scroll to End" Width="110" Command="{Binding Logging.ScrollToEndCommand}"/>
+                        <Button Name="ClearLogButton" Content="{DynamicResource ClearLogButtonContent}" Width="110" Command="{Binding Logging.ClearLogCommand}"/>
+                        <Button Name="ExportLogButton" Content="{DynamicResource ExportLogButtonContent}" Width="110" Command="{Binding Logging.ExportLogCommand}"/>
+                        <Button Name="ScrollToEndButton" Content="{DynamicResource ScrollToEndButtonContent}" Width="110" Command="{Binding Logging.ScrollToEndCommand}"/>
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Button Name="ClearSocatLogButton" Content="Clear Log" Command="{Binding SocatLogging.ClearLogCommand}"/>
-                        <Button Name="ExportSocatLogButton" Content="Export..." Command="{Binding SocatLogging.ExportLogCommand}"/>
-                        <Button Name="SocatScrollToEndButton" Content="Scroll to End" Command="{Binding SocatLogging.ScrollToEndCommand}"/>
+                        <Button Name="ClearSocatLogButton" Content="{DynamicResource ClearLogButtonContent}" Command="{Binding SocatLogging.ClearLogCommand}"/>
+                        <Button Name="ExportSocatLogButton" Content="{DynamicResource ExportLogButtonContent}" Command="{Binding SocatLogging.ExportLogCommand}"/>
+                        <Button Name="SocatScrollToEndButton" Content="{DynamicResource ScrollToEndButtonContent}" Command="{Binding SocatLogging.ScrollToEndCommand}"/>
                     </StackPanel>
                     <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                        <TextBlock Grid.Row="0" Text="Main Logger" Classes="HeaderText" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="LogListBox" Grid.Row="1" ItemsSource="{Binding Logging.LogMessages}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" MinHeight="120">
+                        <TextBlock Grid.Row="0" Text="{DynamicResource MainLoggerHeader}" Classes="HeaderText" FontSize="12" Margin="0,0,0,4" />
+                        <ListBox Name="LogListBox" Grid.Row="1" ItemsSource="{Binding Logging.LogMessages}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" MinHeight="120"
+                                 behaviors:AutoScrollBehavior.IsEnabled="True">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -233,8 +222,9 @@
                         </ListBox>
                     </Grid>
                     <Grid Grid.Row="2" Grid.Column="1" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                        <TextBlock Grid.Row="0" Text="Socat Logger" Classes="HeaderText" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="SocatLogListBox" Grid.Row="1" ItemsSource="{Binding SocatLogging.LogEntries}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" MinHeight="120">
+                        <TextBlock Grid.Row="0" Text="{DynamicResource SocatLoggerHeader}" Classes="HeaderText" FontSize="12" Margin="0,0,0,4" />
+                        <ListBox Name="SocatLogListBox" Grid.Row="1" ItemsSource="{Binding SocatLogging.LogEntries}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" MinHeight="120"
+                                 behaviors:AutoScrollBehavior.IsEnabled="True">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="8">

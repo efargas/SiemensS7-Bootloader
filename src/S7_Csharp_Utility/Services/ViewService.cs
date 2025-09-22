@@ -1,41 +1,62 @@
 using Avalonia.Controls;
 using S7_Csharp_Utility.Interfaces;
 using System;
+using Avalonia;
 
 namespace S7_Csharp_Utility.Services
 {
-    /// <summary>
-    /// Service for managing view-related operations and providing access to the main window.
-    /// </summary>
-    public sealed class ViewService : IViewService
+    public class ViewService : IViewService
     {
         private Window? _mainWindow;
+        private readonly IDialogService _dialogService;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ViewService"/> class.
-        /// </summary>
-        public ViewService()
+        public ViewService(IDialogService dialogService)
         {
+            _dialogService = dialogService;
         }
 
-        /// <summary>
-        /// Sets the main window reference for the service.
-        /// </summary>
-        /// <param name="mainWindow">The main window instance.</param>
-        /// <exception cref="ArgumentNullException">Thrown when mainWindow is null.</exception>
         public void SetMainWindow(Window mainWindow)
         {
-            _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+            _mainWindow = mainWindow;
         }
 
-        /// <summary>
-        /// Gets the main window instance.
-        /// </summary>
-        /// <returns>The main window instance.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when the main window has not been set.</exception>
         public Window GetMainWindow()
         {
-            return _mainWindow ?? throw new InvalidOperationException("Main window has not been set. Call SetMainWindow first.");
+            if (_mainWindow != null)
+                return _mainWindow;
+
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                _mainWindow = desktop.MainWindow;
+                return _mainWindow ?? throw new InvalidOperationException("Main window not found");
+            }
+
+            throw new InvalidOperationException("Unable to get main window");
+        }
+
+        public void ShowProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile> onSetActiveProfile)
+        {
+            var mainWindow = GetMainWindow();
+            new ProfileManagementWindow(configService, onSetActiveProfile).Show(mainWindow);
+        }
+
+        public void ShowFirmwareUnpackerWindow(string extractionPath)
+        {
+            var mainWindow = GetMainWindow();
+            new FirmwareUnpackerWindow(extractionPath, _dialogService).Show(mainWindow);
+        }
+
+        public void ShowHexViewerWindow()
+        {
+            new HexViewerWindow().Show();
+        }
+
+        public void Exit()
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+            {
+                lifetime.Shutdown();
+            }
         }
     }
 }

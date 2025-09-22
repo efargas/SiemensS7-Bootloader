@@ -13,7 +13,13 @@
         <StyleInclude Source="/ApplicationStyles.axaml"/>
     </Application.Styles>
     <Application.Resources>
-        <converters:LogCategoryToColorConverter x:Key="LogCategoryToColorConverter"/>
-        <converters:EnumToTabIndexConverter x:Key="EnumToTabIndexConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="/Resources/StringResources.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <converters:LogCategoryToColorConverter x:Key="LogCategoryToColorConverter"/>
+            <converters:EnumToTabIndexConverter x:Key="EnumToTabIndexConverter"/>
+            <converters:DiffLineTypeToBrushConverter x:Key="DiffLineTypeToBrushConverter"/>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

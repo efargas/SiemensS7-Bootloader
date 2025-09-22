@@ -7,6 +7,7 @@ using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.ViewModels;
 using S7.Net;
 using System;
+using Avalonia.Threading;
 
 namespace S7_Csharp_Utility
 {
@@ -19,6 +20,12 @@ namespace S7_Csharp_Utility
         /// Flag to indicate if we should test the hex viewer
         /// </summary>
         public static bool TestHexViewer { get; set; } = false;
+
+        /// <summary>
+        /// Gets the service provider.
+        /// </summary>
+        public IServiceProvider? Services { get; private set; }
+
         /// <summary>
         /// Initializes the application by loading XAML resources.
         /// </summary>
@@ -35,23 +42,61 @@ namespace S7_Csharp_Utility
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // Check if we should test the hex viewer
                 if (TestHexViewer)
                 {
                     desktop.MainWindow = new TestHexViewerWindow();
-                }
-                else
-                {
-                    // For now, keep the existing MainWindow creation pattern
-                    // TODO: Implement full dependency injection in a future update
-                    desktop.MainWindow = new MainWindow();
+                    base.OnFrameworkInitializationCompleted();
+                    return;
                 }
 
-                // Handle application exit
+                var services = new ServiceCollection();
+                ConfigureServices(services);
+                Services = services.BuildServiceProvider();
+
+                // This resolves the MainWindow, which in turn resolves its dependencies like the ViewModel.
+                desktop.MainWindow = Services.GetRequiredService<MainWindow>();
+                var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();
+
+                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartup();
+                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExit();
                 desktop.Exit += OnApplicationExit;
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        /// <summary>
+        /// Configures the services for the application.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        private void ConfigureServices(IServiceCollection services)
+        {
+            // Register Services
+            services.AddSingleton<LoggingService>(_ => new LoggingService(Dispatcher.UIThread));
+            services.AddSingleton<SocatLoggerService>(_ => new SocatLoggerService(Dispatcher.UIThread));
+            services.AddSingleton<ConfigurationService>();
+            services.AddSingleton<PayloadManager>(_ => new PayloadManager(AppContext.BaseDirectory));
+            services.AddSingleton<SocatService>();
+            services.AddSingleton<PowerController>(sp =>
+            {
+                var loggingService = sp.GetRequiredService<LoggingService>();
+                return new PowerController((message, isError) =>
+                    loggingService.Log(message, isError ? LogCategory.Error : LogCategory.Info));
+            });
+
+            // Register ViewModels
+            services.AddSingleton<MainWindowViewModel>();
+            services.AddTransient<PlcConnectionViewModel>();
+            services.AddTransient<ModbusPowerSupplyViewModel>();
+            services.AddTransient<ConfigurationViewModel>();
+            services.AddTransient<FileCompareViewModel>();
+
+            // Register the MainWindow itself. It will act as the root view.
+            services.AddSingleton<MainWindow>();
+
+            // Register services
+            services.AddSingleton<IDialogService, DialogService>();
+            services.AddSingleton<IViewService, ViewService>();
         }
 
         /// <summary>

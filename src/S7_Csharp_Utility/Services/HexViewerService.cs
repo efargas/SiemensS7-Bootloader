@@ -353,35 +353,41 @@ namespace S7_Csharp_Utility.Services
             result["UInt8"] = length >= 1 ? buffer[0] : (byte)0;
 
             // Multi-byte values
-            var bytes = new byte[Math.Min(8, length)];
-            Array.Copy(buffer, 0, bytes, 0, bytes.Length);
-
-            if (!isLittleEndian && bytes.Length > 1)
+            if (length >= 2)
             {
-                Array.Reverse(bytes);
+                var word = GetBytes(buffer, 0, 2, isLittleEndian);
+                result["Int16"] = BitConverter.ToInt16(word, 0);
+                result["UInt16"] = BitConverter.ToUInt16(word, 0);
             }
 
-            if (bytes.Length >= 2)
+            if (length >= 4)
             {
-                result["Int16"] = BitConverter.ToInt16(bytes, 0);
-                result["UInt16"] = BitConverter.ToUInt16(bytes, 0);
+                var dword = GetBytes(buffer, 0, 4, isLittleEndian);
+                result["Int32"] = BitConverter.ToInt32(dword, 0);
+                result["UInt32"] = BitConverter.ToUInt32(dword, 0);
+                result["Float"] = BitConverter.ToSingle(dword, 0);
             }
 
-            if (bytes.Length >= 4)
+            if (length >= 8)
             {
-                result["Int32"] = BitConverter.ToInt32(bytes, 0);
-                result["UInt32"] = BitConverter.ToUInt32(bytes, 0);
-                result["Float"] = BitConverter.ToSingle(bytes, 0);
-            }
-
-            if (bytes.Length >= 8)
-            {
-                result["Int64"] = BitConverter.ToInt64(bytes, 0);
-                result["UInt64"] = BitConverter.ToUInt64(bytes, 0);
-                result["Double"] = BitConverter.ToDouble(bytes, 0);
+                var qword = GetBytes(buffer, 0, 8, isLittleEndian);
+                result["Int64"] = BitConverter.ToInt64(qword, 0);
+                result["UInt64"] = BitConverter.ToUInt64(qword, 0);
+                result["Double"] = BitConverter.ToDouble(qword, 0);
             }
 
             return result;
+        }
+
+        private static byte[] GetBytes(byte[] source, int startIndex, int length, bool isLittleEndian)
+        {
+            var segment = new byte[length];
+            Array.Copy(source, startIndex, segment, 0, length);
+            if (!isLittleEndian)
+            {
+                Array.Reverse(segment);
+            }
+            return segment;
         }
 
         /// <summary>
