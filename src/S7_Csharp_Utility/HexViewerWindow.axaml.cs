@@ -46,37 +46,38 @@ namespace S7_Csharp_Utility
         private void SetupControlSynchronization()
         {
             var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
-            var hexGrid2 = this.FindControl<DataGrid>("HexDataGrid2");
+            var customHexViewer2 = this.FindControl<HexViewerControl>("CustomHexViewer2");
 
             if (customHexViewer1 != null)
             {
-                // Setup scroll synchronization for the custom control
+                // Setup scroll synchronization between custom controls
                 var scrollViewer1 = customHexViewer1.FindDescendantOfType<ScrollViewer>();
                 
-                if (hexGrid2 != null)
+                if (customHexViewer2 != null)
                 {
-                    var scrollViewer2 = hexGrid2.FindDescendantOfType<ScrollViewer>();
+                    var scrollViewer2 = customHexViewer2.FindDescendantOfType<ScrollViewer>();
                     
                     if (scrollViewer1 != null && scrollViewer2 != null)
                     {
                         scrollViewer1.ScrollChanged += (s, e) => OnScrollChanged(scrollViewer1, scrollViewer2);
                         scrollViewer2.ScrollChanged += (s, e) => OnScrollChanged(scrollViewer2, scrollViewer1);
                     }
-
-                    // Setup selection handling for the DataGrid (second panel)
-                    hexGrid2.SelectionChanged += (s, e) => HexGrid_SelectionChanged(hexGrid2);
                 }
 
-                // Subscribe to ViewModel property changes to update the custom control
+                // Subscribe to ViewModel property changes to update both custom controls
                 _viewModel.PropertyChanged += (s, e) =>
                 {
-                    if (e.PropertyName == nameof(HexViewerViewModel.SelectedOffset))
+                    if (e.PropertyName == nameof(HexViewerViewModel.SelectedOffset) ||
+                        e.PropertyName == nameof(HexViewerViewModel.SelectionStartOffset) ||
+                        e.PropertyName == nameof(HexViewerViewModel.SelectionEndOffset))
                     {
-                        customHexViewer1.UpdateButtonStyles();
+                        customHexViewer1.UpdateSelectionFromViewModel();
+                        customHexViewer2?.UpdateSelectionFromViewModel();
                     }
                     else if (e.PropertyName == nameof(HexViewerViewModel.SearchResults))
                     {
                         customHexViewer1.HighlightSearchResults(_viewModel.SearchResults);
+                        customHexViewer2?.HighlightSearchResults(_viewModel.SearchResults);
                     }
                 };
             }

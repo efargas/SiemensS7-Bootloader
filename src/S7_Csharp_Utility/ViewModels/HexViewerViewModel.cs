@@ -691,7 +691,7 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         /// <summary>
-        /// Updates the inspector panel with data analysis.
+        /// Updates the inspector panel with data analysis based on current selection.
         /// </summary>
         private async Task UpdateInspectorPanelAsync()
         {
@@ -703,23 +703,22 @@ namespace S7_Csharp_Utility.ViewModels
 
             try
             {
-                var analysis = await _hexViewerService.AnalyzeDataAsync(File1Path, SelectedOffset, 16, IsLittleEndian, _cancellationTokenSource.Token).ConfigureAwait(false);
+                // Determine the offset and length to analyze
+                long analyzeOffset = SelectedOffset;
+                int analyzeLength = 16; // Default to 16 bytes for analysis
+                
+                // If we have a selection, use the selection for analysis
+                if (SelectionLength > 0)
+                {
+                    analyzeOffset = Math.Min(SelectionStartOffset, SelectionEndOffset);
+                    analyzeLength = Math.Min((int)SelectionLength, 16); // Limit to 16 bytes for performance
+                }
+
+                var analysis = await _hexViewerService.AnalyzeDataAsync(File1Path, analyzeOffset, analyzeLength, IsLittleEndian, _cancellationTokenSource.Token).ConfigureAwait(false);
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    AsciiValue = analysis.GetValueOrDefault("ASCII", string.Empty).ToString() ?? string.Empty;
-                    Utf8Value = analysis.GetValueOrDefault("UTF8", string.Empty).ToString() ?? string.Empty;
-                    CharValue = analysis.GetValueOrDefault("Char", string.Empty).ToString() ?? string.Empty;
-                    Int8Value = (sbyte)analysis.GetValueOrDefault("Int8", (sbyte)0);
-                    UInt8Value = (byte)analysis.GetValueOrDefault("UInt8", (byte)0);
-                    Int16Value = (short)analysis.GetValueOrDefault("Int16", (short)0);
-                    UInt16Value = (ushort)analysis.GetValueOrDefault("UInt16", (ushort)0);
-                    Int32Value = (int)analysis.GetValueOrDefault("Int32", 0);
-                    UInt32Value = (uint)analysis.GetValueOrDefault("UInt32", 0u);
-                    Int64Value = (long)analysis.GetValueOrDefault("Int64", 0L);
-                    UInt64Value = (ulong)analysis.GetValueOrDefault("UInt64", 0UL);
-                    FloatValue = (float)analysis.GetValueOrDefault("Float", 0.0f);
-                    DoubleValue = (double)analysis.GetValueOrDefault("Double", 0.0);
+                    UpdateInspectorValues(analysis, analyzeLength);
                 });
             }
             catch (Exception ex)
@@ -728,6 +727,70 @@ namespace S7_Csharp_Utility.ViewModels
                 {
                     StatusText = $"❌ Inspector error: {ex.Message}";
                 });
+            }
+        }
+
+        /// <summary>
+        /// Updates inspector values based on analysis results and selection length.
+        /// </summary>
+        private void UpdateInspectorValues(Dictionary<string, object> analysis, int dataLength)
+        {
+            // String values - always show for any selection
+            AsciiValue = analysis.GetValueOrDefault("ASCII", string.Empty).ToString() ?? string.Empty;
+            Utf8Value = analysis.GetValueOrDefault("UTF8", string.Empty).ToString() ?? string.Empty;
+            
+            // Single byte values - always available
+            if (dataLength >= 1)
+            {
+                CharValue = analysis.GetValueOrDefault("Char", string.Empty).ToString() ?? string.Empty;
+                Int8Value = (sbyte)analysis.GetValueOrDefault("Int8", (sbyte)0);
+                UInt8Value = (byte)analysis.GetValueOrDefault("UInt8", (byte)0);
+            }
+            else
+            {
+                CharValue = string.Empty;
+                Int8Value = 0;
+                UInt8Value = 0;
+            }
+
+            // 2-byte values (word) - available when selection is 2+ bytes
+            if (dataLength >= 2)
+            {
+                Int16Value = (short)analysis.GetValueOrDefault("Int16", (short)0);
+                UInt16Value = (ushort)analysis.GetValueOrDefault("UInt16", (ushort)0);
+            }
+            else
+            {
+                Int16Value = 0;
+                UInt16Value = 0;
+            }
+
+            // 4-byte values (dword) - available when selection is 4+ bytes
+            if (dataLength >= 4)
+            {
+                Int32Value = (int)analysis.GetValueOrDefault("Int32", 0);
+                UInt32Value = (uint)analysis.GetValueOrDefault("UInt32", 0u);
+                FloatValue = (float)analysis.GetValueOrDefault("Float", 0.0f);
+            }
+            else
+            {
+                Int32Value = 0;
+                UInt32Value = 0;
+                FloatValue = 0.0f;
+            }
+
+            // 8-byte values (qword) - available when selection is 8+ bytes
+            if (dataLength >= 8)
+            {
+                Int64Value = (long)analysis.GetValueOrDefault("Int64", 0L);
+                UInt64Value = (ulong)analysis.GetValueOrDefault("UInt64", 0UL);
+                DoubleValue = (double)analysis.GetValueOrDefault("Double", 0.0);
+            }
+            else
+            {
+                Int64Value = 0;
+                UInt64Value = 0;
+                DoubleValue = 0.0;
             }
         }
 

@@ -2,30 +2,44 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
-using Avalonia.VisualTree;
-using S7_Csharp_Utility.Commands;
+using Avalonia.Media;
+using Avalonia.Controls.Shapes;
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.ViewModels;
 
 namespace S7_Csharp_Utility.Controls
 {
     /// <summary>
-    /// Custom hex viewer control with improved layout and multi-selection support.
+    /// Efficient hex viewer control using Canvas-based selection instead of buttons.
+    /// Provides better performance and smoother drag selection.
     /// </summary>
     public partial class HexViewerControl : UserControl
     {
-        private readonly HashSet<Button> _selectedButtons = new();
-        private readonly Dictionary<long, Button> _offsetToButtonMap = new();
-        private Button? _lastSelectedButton;
-        private bool _shiftPressed;
-        private bool _ctrlPressed;
-        private long _dragStartOffset = -1;
-        private long _lastHoveredOffset = -1;
+        private Canvas? _selectionCanvas;
+        private ItemsControl? _hexRowsContainer;
+        private ScrollViewer? _hexScrollViewer;
+        
+        // Selection state
+        private bool _isDragging;
+        private Point _dragStartPoint;
+        private long _selectionStartOffset = -1;
+        private long _selectionEndOffset = -1;
+        private readonly List<Rectangle> _selectionRectangles = new();
+        private readonly List<Rectangle> _searchResultRectangles = new();
+        
+        // Layout constants
+        private const double RowHeight = 20;
+        private const double ByteWidth = 24;
+        private const double OffsetWidth = 70;
+        private const double SeparatorWidth = 8;
+        private const double AsciiSeparatorWidth = 16;
+        
+        // Column positions for hex bytes (0-15)
+        private readonly double[] _hexColumnPositions = new double[16];
 
         public static readonly StyledProperty<ObservableCollection<HexViewerService.HexRow>> HexRowsProperty =
             AvaloniaProperty.Register<HexViewerControl, ObservableCollection<HexViewerService.HexRow>>(
@@ -37,135 +51,136 @@ namespace S7_Csharp_Utility.Controls
             set => SetValue(HexRowsProperty, value);
         }
 
-        /// <summary>
-        /// Command to handle hex cell clicks - exposed as a property for XAML binding
-        /// </summary>
-        public ICommand HexCellClickCommand { get; }
-
         public HexViewerControl()
         {
-            // Initialize the command before calling InitializeComponent
-            HexCellClickCommand = new RelayCommand(param => HandleHexCellClickCommand(param));
-            
             InitializeComponent();
+            InitializeColumnPositions();
             
-            // Handle keyboard events for modifier keys
-            KeyDown += OnKeyDown;
-            KeyUp += OnKeyUp;
-            
-            // Make the control focusable to receive keyboard events
+            // Make the control focusable for keyboard events
             Focusable = true;
+            KeyDown += OnKeyDown;
         }
 
         private void InitializeComponent()
         {
             AvaloniaXamlLoader.Load(this);
+            
+            _selectionCanvas = this.FindControl<Canvas>("SelectionCanvas");
+            _hexRowsContainer = this.FindControl<ItemsControl>("HexRowsContainer");
+            _hexScrollViewer = this.FindControl<ScrollViewer>("HexScrollViewer");
         }
 
         /// <summary>
-        /// Command handler that bridges to the actual hex cell click logic
+        /// Initialize the column positions for hex bytes
         /// </summary>
-        private void HandleHexCellClickCommand(object? parameter)
+        private void InitializeColumnPositions()
         {
-            if (parameter is long offset)
+            double currentX = OffsetWidth;
+            
+            // First 8 bytes (00-07)
+            for (int i = 0; i < 8; i++)
             {
-                // Find the button that was clicked - we need to get it from the visual tree
-                var button = FindButtonForOffset(offset);
-                if (button != null)
+                _hexColumnPositions[i] = currentX;
+                currentX += ByteWidth;
+            }
+            
+            // Add separator
+            currentX += SeparatorWidth;
+            
+            // Next 8 bytes (08-0F)
+            for (int i = 8; i < 16; i++)
+            {
+                _hexColumnPositions[i] = currentX;
+                currentX += ByteWidth;
+            }
+        }
+
+        /// <summary>
+        /// Handle pointer pressed events for selection start
+        /// </summary>
+        private void OnPointerPressed(object sender, PointerPressedEventArgs e)
+        {
+            if (_selectionCanvas == null) return;
+            
+            var position = e.GetPosition(_selectionCanvas);
+            var offset = GetOffsetFromPosition(position);
+            
+            if (offset >= 0)
+            {
+                _isDragging = true;
+                _dragStartPoint = position;
+                _selectionStartOffset = offset;
+                _selectionEndOffset = offset;
+                
+                var modifiers = e.KeyModifiers;
+                
+                if (modifiers.HasFlag(KeyModifiers.Shift) && DataContext is HexViewerViewModel viewModel && viewModel.SelectedOffset >= 0)
                 {
-                    HandleHexCellClick(button, offset);
+                    // Extend selection from current selected offset
+                    _selectionStartOffset = viewModel.SelectedOffset;
+                    _selectionEndOffset = offset;
+                }
+                else if (!modifiers.HasFlag(KeyModifiers.Control))
+                {
+                    // Start new selection
+                    _selectionStartOffset = offset;
+                    _selectionEndOffset = offset;
+                }
+                
+                UpdateSelection();
+                e.Pointer.Capture(_selectionCanvas);
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Handle pointer moved events for drag selection
+        /// </summary>
+        private void OnPointerMoved(object sender, PointerEventArgs e)
+        {
+            if (_isDragging)
+            {
+                var position = e.GetPosition(_selectionCanvas);
+                var offset = GetOffsetFromPosition(position);
+                
+                if (offset >= 0)
+                {
+                    _selectionEndOffset = offset;
+                    UpdateSelection();
+                }
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Handle pointer released events to end selection
+        /// </summary>
+        private void OnPointerReleased(object sender, PointerReleasedEventArgs e)
+        {
+            if (_isDragging)
+            {
+                _isDragging = false;
+                e.Pointer.Capture(null);
+                
+                // Update ViewModel with final selection
+                if (DataContext is HexViewerViewModel viewModel)
+                {
+                    var start = Math.Min(_selectionStartOffset, _selectionEndOffset);
+                    var end = Math.Max(_selectionStartOffset, _selectionEndOffset);
                     
-                    // Setup drag selection
-                    if (!_ctrlPressed && !_shiftPressed)
-                    {
-                        _dragStartOffset = offset;
-                    }
+                    viewModel.SelectionStartOffset = start;
+                    viewModel.SelectionEndOffset = end;
+                    viewModel.SelectedOffset = end; // Set cursor to end of selection
                 }
                 
-                // Also notify the parent ViewModel if it exists
-                if (Parent?.DataContext is HexViewerViewModel viewModel)
-                {
-                    viewModel.SelectedOffset = offset;
-                }
+                e.Handled = true;
             }
         }
 
         /// <summary>
-        /// Handles mouse enter events for drag selection
+        /// Handle keyboard navigation
         /// </summary>
-        public void HandleMouseEnter(long offset)
-        {
-            if (_dragStartOffset >= 0 && offset != _lastHoveredOffset)
-            {
-                _lastHoveredOffset = offset;
-                
-                // Perform drag selection
-                if (!_ctrlPressed && !_shiftPressed)
-                {
-                    SelectDragRange(_dragStartOffset, offset);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Handles mouse up events to end drag selection
-        /// </summary>
-        public void HandleMouseUp()
-        {
-            _dragStartOffset = -1;
-            _lastHoveredOffset = -1;
-        }
-
-        /// <summary>
-        /// Selects a range during drag operation
-        /// </summary>
-        private void SelectDragRange(long startOffset, long endOffset)
-        {
-            ClearSelection();
-            
-            var start = Math.Min(startOffset, endOffset);
-            var end = Math.Max(startOffset, endOffset);
-            
-            var allButtons = GetAllHexButtons();
-            foreach (var button in allButtons)
-            {
-                if (button.CommandParameter is long offset && offset >= start && offset <= end)
-                {
-                    SelectButton(button, offset);
-                }
-            }
-            
-            UpdateViewModelSelection();
-        }
-
-        /// <summary>
-        /// Finds the button associated with a specific offset
-        /// </summary>
-        private Button? FindButtonForOffset(long offset)
-        {
-            var allButtons = GetAllHexButtons();
-            return allButtons.FirstOrDefault(b => b.CommandParameter is long buttonOffset && buttonOffset == offset);
-        }
-
-        private void OnKeyDown(object? sender, KeyEventArgs e)
-        {
-            _shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-            _ctrlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            
-            // Handle keyboard navigation
-            HandleKeyboardNavigation(e);
-        }
-
-        private void OnKeyUp(object? sender, KeyEventArgs e)
-        {
-            _shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
-            _ctrlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        }
-
-        /// <summary>
-        /// Handles keyboard navigation within the hex viewer
-        /// </summary>
-        private void HandleKeyboardNavigation(KeyEventArgs e)
+        private void OnKeyDown(object sender, KeyEventArgs e)
         {
             if (DataContext is not HexViewerViewModel viewModel) return;
 
@@ -188,15 +203,15 @@ namespace S7_Csharp_Utility.Controls
                     newOffset = currentOffset + 16;
                     break;
                 case Key.Home:
-                    if (_ctrlPressed)
+                    if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
                         newOffset = 0; // Go to beginning of file
                     else
                         newOffset = (currentOffset / 16) * 16; // Go to beginning of line
                     break;
                 case Key.End:
-                    if (_ctrlPressed)
+                    if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
                     {
-                        // Go to end of file - find last valid offset
+                        // Go to end of file
                         var lastRow = viewModel.HexRows1.LastOrDefault();
                         if (lastRow != null)
                         {
@@ -207,21 +222,21 @@ namespace S7_Csharp_Utility.Controls
                     {
                         // Go to end of current line
                         var lineStart = (currentOffset / 16) * 16;
-                        newOffset = Math.Min(lineStart + 15, currentOffset + (15 - (currentOffset % 16)));
+                        newOffset = lineStart + 15;
                     }
                     break;
                 case Key.PageUp:
-                    newOffset = Math.Max(0, currentOffset - (16 * 10)); // Move up 10 rows
+                    newOffset = Math.Max(0, currentOffset - (16 * 10));
                     break;
                 case Key.PageDown:
-                    newOffset = currentOffset + (16 * 10); // Move down 10 rows
+                    newOffset = currentOffset + (16 * 10);
                     break;
-                case Key.A when _ctrlPressed:
+                case Key.A when e.KeyModifiers.HasFlag(KeyModifiers.Control):
                     SelectAll();
                     e.Handled = true;
                     return;
                 case Key.Escape:
-                    ClearAllSelections();
+                    ClearSelection();
                     e.Handled = true;
                     return;
                 default:
@@ -229,363 +244,308 @@ namespace S7_Csharp_Utility.Controls
                     break;
             }
 
-            if (handled && newOffset != currentOffset)
+            if (handled && newOffset != currentOffset && IsValidOffset(newOffset))
             {
-                // Validate the new offset exists
-                if (IsValidOffset(newOffset))
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
                 {
-                    var button = FindButtonForOffset(newOffset);
-                    if (button != null)
-                    {
-                        if (_shiftPressed && _lastSelectedButton != null)
-                        {
-                            // Extend selection
-                            SelectRange(_lastSelectedButton, button);
-                        }
-                        else
-                        {
-                            // Move selection
-                            ClearSelection();
-                            SelectButton(button, newOffset);
-                            _lastSelectedButton = button;
-                        }
-                        
-                        viewModel.SelectedOffset = newOffset;
-                        UpdateViewModelSelection();
-                        
-                        // Scroll to make the selected byte visible
-                        ScrollToOffset(newOffset);
-                    }
+                    // Extend selection
+                    if (viewModel.SelectionStartOffset < 0)
+                        viewModel.SelectionStartOffset = currentOffset;
+                    viewModel.SelectionEndOffset = newOffset;
                 }
+                else
+                {
+                    // Move cursor
+                    viewModel.SelectionStartOffset = newOffset;
+                    viewModel.SelectionEndOffset = newOffset;
+                }
+                
+                viewModel.SelectedOffset = newOffset;
+                UpdateSelectionFromViewModel();
+                ScrollToOffset(newOffset);
                 e.Handled = true;
             }
         }
 
         /// <summary>
-        /// Checks if an offset is valid (exists in the current data)
+        /// Get the byte offset from a canvas position
         /// </summary>
-        private bool IsValidOffset(long offset)
+        private long GetOffsetFromPosition(Point position)
         {
-            if (DataContext is not HexViewerViewModel viewModel) return false;
+            // Calculate row
+            var row = (int)(position.Y / RowHeight);
+            if (row < 0 || row >= HexRows.Count) return -1;
             
-            return viewModel.HexRows1.Any(row => row.Offsets.Contains(offset));
+            // Calculate column (byte index within row)
+            var column = GetColumnFromX(position.X);
+            if (column < 0 || column >= 16) return -1;
+            
+            // Get the actual offset from the hex row
+            var hexRow = HexRows[row];
+            if (column < hexRow.Offsets.Length)
+            {
+                return hexRow.Offsets[column];
+            }
+            
+            return -1;
         }
 
         /// <summary>
-        /// Scrolls the view to make the specified offset visible
+        /// Get the column index from X position
         /// </summary>
-        private void ScrollToOffset(long offset)
+        private int GetColumnFromX(double x)
         {
-            var scrollViewer = this.FindControl<ScrollViewer>("HexScrollViewer");
-            if (scrollViewer == null) return;
-
-            // Calculate which row contains this offset
-            var rowIndex = (int)(offset / 16);
-            var rowHeight = 20; // Height of each row
-            var targetY = rowIndex * rowHeight;
-
-            // Scroll to make the row visible
-            scrollViewer.Offset = scrollViewer.Offset.WithY(targetY);
-        }
-
-        /// <summary>
-        /// Handles hex cell button clicks with multi-selection support.
-        /// </summary>
-        public void HandleHexCellClick(Button button, long offset)
-        {
-            if (offset < 0) return;
-
-            // Update the ViewModel's selected offset
-            if (DataContext is HexViewerViewModel viewModel)
+            // Find the closest hex column
+            for (int i = 0; i < 16; i++)
             {
-                viewModel.SelectedOffset = offset;
-            }
-
-            if (_ctrlPressed)
-            {
-                // Ctrl+Click: Toggle selection
-                ToggleButtonSelection(button, offset);
-            }
-            else if (_shiftPressed && _lastSelectedButton != null)
-            {
-                // Shift+Click: Range selection
-                SelectRange(_lastSelectedButton, button);
-            }
-            else
-            {
-                // Normal click: Single selection
-                ClearSelection();
-                SelectButton(button, offset);
-            }
-
-            _lastSelectedButton = button;
-            UpdateViewModelSelection();
-        }
-
-        private void ToggleButtonSelection(Button button, long offset)
-        {
-            if (_selectedButtons.Contains(button))
-            {
-                DeselectButton(button);
-            }
-            else
-            {
-                SelectButton(button, offset);
-            }
-        }
-
-        private void SelectRange(Button startButton, Button endButton)
-        {
-            ClearSelection();
-            
-            // Find all buttons between start and end
-            var allButtons = GetAllHexButtons();
-            var startIndex = allButtons.IndexOf(startButton);
-            var endIndex = allButtons.IndexOf(endButton);
-            
-            if (startIndex >= 0 && endIndex >= 0)
-            {
-                var minIndex = Math.Min(startIndex, endIndex);
-                var maxIndex = Math.Max(startIndex, endIndex);
+                var columnStart = _hexColumnPositions[i];
+                var columnEnd = columnStart + ByteWidth;
                 
-                for (int i = minIndex; i <= maxIndex; i++)
+                if (x >= columnStart && x < columnEnd)
                 {
-                    var button = allButtons[i];
-                    if (button.CommandParameter is long offset && offset >= 0)
-                    {
-                        SelectButton(button, offset);
-                    }
+                    return i;
                 }
             }
-        }
-
-        private void SelectButton(Button button, long offset)
-        {
-            _selectedButtons.Add(button);
-            button.Classes.Add("Selected");
-        }
-
-        private void DeselectButton(Button button)
-        {
-            _selectedButtons.Remove(button);
-            button.Classes.Remove("Selected");
-            button.Classes.Remove("RangeSelected");
-        }
-
-        private void ClearSelection()
-        {
-            foreach (var button in _selectedButtons.ToList())
-            {
-                DeselectButton(button);
-            }
-            _selectedButtons.Clear();
-        }
-
-        private List<Button> GetAllHexButtons()
-        {
-            var buttons = new List<Button>();
-            var itemsControl = this.FindControl<ItemsControl>("HexRowsContainer");
             
-            if (itemsControl != null)
+            return -1;
+        }
+
+        /// <summary>
+        /// Get the position of a specific offset
+        /// </summary>
+        private Point GetPositionFromOffset(long offset)
+        {
+            // Find the row containing this offset
+            for (int rowIndex = 0; rowIndex < HexRows.Count; rowIndex++)
             {
-                for (int i = 0; i < itemsControl.ItemCount; i++)
+                var row = HexRows[rowIndex];
+                for (int colIndex = 0; colIndex < row.Offsets.Length; colIndex++)
                 {
-                    var container = itemsControl.ContainerFromIndex(i);
-                    if (container != null)
+                    if (row.Offsets[colIndex] == offset)
                     {
-                        var hexButtons = container.GetVisualDescendants().OfType<Button>()
-                            .Where(b => b.Classes.Contains("HexCell")).ToList();
-                        buttons.AddRange(hexButtons);
+                        var x = _hexColumnPositions[colIndex];
+                        var y = rowIndex * RowHeight;
+                        return new Point(x, y);
                     }
                 }
             }
             
-            return buttons;
+            return new Point(-1, -1);
         }
 
-        private void UpdateViewModelSelection()
+        /// <summary>
+        /// Update the visual selection based on current selection state
+        /// </summary>
+        private void UpdateSelection()
+        {
+            ClearSelectionRectangles();
+            
+            if (_selectionStartOffset < 0 || _selectionEndOffset < 0) return;
+            
+            var start = Math.Min(_selectionStartOffset, _selectionEndOffset);
+            var end = Math.Max(_selectionStartOffset, _selectionEndOffset);
+            
+            // Create selection rectangles for the range
+            for (long offset = start; offset <= end; offset++)
+            {
+                var position = GetPositionFromOffset(offset);
+                if (position.X >= 0 && position.Y >= 0)
+                {
+                    var rect = new Rectangle
+                    {
+                        Width = ByteWidth,
+                        Height = RowHeight,
+                        Fill = new SolidColorBrush(Color.FromArgb(80, 76, 81, 191)), // Semi-transparent blue
+                    };
+                    
+                    Canvas.SetLeft(rect, position.X);
+                    Canvas.SetTop(rect, position.Y);
+                    
+                    _selectionCanvas.Children.Add(rect);
+                    _selectionRectangles.Add(rect);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Update selection from ViewModel state
+        /// </summary>
+        public void UpdateSelectionFromViewModel()
         {
             if (DataContext is HexViewerViewModel viewModel)
             {
-                var selectedOffsets = _selectedButtons
-                    .Where(b => b.CommandParameter is long offset && offset >= 0)
-                    .Select(b => (long)b.CommandParameter!)
-                    .OrderBy(o => o)
-                    .ToList();
-
-                if (selectedOffsets.Count > 0)
-                {
-                    viewModel.SelectionStartOffset = selectedOffsets.First();
-                    viewModel.SelectionEndOffset = selectedOffsets.Last();
-                }
-                else
-                {
-                    viewModel.SelectionStartOffset = -1;
-                    viewModel.SelectionEndOffset = -1;
-                }
+                _selectionStartOffset = viewModel.SelectionStartOffset;
+                _selectionEndOffset = viewModel.SelectionEndOffset;
+                UpdateSelection();
             }
         }
 
         /// <summary>
-        /// Updates button styles based on current selection state.
+        /// Clear all selection rectangles
         /// </summary>
-        public void UpdateButtonStyles()
+        private void ClearSelectionRectangles()
         {
-            if (DataContext is not HexViewerViewModel viewModel) return;
-
-            var allButtons = GetAllHexButtons();
+            if (_selectionCanvas == null) return;
             
-            foreach (var button in allButtons)
+            foreach (var rect in _selectionRectangles)
             {
-                if (button.CommandParameter is long offset && offset >= 0)
+                _selectionCanvas.Children.Remove(rect);
+            }
+            _selectionRectangles.Clear();
+        }
+
+        /// <summary>
+        /// Highlight search results
+        /// </summary>
+        public void HighlightSearchResults(List<long> searchOffsets)
+        {
+            if (_selectionCanvas == null) return;
+            
+            // Clear existing search highlights
+            foreach (var rect in _searchResultRectangles)
+            {
+                _selectionCanvas.Children.Remove(rect);
+            }
+            _searchResultRectangles.Clear();
+            
+            // Add new search highlights
+            foreach (var offset in searchOffsets)
+            {
+                var position = GetPositionFromOffset(offset);
+                if (position.X >= 0 && position.Y >= 0)
                 {
-                    // Remove all selection classes first
-                    button.Classes.Remove("Selected");
-                    button.Classes.Remove("RangeSelected");
+                    var rect = new Rectangle
+                    {
+                        Width = ByteWidth,
+                        Height = RowHeight,
+                        Fill = new SolidColorBrush(Color.FromArgb(100, 245, 158, 11)), // Semi-transparent orange
+                    };
                     
-                    // Apply appropriate style based on selection state
-                    if (offset == viewModel.SelectedOffset)
-                    {
-                        button.Classes.Add("Selected");
-                    }
-                    else if (viewModel.IsOffsetInSelection(offset))
-                    {
-                        button.Classes.Add("RangeSelected");
-                    }
+                    Canvas.SetLeft(rect, position.X);
+                    Canvas.SetTop(rect, position.Y);
+                    
+                    _selectionCanvas.Children.Add(rect);
+                    _searchResultRectangles.Add(rect);
                 }
             }
         }
 
         /// <summary>
-        /// Selects all visible hex bytes.
-        /// </summary>
-        public void SelectAll()
-        {
-            ClearSelection();
-            var allButtons = GetAllHexButtons();
-            
-            foreach (var button in allButtons)
-            {
-                if (button.CommandParameter is long offset && offset >= 0)
-                {
-                    SelectButton(button, offset);
-                }
-            }
-            
-            if (allButtons.Count > 0)
-            {
-                _lastSelectedButton = allButtons.Last();
-            }
-            
-            UpdateViewModelSelection();
-        }
-
-        /// <summary>
-        /// Clears all selections.
-        /// </summary>
-        public void ClearAllSelections()
-        {
-            ClearSelection();
-            _lastSelectedButton = null;
-            UpdateViewModelSelection();
-        }
-
-        /// <summary>
-        /// Event handler for pointer entered on hex cells
-        /// </summary>
-        private void HexCell_PointerEntered(object? sender, PointerEventArgs e)
-        {
-            if (sender is Button button && button.CommandParameter is long offset)
-            {
-                HandleMouseEnter(offset);
-            }
-        }
-
-        /// <summary>
-        /// Event handler for pointer released on hex cells
-        /// </summary>
-        private void HexCell_PointerReleased(object? sender, PointerReleasedEventArgs e)
-        {
-            HandleMouseUp();
-        }
-
-        /// <summary>
-        /// Finds a specific byte offset and scrolls to it
+        /// Navigate to a specific offset
         /// </summary>
         public void GoToOffset(long targetOffset)
         {
             if (IsValidOffset(targetOffset))
             {
-                var button = FindButtonForOffset(targetOffset);
-                if (button != null)
+                if (DataContext is HexViewerViewModel viewModel)
                 {
-                    ClearSelection();
-                    SelectButton(button, targetOffset);
-                    _lastSelectedButton = button;
+                    viewModel.SelectedOffset = targetOffset;
+                    viewModel.SelectionStartOffset = targetOffset;
+                    viewModel.SelectionEndOffset = targetOffset;
                     
-                    if (DataContext is HexViewerViewModel viewModel)
-                    {
-                        viewModel.SelectedOffset = targetOffset;
-                    }
+                    _selectionStartOffset = targetOffset;
+                    _selectionEndOffset = targetOffset;
                     
-                    UpdateViewModelSelection();
+                    UpdateSelection();
                     ScrollToOffset(targetOffset);
                 }
             }
         }
 
         /// <summary>
-        /// Highlights search results
+        /// Scroll to make the specified offset visible
         /// </summary>
-        public void HighlightSearchResults(List<long> searchOffsets)
+        private void ScrollToOffset(long offset)
         {
-            var allButtons = GetAllHexButtons();
+            if (_hexScrollViewer == null) return;
             
-            // Clear existing search highlights
-            foreach (var button in allButtons)
+            var position = GetPositionFromOffset(offset);
+            if (position.Y >= 0)
             {
-                button.Classes.Remove("SearchResult");
-            }
-            
-            // Add search result highlights
-            foreach (var offset in searchOffsets)
-            {
-                var button = FindButtonForOffset(offset);
-                if (button != null)
-                {
-                    button.Classes.Add("SearchResult");
-                }
+                var targetY = position.Y - (_hexScrollViewer.Viewport.Height / 2);
+                _hexScrollViewer.Offset = _hexScrollViewer.Offset.WithY(Math.Max(0, targetY));
             }
         }
 
         /// <summary>
-        /// Gets the currently selected bytes as a byte array
+        /// Check if an offset is valid
+        /// </summary>
+        private bool IsValidOffset(long offset)
+        {
+            return HexRows.Any(row => row.Offsets.Contains(offset));
+        }
+
+        /// <summary>
+        /// Select all visible bytes
+        /// </summary>
+        public void SelectAll()
+        {
+            if (HexRows.Count == 0) return;
+            
+            var firstRow = HexRows.First();
+            var lastRow = HexRows.Last();
+            
+            var firstOffset = firstRow.Offsets.FirstOrDefault(o => o >= 0);
+            var lastOffset = lastRow.Offsets.LastOrDefault(o => o >= 0);
+            
+            if (firstOffset >= 0 && lastOffset >= 0)
+            {
+                _selectionStartOffset = firstOffset;
+                _selectionEndOffset = lastOffset;
+                
+                if (DataContext is HexViewerViewModel viewModel)
+                {
+                    viewModel.SelectionStartOffset = firstOffset;
+                    viewModel.SelectionEndOffset = lastOffset;
+                    viewModel.SelectedOffset = firstOffset;
+                }
+                
+                UpdateSelection();
+            }
+        }
+
+        /// <summary>
+        /// Clear all selections
+        /// </summary>
+        public void ClearSelection()
+        {
+            _selectionStartOffset = -1;
+            _selectionEndOffset = -1;
+            
+            if (DataContext is HexViewerViewModel viewModel)
+            {
+                viewModel.SelectionStartOffset = -1;
+                viewModel.SelectionEndOffset = -1;
+            }
+            
+            ClearSelectionRectangles();
+        }
+
+        /// <summary>
+        /// Get the currently selected bytes as a byte array
         /// </summary>
         public byte[] GetSelectedBytes()
         {
             if (DataContext is not HexViewerViewModel viewModel || viewModel.SelectionLength == 0)
                 return Array.Empty<byte>();
 
-            var selectedOffsets = _selectedButtons
-                .Where(b => b.CommandParameter is long offset && offset >= 0)
-                .Select(b => (long)b.CommandParameter!)
-                .OrderBy(o => o)
-                .ToList();
-
-            if (selectedOffsets.Count == 0) return Array.Empty<byte>();
-
+            var start = Math.Min(viewModel.SelectionStartOffset, viewModel.SelectionEndOffset);
+            var end = Math.Max(viewModel.SelectionStartOffset, viewModel.SelectionEndOffset);
+            
             var result = new List<byte>();
             
-            // Find the bytes from the hex rows
-            foreach (var offset in selectedOffsets)
+            for (long offset = start; offset <= end; offset++)
             {
-                var row = viewModel.HexRows1.FirstOrDefault(r => r.Offsets.Contains(offset));
-                if (row != null)
+                // Find the byte at this offset
+                foreach (var row in HexRows)
                 {
-                    var index = Array.IndexOf(row.Offsets, offset);
-                    if (index >= 0 && index < row.RawBytes.Length)
+                    for (int i = 0; i < row.Offsets.Length; i++)
                     {
-                        result.Add(row.RawBytes[index]);
+                        if (row.Offsets[i] == offset && i < row.RawBytes.Length)
+                        {
+                            result.Add(row.RawBytes[i]);
+                            break;
+                        }
                     }
                 }
             }
