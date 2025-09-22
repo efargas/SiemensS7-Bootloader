@@ -1,6 +1,7 @@
 #nullable enable
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Services;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -11,10 +12,16 @@ namespace S7_Csharp_Utility.ViewModels
     /// </summary>
     public class FileCompareViewModel : ViewModelBase
     {
-        private readonly MainWindowViewModel _mainViewModel;
         private readonly Interfaces.IDialogService _dialogService;
         private readonly LoggingService _loggingService;
         private readonly Interfaces.IViewService _viewService;
+        
+        private bool _isComparing;
+        public bool IsComparing
+        {
+            get => _isComparing;
+            set => SetProperty(ref _isComparing, value);
+        }
 
         private string _compareFolder = string.Empty;
         /// <summary>
@@ -85,9 +92,8 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Initializes a new instance of the <see cref="FileCompareViewModel"/> class.
         /// </summary>
-        public FileCompareViewModel(MainWindowViewModel mainViewModel, Interfaces.IDialogService dialogService, LoggingService loggingService, Interfaces.IViewService viewService)
+        public FileCompareViewModel(Interfaces.IDialogService dialogService, LoggingService loggingService, Interfaces.IViewService viewService)
         {
-            _mainViewModel = mainViewModel;
             _dialogService = dialogService;
             _loggingService = loggingService;
             _viewService = viewService;
@@ -107,7 +113,7 @@ namespace S7_Csharp_Utility.ViewModels
 
         private bool CanExecute()
         {
-            return !_mainViewModel.IsUploadingStager && !_mainViewModel.IsDumpingMemory && !_mainViewModel.IsComparing;
+            return !IsComparing;
         }
 
         private async Task CompareDumpsAsync()
@@ -118,15 +124,16 @@ namespace S7_Csharp_Utility.ViewModels
                 return;
             }
 
-            _mainViewModel.IsComparing = true;
+            IsComparing = true;
             try
             {
                 var comparer = new S7.Utils.DumpComparer(message => _loggingService.Log(message, LogCategory.Info));
                 var fileHashes = await comparer.ComputeFileHashesAsync(CompareFolder);
                 var report = comparer.GenerateFolderCompareReport(fileHashes, CompareFolder);
 
-                await _dialogService.ShowMessageAsync("Comparison Result", report);
-                _loggingService.Log("Comparison complete. See popup for detailed result.");
+                var resultWindow = new Views.ComparisonResultWindow(report);
+                await resultWindow.ShowDialog(_viewService.GetMainWindow());
+                _loggingService.Log("Comparison complete. Results shown in dialog.");
             }
             catch (System.Exception ex)
             {
@@ -135,7 +142,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             finally
             {
-                _mainViewModel.IsComparing = false;
+                IsComparing = false;
             }
         }
 
@@ -147,7 +154,7 @@ namespace S7_Csharp_Utility.ViewModels
                 return;
             }
 
-            _mainViewModel.IsComparing = true;
+            IsComparing = true;
             try
             {
                 _loggingService.Log($"Starting optimized comparison of files:", LogCategory.Info);
@@ -171,7 +178,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             finally
             {
-                _mainViewModel.IsComparing = false;
+                IsComparing = false;
             }
         }
     }

@@ -18,12 +18,6 @@ namespace S7_Csharp_Utility
         [STAThread]
         public static void Main(string[] args)
         {
-            // Check for test hex viewer argument
-            if (args.Length > 0 && args[0] == "--test-hex-viewer")
-            {
-                App.TestHexViewer = true;
-            }
-            
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
 

@@ -16,11 +16,7 @@ namespace S7_Csharp_Utility
     /// </summary>
     public partial class App : Application
     {
-        /// <summary>
-        /// Flag to indicate if we should test the hex viewer
-        /// </summary>
-        public static bool TestHexViewer { get; set; } = false;
-
+        
         /// <summary>
         /// Gets the service provider.
         /// </summary>
@@ -42,13 +38,6 @@ namespace S7_Csharp_Utility
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                if (TestHexViewer)
-                {
-                    desktop.MainWindow = new TestHexViewerWindow();
-                    base.OnFrameworkInitializationCompleted();
-                    return;
-                }
-
                 var services = new ServiceCollection();
                 ConfigureServices(services);
                 Services = services.BuildServiceProvider();

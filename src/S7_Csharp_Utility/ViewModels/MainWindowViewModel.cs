@@ -1,9 +1,12 @@
 #nullable enable
 using S7_Csharp_Utility.Services;
+using S7_Csharp_Utility.Commands;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using System;
 using S7.Net;
+using S7.Net.Interfaces;
+using S7.Net.Channels;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -85,9 +88,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isComparing = value;
                 OnPropertyChanged();
-                ((AsyncRelayCommand)FileCompareViewModel.CompareDumpsCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)FileCompareViewModel.CompareTwoFilesCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
+                                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
                 ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
             }
         }
@@ -211,10 +212,10 @@ namespace S7_Csharp_Utility.ViewModels
             LoadProfileCommand = new AsyncRelayCommand(_ => LoadProfileAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
             SaveConfigurationCommand = new AsyncRelayCommand(_ => SaveConfigurationOnExit(), _ => true, HandleException);
 
-            ShowProfileManagementCommand = new RelayCommand(ShowProfileManagement);
-            ShowFirmwareUnpackerCommand = new RelayCommand(ShowFirmwareUnpacker);
-            ShowHexViewerCommand = new RelayCommand(ShowHexViewer);
-            ExitCommand = new RelayCommand(Exit);
+            ShowProfileManagementCommand = new RelayCommand(_ => ShowProfileManagement());
+            ShowFirmwareUnpackerCommand = new RelayCommand(_ => ShowFirmwareUnpacker());
+            ShowHexViewerCommand = new RelayCommand(_ => ShowHexViewer());
+            ExitCommand = new RelayCommand(_ => Exit());
             
             _ = ScanPayloadsAsync();
         }
@@ -377,7 +378,7 @@ namespace S7_Csharp_Utility.ViewModels
                 });
             });
 
-            var dumpedData = await plcClient.DumpMemoryAsync(address, length, dumperPayload, progress, cancellationToken);
+            var dumpedData = await plcClient.DumpMemoryAsync(address, length, dumperPayload, progress);
             stopwatch.Stop();
             string resolvedDumpsPath = ApplicationConfiguration.ResolvePath(ConfigurationViewModel.DumpsPath, ApplicationConfiguration.GetDefaultDumpsPath());
             string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";

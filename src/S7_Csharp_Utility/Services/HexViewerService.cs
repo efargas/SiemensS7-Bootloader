@@ -152,27 +152,140 @@ namespace S7_Csharp_Utility.Services
             var results = new List<long>();
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             
+            var fileSize = stream.Length;
             var buffer = new byte[DefaultChunkSize + searchBytes.Length - 1];
             var totalBytesRead = 0L;
             var overlap = searchBytes.Length - 1;
 
-            while (totalBytesRead < stream.Length && results.Count < maxResults)
+            while (totalBytesRead < fileSize && results.Count < maxResults)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+                var bytesToRead = Math.Min(buffer.Length, (int)(fileSize - totalBytesRead));
+                var bytesRead = await stream.ReadAsync(buffer, 0, bytesToRead, cancellationToken).ConfigureAwait(false);
                 if (bytesRead == 0) break;
 
                 var matches = await Task.Run(() => FindPatternInBuffer(buffer, bytesRead, searchBytes, totalBytesRead), cancellationToken).ConfigureAwait(false);
                 results.AddRange(matches.Take(maxResults - results.Count));
 
-                totalBytesRead += bytesRead - overlap;
-                if (totalBytesRead < stream.Length)
+                // Calculate next position, ensuring we don't go backwards or get stuck
+                var nextPosition = totalBytesRead + bytesRead - overlap;
+                
+                // Ensure we make progress - if we would read the same position, advance by at least 1 byte
+                if (nextPosition <= totalBytesRead)
+                {
+                    nextPosition = totalBytesRead + 1;
+                }
+                
+                totalBytesRead = nextPosition;
+                
+                // Only seek if we haven't reached the end
+                if (totalBytesRead < fileSize)
                 {
                     stream.Seek(totalBytesRead, SeekOrigin.Begin);
                 }
 
                 progress?.Report(totalBytesRead);
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Searches for SHA1 pattern in the file.
+        /// </summary>
+        public async Task<List<long>> SearchSha1PatternAsync(string filePath, string sha1Pattern, int maxResults = 100, CancellationToken cancellationToken = default, IProgress<long>? progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(filePath);
+            ArgumentNullException.ThrowIfNull(sha1Pattern);
+
+            // SHA1 is 20 bytes (160 bits), so we expect a 40-character hex string
+            var cleanPattern = sha1Pattern.Replace(" ", "").Replace("-", "").Replace(":", "").ToUpperInvariant();
+            if (cleanPattern.Length != 40)
+            {
+                throw new ArgumentException("SHA1 pattern must be 40 hex characters (20 bytes)", nameof(sha1Pattern));
+            }
+
+            var searchBytes = ParseHexPattern(cleanPattern);
+            if (searchBytes.Length != 20)
+            {
+                throw new ArgumentException("Invalid SHA1 pattern", nameof(sha1Pattern));
+            }
+
+            return await SearchHexPatternAsync(filePath, cleanPattern, maxResults, cancellationToken, progress);
+        }
+
+        /// <summary>
+        /// Represents a search result with context information.
+        /// </summary>
+        public sealed class SearchResult
+        {
+            public long Offset { get; init; }
+            public string Context { get; init; } = string.Empty;
+            public byte[] MatchedBytes { get; init; } = Array.Empty<byte>();
+            public string Description { get; init; } = string.Empty;
+        }
+
+        /// <summary>
+        /// Searches for patterns with enhanced result information.
+        /// </summary>
+        public async Task<List<SearchResult>> SearchPatternWithContextAsync(string filePath, string pattern, bool isSha1 = false, int maxResults = 100, CancellationToken cancellationToken = default, IProgress<long>? progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(filePath);
+            ArgumentNullException.ThrowIfNull(pattern);
+
+            List<long> offsets;
+            byte[] searchBytes;
+
+            if (isSha1)
+            {
+                offsets = await SearchSha1PatternAsync(filePath, pattern, maxResults, cancellationToken, progress);
+                searchBytes = ParseHexPattern(pattern.Replace(" ", "").Replace("-", "").Replace(":", ""));
+            }
+            else
+            {
+                offsets = await SearchHexPatternAsync(filePath, pattern, maxResults, cancellationToken, progress);
+                searchBytes = ParseHexPattern(pattern);
+            }
+
+            var results = new List<SearchResult>();
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+            foreach (var offset in offsets)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Read context around the match (32 bytes before and after)
+                const int contextSize = 32;
+                var contextStart = Math.Max(0, offset - contextSize);
+                var contextLength = Math.Min(stream.Length - contextStart, contextSize * 2 + searchBytes.Length);
+
+                stream.Seek(contextStart, SeekOrigin.Begin);
+                var contextBuffer = new byte[contextLength];
+                var bytesRead = await stream.ReadAsync(contextBuffer, 0, (int)contextLength, cancellationToken);
+
+                // Create hex context string
+                var contextHex = Convert.ToHexString(contextBuffer, 0, bytesRead);
+                var formattedContext = string.Join(" ", Enumerable.Range(0, bytesRead)
+                    .Select(i => contextHex.Substring(i * 2, 2)));
+
+                // Extract the matched bytes
+                var matchStart = (int)(offset - contextStart);
+                var matchedBytes = new byte[searchBytes.Length];
+                if (matchStart >= 0 && matchStart + searchBytes.Length <= bytesRead)
+                {
+                    Array.Copy(contextBuffer, matchStart, matchedBytes, 0, searchBytes.Length);
+                }
+
+                var description = isSha1 ? "SHA1 Hash" : "Hex Pattern";
+
+                results.Add(new SearchResult
+                {
+                    Offset = offset,
+                    Context = formattedContext,
+                    MatchedBytes = matchedBytes,
+                    Description = description
+                });
             }
 
             return results;

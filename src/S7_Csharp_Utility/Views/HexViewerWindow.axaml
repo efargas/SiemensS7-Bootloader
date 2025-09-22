@@ -233,13 +233,40 @@
                 
                 <Separator Classes="DarkSeparator" Width="1" Height="24"/>
                 
-                <TextBox Width="200" Text="{Binding SearchText}" 
-                         Watermark="Hex pattern (e.g., 41 42 43)"
+                <CheckBox Content="SHA1 Search" IsChecked="{Binding IsSha1Search}" 
+                          VerticalAlignment="Center" Classes="DarkCheckBox"/>
+                
+                <TextBox Width="300" Text="{Binding SearchText}" 
+                         Watermark="{Binding SearchWatermark}"
                          Classes="DarkInput"/>
                 
                 <Button Content="🔍 Search" Command="{Binding SearchCommand}" 
                         IsEnabled="{Binding !IsLoading}" 
                         Classes="DarkButton InfoButton"/>
+                
+                <Separator Classes="DarkSeparator" Width="1" Height="24"
+                           IsVisible="{Binding HasSearchResults}"/>
+                
+                <!-- Search Navigation Controls -->
+                <StackPanel Orientation="Horizontal" Spacing="5" 
+                            IsVisible="{Binding HasSearchResults}">
+                    <Button Content="⬅️" Command="{Binding NavigateToPreviousResultCommand}" 
+                            IsEnabled="{Binding CanNavigatePrevious}"
+                            Classes="DarkButton SecondaryButton" Padding="8,6" MinWidth="32"/>
+                    
+                    <TextBlock Text="{Binding SearchResultsText}" 
+                               VerticalAlignment="Center" Classes="StatusText" FontSize="11"/>
+                    
+                    <Button Content="➡️" Command="{Binding NavigateToNextResultCommand}" 
+                            IsEnabled="{Binding CanNavigateNext}"
+                            Classes="DarkButton SecondaryButton" Padding="8,6" MinWidth="32"/>
+                    
+                    <Button Content="📋 Results" Command="{Binding ShowSearchResultsCommand}" 
+                            Classes="DarkButton InfoButton" Padding="6,4" FontSize="10"/>
+                    
+                    <Button Content="🗑️" Command="{Binding ClearSearchResultsCommand}" 
+                            Classes="DarkButton DangerButton" Padding="6,4" FontSize="10"/>
+                </StackPanel>
                 
                 <Button Content="🔄 Refresh" Command="{Binding RefreshCommand}" 
                         IsEnabled="{Binding !IsLoading}" 

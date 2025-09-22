@@ -306,8 +306,93 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _searchResults = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSearchResults));
+                OnPropertyChanged(nameof(SearchResultsText));
+                CurrentSearchResultIndex = -1;
             }
         }
+
+        private List<HexViewerService.SearchResult> _searchResultsWithContext = new();
+        /// <summary>
+        /// Gets or sets the list of search results with context information.
+        /// </summary>
+        public List<HexViewerService.SearchResult> SearchResultsWithContext
+        {
+            get => _searchResultsWithContext;
+            set
+            {
+                _searchResultsWithContext = value;
+                OnPropertyChanged();
+                SearchResults = value.Select(r => r.Offset).ToList();
+            }
+        }
+
+        private int _currentSearchResultIndex = -1;
+        /// <summary>
+        /// Gets or sets the current search result index.
+        /// </summary>
+        public int CurrentSearchResultIndex
+        {
+            get => _currentSearchResultIndex;
+            set
+            {
+                _currentSearchResultIndex = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SearchResultsText));
+                OnPropertyChanged(nameof(CanNavigatePrevious));
+                OnPropertyChanged(nameof(CanNavigateNext));
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether there are search results.
+        /// </summary>
+        public bool HasSearchResults => SearchResults.Count > 0;
+
+        /// <summary>
+        /// Gets the search results text for display.
+        /// </summary>
+        public string SearchResultsText
+        {
+            get
+            {
+                if (SearchResults.Count == 0) return "No results";
+                if (CurrentSearchResultIndex < 0) return $"{SearchResults.Count} results found";
+                return $"Result {CurrentSearchResultIndex + 1} of {SearchResults.Count}";
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether we can navigate to the previous search result.
+        /// </summary>
+        public bool CanNavigatePrevious => CurrentSearchResultIndex > 0;
+
+        /// <summary>
+        /// Gets a value indicating whether we can navigate to the next search result.
+        /// </summary>
+        public bool CanNavigateNext => CurrentSearchResultIndex < SearchResults.Count - 1;
+
+        private bool _isSha1Search;
+        /// <summary>
+        /// Gets or sets a value indicating whether the search is for SHA1 patterns.
+        /// </summary>
+        public bool IsSha1Search
+        {
+            get => _isSha1Search;
+            set
+            {
+                _isSha1Search = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SearchWatermark));
+            }
+        }
+
+        /// <summary>
+        /// Gets the search watermark text based on search type.
+        /// </summary>
+        public string SearchWatermark => IsSha1Search 
+            ? "SHA1 hash (40 hex chars, e.g., da39a3ee5e6b4b0d3255bfef95601890afd80709)"
+            : "Hex pattern (e.g., 41 42 43 or ABC)";
 
         #region Inspector Properties
         private string _asciiValue = string.Empty;
@@ -454,7 +539,26 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ICommand UpdateKeyboardModifiersCommand { get; }
 
+        /// <summary>
+        /// Navigates to the previous search result.
+        /// </summary>
+        public ICommand NavigateToPreviousResultCommand { get; }
+
+        /// <summary>
+        /// Navigates to the next search result.
+        /// </summary>
+        public ICommand NavigateToNextResultCommand { get; }
+
         
+        #endregion
+
+        #region Events
+
+        /// <summary>
+        /// Event raised when navigation to a specific offset is requested.
+        /// </summary>
+        public event Action<long>? NavigateToOffsetRequested;
+
         #endregion
 
         /// <summary>
@@ -495,6 +599,10 @@ namespace S7_Csharp_Utility.ViewModels
             CopyAsCArrayCommand = new AsyncRelayCommand(_ => CopyAsCArrayAsync(), _ => SelectionLength > 0);
             CopyAsBase64Command = new AsyncRelayCommand(_ => CopyAsBase64Async(), _ => SelectionLength > 0);
             UpdateKeyboardModifiersCommand = new RelayCommand(param => UpdateKeyboardModifiers(param));
+            
+            // Search result navigation commands
+            NavigateToPreviousResultCommand = new AsyncRelayCommand(_ => NavigateToPreviousResultAsync(), _ => CanNavigatePrevious);
+            NavigateToNextResultCommand = new AsyncRelayCommand(_ => NavigateToNextResultAsync(), _ => CanNavigateNext);
         }
 
         /// <summary>
@@ -502,7 +610,9 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         /// <param name="filePath">The path to the file to load.</param>
         /// <param name="gridNumber">The grid number (1 or 2).</param>
-        public async Task LoadFileAsync(string filePath, int gridNumber = 1)
+        /// <param name="startOffset">The starting offset to load from (default: 0).</param>
+        /// <param name="maxRows">The maximum number of rows to load (default: MaxDisplayRows).</param>
+        public async Task LoadFileAsync(string filePath, int gridNumber = 1, long startOffset = 0, int maxRows = -1)
         {
             if (string.IsNullOrEmpty(filePath))
             {
@@ -522,9 +632,22 @@ namespace S7_Csharp_Utility.ViewModels
                 await Dispatcher.UIThread.InvokeAsync(() => collection.Clear());
 
                 // Load file information
+                var fileInfoLocal = new FileInfo(filePath);
+                var fileSize = fileInfoLocal.Length;
+                
                 var progress = new Progress<long>(bytes =>
                 {
-                    Dispatcher.UIThread.Post(() => LoadingProgress = Math.Min(50, (bytes / 1024.0 / 1024.0) * 10));
+                    Dispatcher.UIThread.Post(() => 
+                    {
+                        if (fileSize > 0)
+                        {
+                            LoadingProgress = Math.Min(50.0, (double)bytes / fileSize * 50.0);
+                        }
+                        else
+                        {
+                            LoadingProgress = 0;
+                        }
+                    });
                 });
 
                 var fileInfo = await _hexViewerService.GetFileInfoAsync(filePath, _cancellationTokenSource.Token, progress);
@@ -545,12 +668,13 @@ namespace S7_Csharp_Utility.ViewModels
                 });
 
                 // Load hex data
+                var actualMaxRows = maxRows > 0 ? maxRows : MaxDisplayRows;
                 var rowProgress = new Progress<int>(rows =>
                 {
-                    Dispatcher.UIThread.Post(() => LoadingProgress = 60 + (rows / (double)MaxDisplayRows) * 40);
+                    Dispatcher.UIThread.Post(() => LoadingProgress = 60 + (rows / (double)actualMaxRows) * 40);
                 });
 
-                var hexRows = await _hexViewerService.LoadHexDataAsync(filePath, 0, MaxDisplayRows, _cancellationTokenSource.Token, rowProgress);
+                var hexRows = await _hexViewerService.LoadHexDataAsync(filePath, startOffset, actualMaxRows, _cancellationTokenSource.Token, rowProgress);
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -631,9 +755,23 @@ namespace S7_Csharp_Utility.ViewModels
                 IsLoading = true;
                 StatusText = "Searching...";
 
-                var progress = new Progress<long>(bytes =>
+                // Get file size for proper progress calculation
+                var fileInfo = new FileInfo(File1Path);
+                var fileSize = fileInfo.Length;
+
+                var progress = new Progress<long>(bytesProcessed =>
                 {
-                    Dispatcher.UIThread.Post(() => LoadingProgress = (bytes / 1024.0 / 1024.0) * 10);
+                    Dispatcher.UIThread.Post(() => 
+                    {
+                        if (fileSize > 0)
+                        {
+                            LoadingProgress = Math.Min(100.0, (double)bytesProcessed / fileSize * 100.0);
+                        }
+                        else
+                        {
+                            LoadingProgress = 0;
+                        }
+                    });
                 });
 
                 var results = await _hexViewerService.SearchHexPatternAsync(File1Path, SearchText, 100, _cancellationTokenSource.Token, progress).ConfigureAwait(false);
@@ -645,7 +783,8 @@ namespace S7_Csharp_Utility.ViewModels
                     {
                         StatusText = $"✅ Found {results.Count} matches";
                         // Navigate to first match
-                        SelectedOffset = results[0];
+                        CurrentSearchResultIndex = 0;
+                        _ = NavigateToSearchResultAsync(0);
                     }
                     else
                     {
@@ -1219,6 +1358,73 @@ namespace S7_Csharp_Utility.ViewModels
                     _shiftKeyPressed = bool.Parse(parts[0]);
                     _ctrlKeyPressed = bool.Parse(parts[1]);
                 }
+            }
+        }
+
+        #endregion
+
+        #region Search Result Navigation Methods
+
+        /// <summary>
+        /// Navigates to the previous search result.
+        /// </summary>
+        private async Task NavigateToPreviousResultAsync()
+        {
+            if (CurrentSearchResultIndex > 0)
+            {
+                CurrentSearchResultIndex--;
+                await NavigateToSearchResultAsync(CurrentSearchResultIndex);
+            }
+        }
+
+        /// <summary>
+        /// Navigates to the next search result.
+        /// </summary>
+        private async Task NavigateToNextResultAsync()
+        {
+            if (CurrentSearchResultIndex < SearchResults.Count - 1)
+            {
+                CurrentSearchResultIndex++;
+                await NavigateToSearchResultAsync(CurrentSearchResultIndex);
+            }
+        }
+
+        /// <summary>
+        /// Navigates to a specific search result by index.
+        /// </summary>
+        private async Task NavigateToSearchResultAsync(int index)
+        {
+            if (index < 0 || index >= SearchResults.Count)
+            {
+                return;
+            }
+
+            var targetOffset = SearchResults[index];
+            
+            try
+            {
+                StatusText = $"Navigating to result {index + 1} of {SearchResults.Count}...";
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    // Set the selected offset to highlight the search result
+                    SelectedOffset = targetOffset;
+                    SelectionStartOffset = targetOffset;
+                    SelectionEndOffset = targetOffset;
+                    
+                    // Trigger navigation to offset event
+                    NavigateToOffsetRequested?.Invoke(targetOffset);
+                    
+                    // Update status
+                    StatusText = $"✅ Result {index + 1} of {SearchResults.Count} at offset 0x{targetOffset:X8}";
+                });
+            }
+            catch (Exception ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusText = $"❌ Navigation error: {ex.Message}";
+                });
             }
         }
 

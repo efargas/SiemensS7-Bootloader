@@ -28,7 +28,7 @@ namespace S7_Csharp_Utility
         public HexViewerWindow(string filePath)
         {
             InitializeComponent();
-            _viewModel = new HexViewerViewModel(new DialogService(this));
+            _viewModel = new HexViewerViewModel(new DialogService());
             DataContext = _viewModel;
 
             // Load initial file if provided
@@ -79,6 +79,12 @@ namespace S7_Csharp_Utility
                         customHexViewer1.HighlightSearchResults(_viewModel.SearchResults);
                         customHexViewer2?.HighlightSearchResults(_viewModel.SearchResults);
                     }
+                };
+
+                // Subscribe to navigation events from the ViewModel
+                _viewModel.NavigateToOffsetRequested += async (targetOffset) =>
+                {
+                    await NavigateToOffsetAsync(targetOffset);
                 };
             }
         }
@@ -175,12 +181,53 @@ namespace S7_Csharp_Utility
         }
 
         /// <summary>
+        /// Navigates to a specific offset by loading the appropriate data chunk and scrolling to the target.
+        /// </summary>
+        /// <param name="targetOffset">The target offset to navigate to.</param>
+        private async System.Threading.Tasks.Task NavigateToOffsetAsync(long targetOffset)
+        {
+            if (string.IsNullOrEmpty(_viewModel.File1Path))
+                return;
+
+            try
+            {
+                // Check if the target offset is already visible in the current data
+                var isOffsetVisible = _viewModel.HexRows1.Any(row => 
+                    row.Offsets.Any(offset => offset == targetOffset));
+
+                if (!isOffsetVisible)
+                {
+                    // Need to load data around the target offset
+                    const int hexBytesPerLine = 16;
+                    const int maxDisplayRows = 10000;
+                    
+                    // Calculate start offset to center the target in the view
+                    var rowsToShow = maxDisplayRows / 2;
+                    var startOffset = Math.Max(0, targetOffset - (rowsToShow * hexBytesPerLine));
+                    
+                    // Align to row boundary (16-byte boundary)
+                    startOffset = (startOffset / hexBytesPerLine) * hexBytesPerLine;
+
+                    // Load the data chunk
+                    await _viewModel.LoadFileAsync(_viewModel.File1Path, 1, startOffset, maxDisplayRows);
+                }
+
+                // Now navigate to the offset in the control
+                var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
+                customHexViewer1?.GoToOffset(targetOffset);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error navigating to offset: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Handles the Go To Offset command by navigating to the specified offset in the custom control.
         /// </summary>
         public void GoToOffset(long offset)
         {
-            var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
-            customHexViewer1?.GoToOffset(offset);
+            _ = NavigateToOffsetAsync(offset);
         }
 
         /// <summary>
