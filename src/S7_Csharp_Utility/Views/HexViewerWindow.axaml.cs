@@ -11,7 +11,6 @@ namespace S7_Csharp_Utility
     public partial class HexViewerWindow : Window
     {
         private readonly HexViewerViewModel _viewModel;
-        private bool _isSyncingScroll;
 
         public HexViewerWindow() : this(string.Empty) { }
 
@@ -23,7 +22,7 @@ namespace S7_Csharp_Utility
 
             if (!string.IsNullOrEmpty(filePath))
             {
-                _ = _viewModel.LoadFileAsync(filePath);
+                _ = _viewModel.LoadFileAsync(1, filePath);
             }
 
             SetupControlSynchronization();
@@ -36,52 +35,17 @@ namespace S7_Csharp_Utility
 
             if (customHexViewer1 != null)
             {
-                var scrollViewer1 = customHexViewer1.FindDescendantOfType<ScrollViewer>();
-                
-                if (customHexViewer2 != null)
+                _viewModel.NavigateToOffsetRequested += (offset) =>
                 {
-                    var scrollViewer2 = customHexViewer2.FindDescendantOfType<ScrollViewer>();
-                    
-                    if (scrollViewer1 != null && scrollViewer2 != null)
+                    customHexViewer1.ScrollToOffset(offset);
+                    if (customHexViewer2 != null)
                     {
-                        scrollViewer1.ScrollChanged += (s, e) => OnScrollChanged(scrollViewer1, scrollViewer2);
-                        scrollViewer2.ScrollChanged += (s, e) => OnScrollChanged(scrollViewer2, scrollViewer1);
-                    }
-                }
-
-                _viewModel.PropertyChanged += (s, e) =>
-                {
-                    if (e.PropertyName == nameof(HexViewerViewModel.SelectedOffset) ||
-                        e.PropertyName == nameof(HexViewerViewModel.SelectionStartOffset) ||
-                        e.PropertyName == nameof(HexViewerViewModel.SelectionEndOffset))
-                    {
-                        customHexViewer1.UpdateSelectionFromViewModel();
-                        customHexViewer2?.UpdateSelectionFromViewModel();
+                        customHexViewer2.ScrollToOffset(offset);
                     }
                 };
             }
         }
 
-        private void OnScrollChanged(ScrollViewer source, ScrollViewer target)
-        {
-            if (_isSyncingScroll || !_viewModel.IsSynchronizationEnabled) return;
-
-            _isSyncingScroll = true;
-            try
-            {
-                target.Offset = source.Offset;
-            }
-            finally
-            {
-                _isSyncingScroll = false;
-            }
-        }
-
-        public byte[] GetSelectedBytes()
-        {
-            var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
-            return customHexViewer1?.GetSelectedBytes() ?? Array.Empty<byte>();
-        }
 
         protected override void OnClosed(EventArgs e)
         {

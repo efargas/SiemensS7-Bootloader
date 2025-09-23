@@ -7,6 +7,7 @@ using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.ViewModels;
 using S7.Net;
 using System;
+using System.Linq;
 using Avalonia.Threading;
 
 namespace S7_Csharp_Utility
@@ -21,6 +22,9 @@ namespace S7_Csharp_Utility
         /// Gets the service provider.
         /// </summary>
         public IServiceProvider? Services { get; private set; }
+
+        public string[] HexHeader { get; } = Enumerable.Range(0, 16).Select(i => $"{i:X2}").ToArray();
+
 
         /// <summary>
         /// Initializes the application by loading XAML resources.

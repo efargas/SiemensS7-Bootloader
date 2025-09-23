@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 
 namespace S7_Csharp_Utility.Services
 {
+    public enum SearchType { Hex, SHA1, Text }
+
     public sealed class HexViewerService
     {
         private const int DefaultChunkSize = 64 * 1024;
@@ -191,6 +193,49 @@ namespace S7_Csharp_Utility.Services
             }
             
             return $"{number:n1} {suffixes[counter]}";
+        }
+
+        public async Task SearchAsync(
+            VirtualizingHexList hexList,
+            string searchText,
+            SearchType searchType,
+            IProgress<long> progress,
+            CancellationToken cancellationToken)
+        {
+            await Task.Run(() =>
+            {
+                if (string.IsNullOrEmpty(searchText) || hexList == null)
+                {
+                    return;
+                }
+
+                byte[] pattern;
+                try
+                {
+                    pattern = searchType switch
+                    {
+                        SearchType.Hex => Convert.FromHexString(searchText.Replace(" ", "").Replace("0x", "")),
+                        SearchType.SHA1 => Convert.FromHexString(searchText.Replace(" ", "").Replace("0x", "")),
+                        SearchType.Text => Encoding.UTF8.GetBytes(searchText),
+                        _ => throw new NotSupportedException($"Search type {searchType} is not supported.")
+                    };
+                }
+                catch (FormatException)
+                {
+                    return; // Invalid hex, do nothing.
+                }
+
+                if (pattern.Length == 0)
+                {
+                    return;
+                }
+
+                foreach (var offset in hexList.Search(pattern, 0, cancellationToken))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    progress.Report(offset);
+                }
+            }, cancellationToken);
         }
     }
 }

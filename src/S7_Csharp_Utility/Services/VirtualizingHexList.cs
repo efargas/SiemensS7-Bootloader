@@ -101,6 +101,56 @@ namespace S7_Csharp_Utility.Services
             return buffer;
         }
 
+        public IEnumerable<long> Search(byte[] pattern, long startOffset, CancellationToken cancellationToken)
+        {
+            if (pattern == null || pattern.Length == 0 || FileSize < pattern.Length)
+                yield break;
+
+            long endOffset = FileSize - pattern.Length + 1;
+            int patternLength = pattern.Length;
+            const int bufferSize = 4 * 1024 * 1024; // 4MB
+            byte[] buffer = new byte[bufferSize];
+
+            long currentOffset = startOffset;
+
+            while (currentOffset < endOffset)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                int bytesToRead = (int)Math.Min(bufferSize, FileSize - currentOffset);
+                _accessor.ReadArray(currentOffset, buffer, 0, bytesToRead);
+
+                int searchLimit = bytesToRead - patternLength + 1;
+                for (int i = 0; i < searchLimit; i++)
+                {
+                    bool match = true;
+                    for (int j = 0; j < patternLength; j++)
+                    {
+                        if (buffer[i + j] != pattern[j])
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+
+                    if (match)
+                    {
+                        yield return currentOffset + i;
+                    }
+                }
+
+                long nextOffset = currentOffset + bytesToRead - (patternLength - 1);
+                if (nextOffset <= currentOffset)
+                {
+                    currentOffset++;
+                }
+                else
+                {
+                    currentOffset = nextOffset;
+                }
+            }
+        }
+
         public void Dispose()
         {
             _accessor.Dispose();

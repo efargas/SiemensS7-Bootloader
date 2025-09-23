@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,7 @@ using Avalonia;
 using Avalonia.Threading;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using S7_Csharp_Utility.Models;
 
 namespace S7_Csharp_Utility.ViewModels
 {
@@ -21,16 +23,29 @@ namespace S7_Csharp_Utility.ViewModels
     {
         private readonly HexViewerService _hexViewerService;
         private readonly IDialogService _dialogService;
-        private readonly CancellationTokenSource _cancellationTokenSource;
+        private CancellationTokenSource _cancellationTokenSource;
 
-        private bool _isSelecting = false;
-        private long _selectionAnchor = -1;
-        private bool _shiftKeyPressed = false;
-        private bool _ctrlKeyPressed = false;
-        private readonly HashSet<long> _multiSelection = new();
+        private IList<HexViewerService.HexRow>? _hexRows1;
+        public IList<HexViewerService.HexRow>? HexRows1
+        {
+            get => _hexRows1;
+            set
+            {
+                _hexRows1 = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public IList<HexViewerService.HexRow>? HexRows1 { get; private set; }
-        public IList<HexViewerService.HexRow>? HexRows2 { get; private set; }
+        private IList<HexViewerService.HexRow>? _hexRows2;
+        public IList<HexViewerService.HexRow>? HexRows2
+        {
+            get => _hexRows2;
+            set
+            {
+                _hexRows2 = value;
+                OnPropertyChanged();
+            }
+        }
 
         private string _file1Path = string.Empty;
         public string File1Path
@@ -203,6 +218,76 @@ namespace S7_Csharp_Utility.ViewModels
             return offset >= start && offset <= end;
         }
 
+        private HexViewerService.HexRow? _selectedRow;
+        public HexViewerService.HexRow? SelectedRow
+        {
+            get => _selectedRow;
+            set
+            {
+                _selectedRow = value;
+                if (value != null)
+                {
+                    SelectedOffset = value.ByteOffset;
+                }
+                OnPropertyChanged();
+            }
+        }
+
+        #region Search Properties
+        private string _searchText = string.Empty;
+        public string SearchText
+        {
+            get => _searchText;
+            set
+            {
+                _searchText = value;
+                OnPropertyChanged();
+                ((AsyncRelayCommand)SearchCommand).RaiseCanExecuteChanged();
+            }
+        }
+
+        private bool _isSearching;
+        public bool IsSearching
+        {
+            get => _isSearching;
+            set
+            {
+                _isSearching = value;
+                OnPropertyChanged();
+                ((AsyncRelayCommand)SearchCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)StopSearchCommand).RaiseCanExecuteChanged();
+            }
+        }
+
+        public ObservableCollection<Models.SearchResult> SearchResults { get; } = new();
+
+        private Models.SearchResult? _selectedSearchResult;
+        public Models.SearchResult? SelectedSearchResult
+        {
+            get => _selectedSearchResult;
+            set
+            {
+                _selectedSearchResult = value;
+                OnPropertyChanged();
+                if (value != null)
+                {
+                    NavigateToOffsetRequested?.Invoke(value.Offset);
+                }
+            }
+        }
+
+        private SearchType _searchType;
+        public SearchType SearchType
+        {
+            get => _searchType;
+            set { _searchType = value; OnPropertyChanged(); }
+        }
+
+        public IEnumerable<SearchType> SearchTypes => Enum.GetValues(typeof(SearchType)).Cast<SearchType>();
+
+        public int SearchPatternLength { get; private set; } = 0;
+        #endregion
+
         #region Inspector Properties
         private string _asciiValue = string.Empty;
         public string AsciiValue { get => _asciiValue; set => SetProperty(ref _asciiValue, value); }
@@ -247,12 +332,7 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand LoadFirstFileCommand { get; }
         public ICommand LoadSecondFileCommand { get; }
         public ICommand ExportSelectionCommand { get; }
-        public ICommand RefreshCommand { get; }
         public ICommand ToggleInspectorCommand { get; }
-        public ICommand SetSelectedOffsetCommand { get; }
-        public ICommand HexCellMouseDownCommand { get; }
-        public ICommand HexCellMouseEnterCommand { get; }
-        public ICommand HexCellMouseUpCommand { get; }
         public ICommand CopySelectionCommand { get; }
         public ICommand CopyAsHexCommand { get; }
         public ICommand CopyAsAsciiCommand { get; }
@@ -261,44 +341,51 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand ExportToFileCommand { get; }
         public ICommand CopyAsCArrayCommand { get; }
         public ICommand CopyAsBase64Command { get; }
-        public ICommand UpdateKeyboardModifiersCommand { get; }
-        
+        public ICommand SearchCommand { get; }
+        public ICommand StopSearchCommand { get; }
+        public ICommand ClearSearchCommand { get; }
+        public ICommand NavigateToNextResultCommand { get; }
+        public ICommand NavigateToPreviousResultCommand { get; }
+
+        public event Action<long>? NavigateToOffsetRequested;
+
         public HexViewerViewModel(IDialogService dialogService)
         {
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _hexViewerService = new HexViewerService();
             _cancellationTokenSource = new CancellationTokenSource();
 
-            LoadFirstFileCommand = new AsyncRelayCommand(_ => LoadFirstFileAsync(), _ => !IsLoading);
-            LoadSecondFileCommand = new AsyncRelayCommand(_ => LoadSecondFileAsync(), _ => !IsLoading && IsSideBySideMode);
-            ExportSelectionCommand = new AsyncRelayCommand(_ => ExportSelectionAsync(), _ => !IsLoading && SelectionLength > 0);
-            RefreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), _ => !IsLoading);
+            LoadFirstFileCommand = new AsyncRelayCommand(async _ => await LoadFileAsync(1, null), _ => !IsLoading);
+            LoadSecondFileCommand = new AsyncRelayCommand(async _ => await LoadFileAsync(2, null), _ => !IsLoading && IsSideBySideMode);
+            ExportSelectionCommand = new AsyncRelayCommand(ExportSelectionAsync, _ => !IsLoading && SelectionLength > 0);
             ToggleInspectorCommand = new RelayCommand(_ => IsInspectorVisible = !IsInspectorVisible);
-            SetSelectedOffsetCommand = new RelayCommand(param => HandleCellClick(param));
             
-            HexCellMouseDownCommand = new RelayCommand(param => HandleMouseDown(param));
-            HexCellMouseEnterCommand = new RelayCommand(param => HandleMouseEnter(param));
-            HexCellMouseUpCommand = new RelayCommand(param => HandleMouseUp(param));
+            CopySelectionCommand = new AsyncRelayCommand(CopySelectionAsync, _ => SelectionLength > 0);
+            CopyAsHexCommand = new AsyncRelayCommand(CopyAsHexAsync, _ => SelectionLength > 0);
+            CopyAsAsciiCommand = new AsyncRelayCommand(CopyAsAsciiAsync, _ => SelectionLength > 0);
             
-            CopySelectionCommand = new AsyncRelayCommand(_ => CopySelectionAsync(), _ => SelectionLength > 0);
-            CopyAsHexCommand = new AsyncRelayCommand(_ => CopyAsHexAsync(), _ => SelectionLength > 0);
-            CopyAsAsciiCommand = new AsyncRelayCommand(_ => CopyAsAsciiAsync(), _ => SelectionLength > 0);
+            SelectAllCommand = new RelayCommand(SelectAll, _ => HexRows1 != null && HexRows1.Count > 0);
+            ClearSelectionCommand = new RelayCommand(ClearSelection, _ => SelectionLength > 0);
             
-            SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => HexRows1 != null && HexRows1.Count > 0);
-            ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => SelectionLength > 0);
-            
-            ExportToFileCommand = new AsyncRelayCommand(_ => ExportToFileAsync(), _ => SelectionLength > 0);
-            CopyAsCArrayCommand = new AsyncRelayCommand(_ => CopyAsCArrayAsync(), _ => SelectionLength > 0);
-            CopyAsBase64Command = new AsyncRelayCommand(_ => CopyAsBase64Async(), _ => SelectionLength > 0);
-            UpdateKeyboardModifiersCommand = new RelayCommand(param => UpdateKeyboardModifiers(param));
+            ExportToFileCommand = new AsyncRelayCommand(ExportToFileAsync, _ => SelectionLength > 0);
+            CopyAsCArrayCommand = new AsyncRelayCommand(CopyAsCArrayAsync, _ => SelectionLength > 0);
+            CopyAsBase64Command = new AsyncRelayCommand(CopyAsBase64Async, _ => SelectionLength > 0);
+
+            SearchCommand = new AsyncRelayCommand(SearchAsync, _ => !IsSearching && !string.IsNullOrWhiteSpace(SearchText));
+            StopSearchCommand = new RelayCommand(StopSearch, _ => IsSearching);
+            ClearSearchCommand = new RelayCommand(ClearSearch);
+            NavigateToNextResultCommand = new RelayCommand(NavigateToNextResult, _ => SearchResults.Count > 0);
+            NavigateToPreviousResultCommand = new RelayCommand(NavigateToPreviousResult, _ => SearchResults.Count > 0);
         }
 
-        public async Task LoadFileAsync(string filePath, int gridNumber = 1)
+        public async Task LoadFileAsync(int gridNumber, string? filePath = null)
         {
             if (string.IsNullOrEmpty(filePath))
             {
-                return;
+                filePath = await _dialogService.ShowOpenFileDialogAsync("Select File to View", "*", "All Files").ConfigureAwait(false);
             }
+
+            if (filePath == null) return;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -348,57 +435,21 @@ namespace S7_Csharp_Utility.ViewModels
             }
             catch (OperationCanceledException)
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    StatusText = "❌ Loading cancelled";
-                });
+                StatusText = "❌ Loading cancelled";
             }
             catch (Exception ex)
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    StatusText = $"❌ Error loading file: {ex.Message}";
-                });
+                StatusText = $"❌ Error loading file: {ex.Message}";
             }
             finally
             {
-                await Dispatcher.UIThread.InvokeAsync(() => IsLoading = false);
+                IsLoading = false;
             }
         }
 
-        private async Task LoadFirstFileAsync()
-        {
-            var filePath = await _dialogService.ShowOpenFileDialogAsync("Select File to View", "*", "All Files").ConfigureAwait(false);
-            if (filePath != null)
-            {
-                await LoadFileAsync(filePath);
-            }
-        }
-
-        private async Task LoadSecondFileAsync()
-        {
-            var filePath = await _dialogService.ShowOpenFileDialogAsync("Select Second File", "*", "All Files").ConfigureAwait(false);
-            if (filePath != null)
-            {
-                await LoadFileAsync(filePath, 2);
-            }
-        }
-
-        private async Task ExportSelectionAsync()
+        private async Task ExportSelectionAsync(object? _ = null)
         {
             await _dialogService.ShowMessageAsync("Export", "Export functionality not yet implemented").ConfigureAwait(false);
-        }
-
-        private async Task RefreshAsync()
-        {
-            if (!string.IsNullOrEmpty(File1Path))
-            {
-                await LoadFileAsync(File1Path);
-            }
-            if (!string.IsNullOrEmpty(File2Path) && IsSideBySideMode)
-            {
-                await LoadFileAsync(File2Path, 2);
-            }
         }
 
         private async Task UpdateInspectorPanelAsync()
@@ -423,19 +474,12 @@ namespace S7_Csharp_Utility.ViewModels
                 if (HexRows1 is VirtualizingHexList virtualizingHexList)
                 {
                     var analysis = await _hexViewerService.AnalyzeDataAsync(virtualizingHexList, analyzeOffset, analyzeLength, IsLittleEndian, _cancellationTokenSource.Token).ConfigureAwait(false);
-
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        UpdateInspectorValues(analysis, analyzeLength);
-                    });
+                    UpdateInspectorValues(analysis, analyzeLength);
                 }
             }
             catch (Exception ex)
             {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    StatusText = $"❌ Inspector error: {ex.Message}";
-                });
+                StatusText = $"❌ Inspector error: {ex.Message}";
             }
         }
 
@@ -525,112 +569,34 @@ namespace S7_Csharp_Utility.ViewModels
 
         #region Range Selection Methods
 
-        private void HandleCellClick(object? parameter)
-        {
-            if (parameter is not long offset || offset < 0) return;
-
-            var shiftPressed = _shiftKeyPressed;
-            var ctrlPressed = _ctrlKeyPressed;
-
-            if (shiftPressed && _selectionAnchor >= 0)
-            {
-                SelectionStartOffset = _selectionAnchor;
-                SelectionEndOffset = offset;
-                SelectedOffset = offset;
-            }
-            else if (ctrlPressed)
-            {
-                StartNewSelection(offset);
-            }
-            else
-            {
-                StartNewSelection(offset);
-            }
-
-            UpdateStatusText();
-        }
-
-        private void HandleMouseDown(object? parameter)
-        {
-            if (parameter is not long offset || offset < 0) return;
-
-            _isSelecting = true;
-            _selectionAnchor = offset;
-            StartNewSelection(offset);
-        }
-
-        private void HandleMouseEnter(object? parameter)
-        {
-            if (!_isSelecting || parameter is not long offset || offset < 0) return;
-
-            SelectionStartOffset = _selectionAnchor;
-            SelectionEndOffset = offset;
-            SelectedOffset = offset;
-            UpdateStatusText();
-        }
-
-        private void HandleMouseUp(object? parameter)
-        {
-            _isSelecting = false;
-        }
-
-        private void StartNewSelection(long offset)
-        {
-            _selectionAnchor = offset;
-            SelectionStartOffset = offset;
-            SelectionEndOffset = offset;
-            SelectedOffset = offset;
-        }
-
-        private void SelectAll()
+        private void SelectAll(object? _ = null)
         {
             if (HexRows1 is not VirtualizingHexList virtualizingHexList || virtualizingHexList.FileSize == 0) return;
 
             SelectionStartOffset = 0;
             SelectionEndOffset = virtualizingHexList.FileSize - 1;
             SelectedOffset = 0;
-            _selectionAnchor = 0;
-            UpdateStatusText();
         }
 
-        private void ClearSelection()
+        private void ClearSelection(object? _ = null)
         {
             SelectionStartOffset = -1;
             SelectionEndOffset = -1;
-            _selectionAnchor = -1;
-            UpdateStatusText();
-        }
-
-        private void UpdateStatusText()
-        {
-            if (SelectionLength > 0)
-            {
-                var start = Math.Min(SelectionStartOffset, SelectionEndOffset);
-                var end = Math.Max(SelectionStartOffset, SelectionEndOffset);
-                StatusText = $"Selected {SelectionLength} bytes (0x{start:X8} - 0x{end:X8})";
-            }
-            else if (SelectedOffset >= 0)
-            {
-                StatusText = $"Selected offset: 0x{SelectedOffset:X8}";
-            }
-            else
-            {
-                StatusText = "Ready";
-            }
+            SelectedOffset = -1;
         }
 
         #endregion
 
         #region Copy Methods
 
-        private async Task CopySelectionAsync()
+        private async Task CopySelectionAsync(object? _ = null)
         {
             await CopyAsHexAsync();
         }
 
-        private async Task CopyAsHexAsync()
+        private async Task CopyAsHexAsync(object? _ = null)
         {
-            if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
+            if (SelectionLength == 0 || HexRows1 is not VirtualizingHexList list)
             {
                 await _dialogService.ShowMessageAsync("Copy", "No selection to copy").ConfigureAwait(false);
                 return;
@@ -641,19 +607,13 @@ namespace S7_Csharp_Utility.ViewModels
                 var start = Math.Min(SelectionStartOffset, SelectionEndOffset);
                 var length = (int)SelectionLength;
 
-                using var stream = new FileStream(File1Path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                stream.Seek(start, SeekOrigin.Begin);
-
-                var buffer = new byte[length];
-                var bytesRead = await stream.ReadAsync(buffer, 0, length, _cancellationTokenSource.Token);
-
-                var hexString = Convert.ToHexString(buffer, 0, bytesRead);
-                
-                var formattedHex = string.Join(" ", Enumerable.Range(0, bytesRead)
+                var buffer = list.ReadRange(start, length);
+                var hexString = Convert.ToHexString(buffer);
+                var formattedHex = string.Join(" ", Enumerable.Range(0, buffer.Length)
                     .Select(i => hexString.Substring(i * 2, 2)));
 
                 await SetClipboardTextAsync(formattedHex);
-                StatusText = $"✅ Copied {bytesRead} bytes as hex to clipboard";
+                StatusText = $"✅ Copied {buffer.Length} bytes as hex to clipboard";
             }
             catch (Exception ex)
             {
@@ -661,9 +621,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async Task CopyAsAsciiAsync()
+        private async Task CopyAsAsciiAsync(object? _ = null)
         {
-            if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
+            if (SelectionLength == 0 || HexRows1 is not VirtualizingHexList list)
             {
                 await _dialogService.ShowMessageAsync("Copy", "No selection to copy").ConfigureAwait(false);
                 return;
@@ -674,21 +634,16 @@ namespace S7_Csharp_Utility.ViewModels
                 var start = Math.Min(SelectionStartOffset, SelectionEndOffset);
                 var length = (int)SelectionLength;
 
-                using var stream = new FileStream(File1Path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                stream.Seek(start, SeekOrigin.Begin);
-
-                var buffer = new byte[length];
-                var bytesRead = await stream.ReadAsync(buffer, 0, length, _cancellationTokenSource.Token);
-
+                var buffer = list.ReadRange(start, length);
                 var asciiString = new StringBuilder();
-                for (int i = 0; i < bytesRead; i++)
+                for (int i = 0; i < buffer.Length; i++)
                 {
                     var b = buffer[i];
                     asciiString.Append(char.IsControl((char)b) ? '.' : (char)b);
                 }
 
                 await SetClipboardTextAsync(asciiString.ToString());
-                StatusText = $"✅ Copied {bytesRead} bytes as ASCII to clipboard";
+                StatusText = $"✅ Copied {buffer.Length} bytes as ASCII to clipboard";
             }
             catch (Exception ex)
             {
@@ -715,9 +670,9 @@ namespace S7_Csharp_Utility.ViewModels
 
         #region Enhanced Export and Copy Methods
 
-        private async Task ExportToFileAsync()
+        private async Task ExportToFileAsync(object? _ = null)
         {
-            if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
+            if (SelectionLength == 0 || HexRows1 is not VirtualizingHexList list)
             {
                 await _dialogService.ShowMessageAsync("Export", "No selection to export").ConfigureAwait(false);
                 return;
@@ -733,26 +688,9 @@ namespace S7_Csharp_Utility.ViewModels
                 var start = Math.Min(SelectionStartOffset, SelectionEndOffset);
                 var length = (int)SelectionLength;
 
-                using var sourceStream = new FileStream(File1Path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using var targetStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
-                
-                sourceStream.Seek(start, SeekOrigin.Begin);
-                
-                var buffer = new byte[Math.Min(8192, length)];
-                var totalBytesRead = 0;
-                
-                while (totalBytesRead < length)
-                {
-                    var bytesToRead = Math.Min(buffer.Length, length - totalBytesRead);
-                    var bytesRead = await sourceStream.ReadAsync(buffer, 0, bytesToRead, _cancellationTokenSource.Token);
-                    
-                    if (bytesRead == 0) break;
-                    
-                    await targetStream.WriteAsync(buffer, 0, bytesRead, _cancellationTokenSource.Token);
-                    totalBytesRead += bytesRead;
-                }
-
-                StatusText = $"✅ Exported {totalBytesRead} bytes to {Path.GetFileName(filePath)}";
+                var buffer = list.ReadRange(start, length);
+                await File.WriteAllBytesAsync(filePath, buffer, _cancellationTokenSource.Token);
+                StatusText = $"✅ Exported {length} bytes to {Path.GetFileName(filePath)}";
             }
             catch (Exception ex)
             {
@@ -760,9 +698,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async Task CopyAsCArrayAsync()
+        private async Task CopyAsCArrayAsync(object? _ = null)
         {
-            if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
+            if (SelectionLength == 0 || HexRows1 is not VirtualizingHexList list)
             {
                 await _dialogService.ShowMessageAsync("Copy", "No selection to copy").ConfigureAwait(false);
                 return;
@@ -773,17 +711,12 @@ namespace S7_Csharp_Utility.ViewModels
                 var start = Math.Min(SelectionStartOffset, SelectionEndOffset);
                 var length = (int)SelectionLength;
 
-                using var stream = new FileStream(File1Path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                stream.Seek(start, SeekOrigin.Begin);
-
-                var buffer = new byte[length];
-                var bytesRead = await stream.ReadAsync(buffer, 0, length, _cancellationTokenSource.Token);
-
+                var buffer = list.ReadRange(start, length);
                 var sb = new StringBuilder();
-                sb.AppendLine($"// Selection from offset 0x{start:X8}, {bytesRead} bytes");
-                sb.AppendLine($"unsigned char data[{bytesRead}] = {{");
+                sb.AppendLine($"// Selection from offset 0x{start:X8}, {length} bytes");
+                sb.AppendLine($"unsigned char data[{length}] = {{");
                 
-                for (int i = 0; i < bytesRead; i++)
+                for (int i = 0; i < length; i++)
                 {
                     if (i % 16 == 0)
                     {
@@ -792,14 +725,14 @@ namespace S7_Csharp_Utility.ViewModels
                     }
                     
                     sb.Append($"0x{buffer[i]:X2}");
-                    if (i < bytesRead - 1) sb.Append(", ");
+                    if (i < length - 1) sb.Append(", ");
                 }
                 
                 sb.AppendLine();
                 sb.AppendLine("};");
 
                 await SetClipboardTextAsync(sb.ToString());
-                StatusText = $"✅ Copied {bytesRead} bytes as C array to clipboard";
+                StatusText = $"✅ Copied {length} bytes as C array to clipboard";
             }
             catch (Exception ex)
             {
@@ -807,9 +740,9 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async Task CopyAsBase64Async()
+        private async Task CopyAsBase64Async(object? _ = null)
         {
-            if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
+            if (SelectionLength == 0 || HexRows1 is not VirtualizingHexList list)
             {
                 await _dialogService.ShowMessageAsync("Copy", "No selection to copy").ConfigureAwait(false);
                 return;
@@ -820,16 +753,11 @@ namespace S7_Csharp_Utility.ViewModels
                 var start = Math.Min(SelectionStartOffset, SelectionEndOffset);
                 var length = (int)SelectionLength;
 
-                using var stream = new FileStream(File1Path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                stream.Seek(start, SeekOrigin.Begin);
-
-                var buffer = new byte[length];
-                var bytesRead = await stream.ReadAsync(buffer, 0, length, _cancellationTokenSource.Token);
-
-                var base64String = Convert.ToBase64String(buffer, 0, bytesRead);
+                var buffer = list.ReadRange(start, length);
+                var base64String = Convert.ToBase64String(buffer);
                 
                 await SetClipboardTextAsync(base64String);
-                StatusText = $"✅ Copied {bytesRead} bytes as Base64 to clipboard";
+                StatusText = $"✅ Copied {length} bytes as Base64 to clipboard";
             }
             catch (Exception ex)
             {
@@ -837,25 +765,129 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private void UpdateKeyboardModifiers(object? parameter)
+        #endregion
+
+        #region Search Methods
+        private async Task SearchAsync(object? _ = null)
         {
-            if (parameter is string modifierState)
+            IsSearching = true;
+            SearchResults.Clear();
+            SearchPatternLength = 0;
+
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
+            try
             {
-                var parts = modifierState.Split(',');
-                if (parts.Length >= 2)
+                if (HexRows1 is not VirtualizingHexList listToSearch)
                 {
-                    _shiftKeyPressed = bool.Parse(parts[0]);
-                    _ctrlKeyPressed = bool.Parse(parts[1]);
+                    StatusText = "❌ No file loaded to search.";
+                    return;
                 }
+
+                StatusText = $"Searching for '{SearchText}'...";
+
+                var progress = new Progress<long>(offset => SearchResults.Add(new SearchResult(1, offset)));
+                await _hexViewerService.SearchAsync(listToSearch, SearchText, SearchType, progress, token);
+
+                if (SearchResults.Any())
+                {
+                    byte[] pattern;
+                    try
+                    {
+                        pattern = SearchType switch
+                        {
+                            SearchType.Hex => Convert.FromHexString(SearchText.Replace(" ", "").Replace("0x", "")),
+                            SearchType.SHA1 => Convert.FromHexString(SearchText.Replace(" ", "").Replace("0x", "")),
+                            SearchType.Text => Encoding.UTF8.GetBytes(SearchText),
+                            _ => Array.Empty<byte>()
+                        };
+                    }
+                    catch { pattern = Array.Empty<byte>(); }
+                    SearchPatternLength = pattern.Length;
+
+                    StatusText = $"✅ Found {SearchResults.Count} occurrences.";
+                    SelectedSearchResult = SearchResults.FirstOrDefault();
+                }
+                else
+                {
+                    StatusText = $"ℹ️ No occurrences found for '{SearchText}'.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                StatusText = "❌ Search cancelled.";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"❌ Search error: {ex.Message}";
+            }
+            finally
+            {
+                IsSearching = false;
+                OnPropertyChanged(nameof(SearchResults)); // To refresh the view
+                ((RelayCommand)NavigateToNextResultCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)NavigateToPreviousResultCommand).RaiseCanExecuteChanged();
             }
         }
 
+        private void StopSearch(object? _ = null)
+        {
+            _cancellationTokenSource?.Cancel();
+        }
+
+        private void ClearSearch(object? _ = null)
+        {
+            SearchResults.Clear();
+            SearchPatternLength = 0;
+            OnPropertyChanged(nameof(SearchResults));
+            StatusText = "Ready";
+        }
+
+        private void NavigateToNextResult(object? _ = null)
+        {
+            if (SearchResults.Count == 0) return;
+
+            if (SelectedSearchResult == null)
+            {
+                SelectedSearchResult = SearchResults[0];
+                return;
+            }
+
+            var currentIndex = SearchResults.IndexOf(SelectedSearchResult);
+            if (currentIndex < SearchResults.Count - 1)
+            {
+                SelectedSearchResult = SearchResults[currentIndex + 1];
+            }
+            else
+            {
+                SelectedSearchResult = SearchResults[0];
+            }
+        }
+
+        private void NavigateToPreviousResult(object? _ = null)
+        {
+            if (SearchResults.Count == 0) return;
+
+            if (SelectedSearchResult == null)
+            {
+                SelectedSearchResult = SearchResults[^1];
+                return;
+            }
+
+            var currentIndex = SearchResults.IndexOf(SelectedSearchResult);
+            if (currentIndex > 0)
+            {
+                SelectedSearchResult = SearchResults[currentIndex - 1];
+            }
+            else
+            {
+                SelectedSearchResult = SearchResults[^1];
+            }
+        }
         #endregion
 
-
-        /// <summary>
-        /// Disposes of resources used by the ViewModel.
-        /// </summary>
         public void Dispose()
         {
             _cancellationTokenSource?.Cancel();

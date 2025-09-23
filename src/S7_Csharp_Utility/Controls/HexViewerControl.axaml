@@ -2,9 +2,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:converters="using:S7_Csharp_Utility.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="S7_Csharp_Utility.Controls.HexViewerControl"
              Background="#1A202C">
+
+    <UserControl.Resources>
+        <converters:SearchResultHighlightConverter x:Key="SearchResultHighlightConverter"/>
+    </UserControl.Resources>
     
     <UserControl.Styles>
         <!-- Header Text Style -->
@@ -38,6 +43,9 @@
             <Setter Property="Padding" Value="2"/>
             <Setter Property="MinWidth" Value="20"/>
         </Style>
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="#4C51BF"/>
+        </Style>
         
         <!-- ASCII Text Style -->
         <Style Selector="TextBlock.AsciiText">
@@ -49,125 +57,93 @@
         </Style>
     </UserControl.Styles>
     
-    <ScrollViewer x:Name="HexScrollViewer" 
-                  HorizontalScrollBarVisibility="Auto" 
-                  VerticalScrollBarVisibility="Auto">
-        <Grid x:Name="MainGrid">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="24"/>  <!-- Header -->
-                <RowDefinition Height="*"/>   <!-- Content -->
-            </Grid.RowDefinitions>
-            
-            <!-- Header Row -->
-            <Grid Grid.Row="0" Height="24" Background="#374151">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="70"/>  <!-- Offset -->
-                    <ColumnDefinition Width="24"/>  <!-- 00 -->
-                    <ColumnDefinition Width="24"/>  <!-- 01 -->
-                    <ColumnDefinition Width="24"/>  <!-- 02 -->
-                    <ColumnDefinition Width="24"/>  <!-- 03 -->
-                    <ColumnDefinition Width="24"/>  <!-- 04 -->
-                    <ColumnDefinition Width="24"/>  <!-- 05 -->
-                    <ColumnDefinition Width="24"/>  <!-- 06 -->
-                    <ColumnDefinition Width="24"/>  <!-- 07 -->
-                    <ColumnDefinition Width="8"/>   <!-- Separator -->
-                    <ColumnDefinition Width="24"/>  <!-- 08 -->
-                    <ColumnDefinition Width="24"/>  <!-- 09 -->
-                    <ColumnDefinition Width="24"/>  <!-- 0A -->
-                    <ColumnDefinition Width="24"/>  <!-- 0B -->
-                    <ColumnDefinition Width="24"/>  <!-- 0C -->
-                    <ColumnDefinition Width="24"/>  <!-- 0D -->
-                    <ColumnDefinition Width="24"/>  <!-- 0E -->
-                    <ColumnDefinition Width="24"/>  <!-- 0F -->
-                    <ColumnDefinition Width="16"/>  <!-- Separator -->
-                    <ColumnDefinition Width="*"/>   <!-- ASCII -->
-                </Grid.ColumnDefinitions>
-                
-                <TextBlock Grid.Column="0" Text="Offset" Classes="HeaderText"/>
-                <TextBlock Grid.Column="1" Text="00" Classes="HeaderText"/>
-                <TextBlock Grid.Column="2" Text="01" Classes="HeaderText"/>
-                <TextBlock Grid.Column="3" Text="02" Classes="HeaderText"/>
-                <TextBlock Grid.Column="4" Text="03" Classes="HeaderText"/>
-                <TextBlock Grid.Column="5" Text="04" Classes="HeaderText"/>
-                <TextBlock Grid.Column="6" Text="05" Classes="HeaderText"/>
-                <TextBlock Grid.Column="7" Text="06" Classes="HeaderText"/>
-                <TextBlock Grid.Column="8" Text="07" Classes="HeaderText"/>
-                <TextBlock Grid.Column="10" Text="08" Classes="HeaderText"/>
-                <TextBlock Grid.Column="11" Text="09" Classes="HeaderText"/>
-                <TextBlock Grid.Column="12" Text="0A" Classes="HeaderText"/>
-                <TextBlock Grid.Column="13" Text="0B" Classes="HeaderText"/>
-                <TextBlock Grid.Column="14" Text="0C" Classes="HeaderText"/>
-                <TextBlock Grid.Column="15" Text="0D" Classes="HeaderText"/>
-                <TextBlock Grid.Column="16" Text="0E" Classes="HeaderText"/>
-                <TextBlock Grid.Column="17" Text="0F" Classes="HeaderText"/>
-                <TextBlock Grid.Column="19" Text="ASCII" Classes="HeaderText"/>
-            </Grid>
-            
-            <!-- Content Area with Canvas for Selection Overlay -->
-            <Grid Grid.Row="1" x:Name="ContentGrid">
-                <!-- Data Rows -->
-                <ItemsControl x:Name="HexRowsContainer" ItemsSource="{Binding $parent[UserControl].HexRows}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Height="20" Background="Transparent">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="70"/>  <!-- Offset -->
-                                    <ColumnDefinition Width="24"/>  <!-- 00 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 01 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 02 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 03 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 04 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 05 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 06 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 07 -->
-                                    <ColumnDefinition Width="8"/>   <!-- Separator -->
-                                    <ColumnDefinition Width="24"/>  <!-- 08 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 09 -->
-                                    <ColumnDefinition Width="24"/>  <!-- 0A -->
-                                    <ColumnDefinition Width="24"/>  <!-- 0B -->
-                                    <ColumnDefinition Width="24"/>  <!-- 0C -->
-                                    <ColumnDefinition Width="24"/>  <!-- 0D -->
-                                    <ColumnDefinition Width="24"/>  <!-- 0E -->
-                                    <ColumnDefinition Width="24"/>  <!-- 0F -->
-                                    <ColumnDefinition Width="16"/>  <!-- Separator -->
-                                    <ColumnDefinition Width="*"/>   <!-- ASCII -->
-                                </Grid.ColumnDefinitions>
-                                
-                                <!-- Offset -->
-                                <TextBlock Grid.Column="0" Text="{Binding Address}" Classes="OffsetText"/>
-                                
-                                <!-- Hex Bytes -->
-                                <TextBlock Grid.Column="1" Text="{Binding Bytes[0]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="2" Text="{Binding Bytes[1]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="3" Text="{Binding Bytes[2]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="4" Text="{Binding Bytes[3]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="5" Text="{Binding Bytes[4]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="6" Text="{Binding Bytes[5]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="7" Text="{Binding Bytes[6]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="8" Text="{Binding Bytes[7]}" Classes="HexText"/>
-                                
-                                <TextBlock Grid.Column="10" Text="{Binding Bytes[8]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="11" Text="{Binding Bytes[9]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="12" Text="{Binding Bytes[10]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="13" Text="{Binding Bytes[11]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="14" Text="{Binding Bytes[12]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="15" Text="{Binding Bytes[13]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="16" Text="{Binding Bytes[14]}" Classes="HexText"/>
-                                <TextBlock Grid.Column="17" Text="{Binding Bytes[15]}" Classes="HexText"/>
-                                
-                                <!-- ASCII -->
-                                <TextBlock Grid.Column="19" Text="{Binding Ascii}" Classes="AsciiText"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                
-                <!-- Selection Overlay Canvas -->
-                <Canvas x:Name="SelectionCanvas" Background="Transparent" 
-                        PointerPressed="OnPointerPressed"
-                        PointerMoved="OnPointerMoved"
-                        PointerReleased="OnPointerReleased"/>
-            </Grid>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="24"/>  <!-- Header -->
+            <RowDefinition Height="*"/>   <!-- Content -->
+        </Grid.RowDefinitions>
+
+        <!-- Header Row -->
+        <Grid Grid.Row="0" Height="24" Background="#374151">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="70"/>  <!-- Offset -->
+                <ColumnDefinition Width="*"/>   <!-- Hex Values -->
+                <ColumnDefinition Width="Auto"/> <!-- ASCII -->
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="Offset" Classes="HeaderText"/>
+
+            <ItemsControl Grid.Column="1" ItemsSource="{Binding Source={x:Static Application.Current}, Path=HexHeader}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" Classes="HeaderText" Width="24"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Grid.Column="2" Text="ASCII" Classes="HeaderText" Margin="16,0,0,0"/>
         </Grid>
-    </ScrollViewer>
+
+        <Grid Grid.Row="1">
+            <ListBox x:Name="HexListBox" ItemsSource="{Binding HexRows}"
+                     SelectedItem="{Binding SelectedRow}"
+                     SelectionMode="Single"
+                     Background="Transparent"
+                     BorderThickness="0">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Height="20" Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>  <!-- Offset -->
+                                <ColumnDefinition Width="*"/>   <!-- Hex Values -->
+                                <ColumnDefinition Width="Auto"/> <!-- ASCII -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Offset -->
+                            <TextBlock Grid.Column="0" Text="{Binding Address}" Classes="OffsetText"/>
+
+                            <!-- Hex Bytes -->
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding Bytes}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Classes="HexText">
+                                            <TextBlock.Background>
+                                                <MultiBinding Converter="{StaticResource SearchResultHighlightConverter}">
+                                                    <Binding Path="DataContext.Offsets[{Binding RelativeSource={RelativeSource Self}, Path=VisualParent.VisualParent.Children.IndexOf(VisualParent)}]" />
+                                                    <Binding Path="$parent[ListBox].DataContext.SearchResults"/>
+                                                    <Binding Path="$parent[ListBox].DataContext.SearchPatternLength"/>
+                                                </MultiBinding>
+                                            </TextBlock.Background>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- ASCII -->
+                            <TextBlock Grid.Column="2" Text="{Binding Ascii}" Classes="AsciiText"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <Canvas x:Name="SelectionCanvas" Background="Transparent" IsHitTestVisible="True"
+                    PointerPressed="OnHexListBoxPointerPressed"
+                    PointerMoved="OnHexListBoxPointerMoved"
+                    PointerReleased="OnHexListBoxPointerReleased"/>
+        </Grid>
+    </Grid>
 </UserControl>
