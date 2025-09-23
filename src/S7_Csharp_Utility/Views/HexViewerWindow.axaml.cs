@@ -8,30 +8,19 @@ using S7_Csharp_Utility.Controls;
 
 namespace S7_Csharp_Utility
 {
-    /// <summary>
-    /// Optimized hex viewer window with side-by-side comparison and data analysis.
-    /// </summary>
     public partial class HexViewerWindow : Window
     {
         private readonly HexViewerViewModel _viewModel;
         private bool _isSyncingScroll;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="HexViewerWindow"/> class.
-        /// </summary>
         public HexViewerWindow() : this(string.Empty) { }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="HexViewerWindow"/> class with a file path.
-        /// </summary>
-        /// <param name="filePath">The initial file path to load.</param>
         public HexViewerWindow(string filePath)
         {
             InitializeComponent();
             _viewModel = new HexViewerViewModel(new DialogService());
             DataContext = _viewModel;
 
-            // Load initial file if provided
             if (!string.IsNullOrEmpty(filePath))
             {
                 _ = _viewModel.LoadFileAsync(filePath);
@@ -40,9 +29,6 @@ namespace S7_Csharp_Utility
             SetupControlSynchronization();
         }
 
-        /// <summary>
-        /// Sets up scroll and selection synchronization between the hex viewer controls.
-        /// </summary>
         private void SetupControlSynchronization()
         {
             var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
@@ -50,7 +36,6 @@ namespace S7_Csharp_Utility
 
             if (customHexViewer1 != null)
             {
-                // Setup scroll synchronization between custom controls
                 var scrollViewer1 = customHexViewer1.FindDescendantOfType<ScrollViewer>();
                 
                 if (customHexViewer2 != null)
@@ -64,7 +49,6 @@ namespace S7_Csharp_Utility
                     }
                 }
 
-                // Subscribe to ViewModel property changes to update both custom controls
                 _viewModel.PropertyChanged += (s, e) =>
                 {
                     if (e.PropertyName == nameof(HexViewerViewModel.SelectedOffset) ||
@@ -74,26 +58,10 @@ namespace S7_Csharp_Utility
                         customHexViewer1.UpdateSelectionFromViewModel();
                         customHexViewer2?.UpdateSelectionFromViewModel();
                     }
-                    else if (e.PropertyName == nameof(HexViewerViewModel.SearchResults))
-                    {
-                        customHexViewer1.HighlightSearchResults(_viewModel.SearchResults);
-                        customHexViewer2?.HighlightSearchResults(_viewModel.SearchResults);
-                    }
-                };
-
-                // Subscribe to navigation events from the ViewModel
-                _viewModel.NavigateToOffsetRequested += async (targetOffset) =>
-                {
-                    await NavigateToOffsetAsync(targetOffset);
                 };
             }
         }
 
-        /// <summary>
-        /// Handles scroll synchronization between hex controls.
-        /// </summary>
-        /// <param name="source">The source scroll viewer.</param>
-        /// <param name="target">The target scroll viewer to synchronize.</param>
         private void OnScrollChanged(ScrollViewer source, ScrollViewer target)
         {
             if (_isSyncingScroll || !_viewModel.IsSynchronizationEnabled) return;
@@ -109,148 +77,12 @@ namespace S7_Csharp_Utility
             }
         }
 
-        /// <summary>
-        /// Handles selection changes in hex grids and updates the data inspector.
-        /// </summary>
-        /// <param name="grid">The grid that had its selection changed.</param>
-        private void HexGrid_SelectionChanged(DataGrid grid)
-        {
-            if (grid?.SelectedItem is not HexViewerService.HexRow selectedRow)
-            {
-                return;
-            }
-
-            try
-            {
-                // Update the selected offset for the data inspector
-                _viewModel.SelectedOffset = selectedRow.ByteOffset;
-
-                // Synchronize selection between controls if enabled
-                if (_viewModel.IsSynchronizationEnabled && _viewModel.IsSideBySideMode)
-                {
-                    SynchronizeSelectionByAddress(selectedRow.ByteOffset);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error handling selection change: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Synchronizes selection between controls based on address/offset.
-        /// </summary>
-        /// <param name="targetOffset">The target offset to synchronize to.</param>
-        private void SynchronizeSelectionByAddress(long targetOffset)
-        {
-            try
-            {
-                var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
-                var hexGrid2 = this.FindControl<DataGrid>("HexDataGrid2");
-
-                if (customHexViewer1 != null)
-                {
-                    // Update the custom hex viewer selection
-                    customHexViewer1.GoToOffset(targetOffset);
-                }
-
-                if (hexGrid2 != null)
-                {
-                    // Find the row with matching offset in the second grid
-                    var matchingRow = _viewModel.HexRows2.FirstOrDefault(row => row.ByteOffset == targetOffset);
-                    if (matchingRow != null)
-                    {
-                        // Temporarily disable selection change handling to avoid recursion
-                        _isSyncingScroll = true;
-                        try
-                        {
-                            hexGrid2.SelectedItem = matchingRow;
-                            hexGrid2.ScrollIntoView(matchingRow, hexGrid2.Columns.FirstOrDefault());
-                        }
-                        finally
-                        {
-                            _isSyncingScroll = false;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error synchronizing selection: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Navigates to a specific offset by loading the appropriate data chunk and scrolling to the target.
-        /// </summary>
-        /// <param name="targetOffset">The target offset to navigate to.</param>
-        private async System.Threading.Tasks.Task NavigateToOffsetAsync(long targetOffset)
-        {
-            if (string.IsNullOrEmpty(_viewModel.File1Path))
-                return;
-
-            try
-            {
-                // Check if the target offset is already visible in the current data
-                var isOffsetVisible = _viewModel.HexRows1.Any(row => 
-                    row.Offsets.Any(offset => offset == targetOffset));
-
-                if (!isOffsetVisible)
-                {
-                    // Need to load data around the target offset
-                    const int hexBytesPerLine = 16;
-                    const int maxDisplayRows = 10000;
-                    
-                    // Calculate start offset to center the target in the view
-                    var rowsToShow = maxDisplayRows / 2;
-                    var startOffset = Math.Max(0, targetOffset - (rowsToShow * hexBytesPerLine));
-                    
-                    // Align to row boundary (16-byte boundary)
-                    startOffset = (startOffset / hexBytesPerLine) * hexBytesPerLine;
-
-                    // Load the data chunk
-                    await _viewModel.LoadFileAsync(_viewModel.File1Path, 1, startOffset, maxDisplayRows);
-                }
-
-                // Now navigate to the offset in the control
-                var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
-                customHexViewer1?.GoToOffset(targetOffset);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error navigating to offset: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Handles the Go To Offset command by navigating to the specified offset in the custom control.
-        /// </summary>
-        public void GoToOffset(long offset)
-        {
-            _ = NavigateToOffsetAsync(offset);
-        }
-
-        /// <summary>
-        /// Handles search result highlighting in the custom control.
-        /// </summary>
-        public void HighlightSearchResults(System.Collections.Generic.List<long> searchOffsets)
-        {
-            var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
-            customHexViewer1?.HighlightSearchResults(searchOffsets);
-        }
-
-        /// <summary>
-        /// Gets the selected bytes from the custom hex viewer control.
-        /// </summary>
         public byte[] GetSelectedBytes()
         {
             var customHexViewer1 = this.FindControl<HexViewerControl>("CustomHexViewer1");
             return customHexViewer1?.GetSelectedBytes() ?? Array.Empty<byte>();
         }
 
-        /// <summary>
-        /// Disposes of resources when the window is closed.
-        /// </summary>
         protected override void OnClosed(EventArgs e)
         {
             _viewModel?.Dispose();

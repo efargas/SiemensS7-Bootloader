@@ -24,7 +24,8 @@ namespace S7_Csharp_Utility.Services
             var app = Avalonia.Application.Current;
             if (app?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
             {
-                return desktop.MainWindow ?? throw new System.InvalidOperationException("Main window not found");
+                _mainWindow = desktop.MainWindow;
+                return _mainWindow ?? throw new System.InvalidOperationException("Main window not found");
             }
 
             throw new System.InvalidOperationException("Unable to get main window");

@@ -226,8 +226,24 @@ namespace S7_Csharp_Utility.ViewModels
             _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
         }
 
-        private void ShowProfileManagement() => ViewService.ShowProfileManagementWindow(ConfigService, profile => LoadedProfile = profile);
-        private void ShowFirmwareUnpacker() => ViewService.ShowFirmwareUnpackerWindow(ConfigurationViewModel.ExtractionPath);
+        private void ShowProfileManagement()
+        {
+            ViewService.ShowProfileManagementWindow(ConfigService, profile =>
+            {
+                if (profile != null)
+                {
+                    LoadedProfile = profile;
+                }
+            });
+        }
+
+        private void ShowFirmwareUnpacker()
+        {
+            if (ConfigurationViewModel.ExtractionPath != null)
+            {
+                ViewService.ShowFirmwareUnpackerWindow(ConfigurationViewModel.ExtractionPath);
+            }
+        }
         private void ShowHexViewer() => ViewService.ShowHexViewerWindow();
         private void Exit() => ViewService.Exit();
 

@@ -1,6 +1,6 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,49 +10,29 @@ using System.Windows.Input;
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
+using Avalonia;
 using Avalonia.Threading;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Platform.Storage;
-using Avalonia.VisualTree;
-using Avalonia;
 
 namespace S7_Csharp_Utility.ViewModels
 {
-    /// <summary>
-    /// ViewModel for optimized hex viewing with chunked loading, side-by-side comparison, and data analysis.
-    /// Supports large files without blocking the UI thread.
-    /// </summary>
     public sealed class HexViewerViewModel : ViewModelBase, IDisposable
     {
         private readonly HexViewerService _hexViewerService;
         private readonly IDialogService _dialogService;
         private readonly CancellationTokenSource _cancellationTokenSource;
-        private const int MaxDisplayRows = 10000; // Limit for performance
 
-        // Selection state tracking
         private bool _isSelecting = false;
         private long _selectionAnchor = -1;
         private bool _shiftKeyPressed = false;
         private bool _ctrlKeyPressed = false;
         private readonly HashSet<long> _multiSelection = new();
 
-        #region Properties
-
-        /// <summary>
-        /// Gets the hex rows for the first file.
-        /// </summary>
-        public ObservableCollection<HexViewerService.HexRow> HexRows1 { get; } = new();
-
-        /// <summary>
-        /// Gets the hex rows for the second file (side-by-side mode).
-        /// </summary>
-        public ObservableCollection<HexViewerService.HexRow> HexRows2 { get; } = new();
+        public IList<HexViewerService.HexRow>? HexRows1 { get; private set; }
+        public IList<HexViewerService.HexRow>? HexRows2 { get; private set; }
 
         private string _file1Path = string.Empty;
-        /// <summary>
-        /// Gets or sets the path to the first file.
-        /// </summary>
         public string File1Path
         {
             get => _file1Path;
@@ -60,9 +40,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _file2Path = string.Empty;
-        /// <summary>
-        /// Gets or sets the path to the second file.
-        /// </summary>
         public string File2Path
         {
             get => _file2Path;
@@ -70,9 +47,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _file1Info = string.Empty;
-        /// <summary>
-        /// Gets or sets the information about the first file.
-        /// </summary>
         public string File1Info
         {
             get => _file1Info;
@@ -80,9 +54,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private string _file2Info = string.Empty;
-        /// <summary>
-        /// Gets or sets the information about the second file.
-        /// </summary>
         public string File2Info
         {
             get => _file2Info;
@@ -90,9 +61,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _isSideBySideMode;
-        /// <summary>
-        /// Gets or sets a value indicating whether side-by-side mode is enabled.
-        /// </summary>
         public bool IsSideBySideMode
         {
             get => _isSideBySideMode;
@@ -110,22 +78,15 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Gets a value indicating whether the second panel should be shown.
-        /// </summary>
         public bool ShowSecondPanel => IsSideBySideMode;
 
         private GridLength _secondPanelWidth = new GridLength(0, GridUnitType.Pixel);
-        /// <summary>
-        /// Gets or sets the width of the second panel.
-        /// </summary>
         public GridLength SecondPanelWidth
         {
             get => _secondPanelWidth;
             set { _secondPanelWidth = value; OnPropertyChanged(); }
         }
 
-        // Width of the Inspector panel (right column). When collapsed, set to 0.
         private GridLength _inspectorWidth = new GridLength(350, GridUnitType.Pixel);
         public GridLength InspectorWidth
         {
@@ -133,7 +94,6 @@ namespace S7_Csharp_Utility.ViewModels
             set { _inspectorWidth = value; OnPropertyChanged(); }
         }
 
-        // Separator width between viewers. Set to 0 when not side-by-side.
         private GridLength _separatorWidth = new GridLength(0, GridUnitType.Pixel);
         public GridLength SeparatorWidth
         {
@@ -155,54 +115,20 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _isLoading;
-        /// <summary>
-        /// Gets or sets a value indicating whether files are currently being loaded.
-        /// </summary>
         public bool IsLoading
         {
             get => _isLoading;
             set { _isLoading = value; OnPropertyChanged(); }
         }
 
-        private double _loadingProgress;
-        /// <summary>
-        /// Gets or sets the loading progress percentage.
-        /// </summary>
-        public double LoadingProgress
-        {
-            get => _loadingProgress;
-            set { _loadingProgress = value; OnPropertyChanged(); }
-        }
-
         private string _statusText = "Ready";
-        /// <summary>
-        /// Gets or sets the status text.
-        /// </summary>
         public string StatusText
         {
             get => _statusText;
             set { _statusText = value; OnPropertyChanged(); }
         }
 
-        private string _searchText = string.Empty;
-        /// <summary>
-        /// Gets or sets the search text.
-        /// </summary>
-        public string SearchText
-        {
-            get => _searchText;
-            set
-            {
-                _searchText = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)SearchCommand).RaiseCanExecuteChanged();
-            }
-        }
-
         private bool _isLittleEndian = true;
-        /// <summary>
-        /// Gets or sets a value indicating whether multi-byte values should be interpreted as little-endian.
-        /// </summary>
         public bool IsLittleEndian
         {
             get => _isLittleEndian;
@@ -215,9 +141,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private bool _isSynchronizationEnabled = true;
-        /// <summary>
-        /// Gets or sets a value indicating whether view synchronization is enabled.
-        /// </summary>
         public bool IsSynchronizationEnabled
         {
             get => _isSynchronizationEnabled;
@@ -225,9 +148,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private long _selectedOffset;
-        /// <summary>
-        /// Gets or sets the selected byte offset.
-        /// </summary>
         public long SelectedOffset
         {
             get => _selectedOffset;
@@ -240,9 +160,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private long _selectionStartOffset = -1;
-        /// <summary>
-        /// Gets or sets the start offset of the selection range.
-        /// </summary>
         public long SelectionStartOffset
         {
             get => _selectionStartOffset;
@@ -255,9 +172,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private long _selectionEndOffset = -1;
-        /// <summary>
-        /// Gets or sets the end offset of the selection range.
-        /// </summary>
         public long SelectionEndOffset
         {
             get => _selectionEndOffset;
@@ -269,9 +183,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Gets the length of the current selection.
-        /// </summary>
         public long SelectionLength
         {
             get
@@ -284,9 +195,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Checks if the given offset is within the current selection range.
-        /// </summary>
         public bool IsOffsetInSelection(long offset)
         {
             if (SelectionStartOffset < 0 || SelectionEndOffset < 0) return false;
@@ -294,105 +202,6 @@ namespace S7_Csharp_Utility.ViewModels
             var end = Math.Max(SelectionStartOffset, SelectionEndOffset);
             return offset >= start && offset <= end;
         }
-
-        private List<long> _searchResults = new();
-        /// <summary>
-        /// Gets or sets the list of search result offsets.
-        /// </summary>
-        public List<long> SearchResults
-        {
-            get => _searchResults;
-            set
-            {
-                _searchResults = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasSearchResults));
-                OnPropertyChanged(nameof(SearchResultsText));
-                CurrentSearchResultIndex = -1;
-            }
-        }
-
-        private List<HexViewerService.SearchResult> _searchResultsWithContext = new();
-        /// <summary>
-        /// Gets or sets the list of search results with context information.
-        /// </summary>
-        public List<HexViewerService.SearchResult> SearchResultsWithContext
-        {
-            get => _searchResultsWithContext;
-            set
-            {
-                _searchResultsWithContext = value;
-                OnPropertyChanged();
-                SearchResults = value.Select(r => r.Offset).ToList();
-            }
-        }
-
-        private int _currentSearchResultIndex = -1;
-        /// <summary>
-        /// Gets or sets the current search result index.
-        /// </summary>
-        public int CurrentSearchResultIndex
-        {
-            get => _currentSearchResultIndex;
-            set
-            {
-                _currentSearchResultIndex = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(SearchResultsText));
-                OnPropertyChanged(nameof(CanNavigatePrevious));
-                OnPropertyChanged(nameof(CanNavigateNext));
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether there are search results.
-        /// </summary>
-        public bool HasSearchResults => SearchResults.Count > 0;
-
-        /// <summary>
-        /// Gets the search results text for display.
-        /// </summary>
-        public string SearchResultsText
-        {
-            get
-            {
-                if (SearchResults.Count == 0) return "No results";
-                if (CurrentSearchResultIndex < 0) return $"{SearchResults.Count} results found";
-                return $"Result {CurrentSearchResultIndex + 1} of {SearchResults.Count}";
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether we can navigate to the previous search result.
-        /// </summary>
-        public bool CanNavigatePrevious => CurrentSearchResultIndex > 0;
-
-        /// <summary>
-        /// Gets a value indicating whether we can navigate to the next search result.
-        /// </summary>
-        public bool CanNavigateNext => CurrentSearchResultIndex < SearchResults.Count - 1;
-
-        private bool _isSha1Search;
-        /// <summary>
-        /// Gets or sets a value indicating whether the search is for SHA1 patterns.
-        /// </summary>
-        public bool IsSha1Search
-        {
-            get => _isSha1Search;
-            set
-            {
-                _isSha1Search = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(SearchWatermark));
-            }
-        }
-
-        /// <summary>
-        /// Gets the search watermark text based on search type.
-        /// </summary>
-        public string SearchWatermark => IsSha1Search 
-            ? "SHA1 hash (40 hex chars, e.g., da39a3ee5e6b4b0d3255bfef95601890afd80709)"
-            : "Hex pattern (e.g., 41 42 43 or ABC)";
 
         #region Inspector Properties
         private string _asciiValue = string.Empty;
@@ -435,136 +244,25 @@ namespace S7_Csharp_Utility.ViewModels
         public double DoubleValue { get => _doubleValue; set => SetProperty(ref _doubleValue, value); }
         #endregion
 
-        #endregion
-
-        #region Commands
-
-        /// <summary>
-        /// Gets the command to load the first file.
-        /// </summary>
         public ICommand LoadFirstFileCommand { get; }
-
-        /// <summary>
-        /// Gets the command to load the second file.
-        /// </summary>
         public ICommand LoadSecondFileCommand { get; }
-
-        /// <summary>
-        /// Gets the command to export the selection.
-        /// </summary>
         public ICommand ExportSelectionCommand { get; }
-
-        /// <summary>
-        /// Gets the command to search for hex patterns.
-        /// </summary>
-        public ICommand SearchCommand { get; }
-
-        /// <summary>
-        /// Gets the command to refresh the current view.
-        /// </summary>
         public ICommand RefreshCommand { get; }
-
-        /// <summary>
-        /// Gets the command to go to a specific offset.
-        /// </summary>
-        public ICommand GoToOffsetCommand { get; }
-
-        /// <summary>
-        /// Toggles the visibility (width) of the Inspector panel.
-        /// </summary>
         public ICommand ToggleInspectorCommand { get; }
-
-        /// <summary>
-        /// Sets the selected offset from hex cell clicks.
-        /// </summary>
         public ICommand SetSelectedOffsetCommand { get; }
-
-        /// <summary>
-        /// Handles hex cell mouse down events for range selection.
-        /// </summary>
         public ICommand HexCellMouseDownCommand { get; }
-
-        /// <summary>
-        /// Handles hex cell mouse enter events for drag selection.
-        /// </summary>
         public ICommand HexCellMouseEnterCommand { get; }
-
-        /// <summary>
-        /// Handles hex cell mouse up events to end selection.
-        /// </summary>
         public ICommand HexCellMouseUpCommand { get; }
-
-        /// <summary>
-        /// Copies the selected bytes to clipboard.
-        /// </summary>
         public ICommand CopySelectionCommand { get; }
-
-        /// <summary>
-        /// Copies the selected bytes as hex string to clipboard.
-        /// </summary>
         public ICommand CopyAsHexCommand { get; }
-
-        /// <summary>
-        /// Copies the selected bytes as ASCII string to clipboard.
-        /// </summary>
         public ICommand CopyAsAsciiCommand { get; }
-
-        /// <summary>
-        /// Selects all bytes in the current view.
-        /// </summary>
         public ICommand SelectAllCommand { get; }
-
-        /// <summary>
-        /// Clears the current selection.
-        /// </summary>
         public ICommand ClearSelectionCommand { get; }
-
-        /// <summary>
-        /// Exports selection to file with various formats.
-        /// </summary>
         public ICommand ExportToFileCommand { get; }
-
-        /// <summary>
-        /// Copies selection as C array format.
-        /// </summary>
         public ICommand CopyAsCArrayCommand { get; }
-
-        /// <summary>
-        /// Copies selection as Base64 string.
-        /// </summary>
         public ICommand CopyAsBase64Command { get; }
-
-        /// <summary>
-        /// Updates keyboard modifier states.
-        /// </summary>
         public ICommand UpdateKeyboardModifiersCommand { get; }
-
-        /// <summary>
-        /// Navigates to the previous search result.
-        /// </summary>
-        public ICommand NavigateToPreviousResultCommand { get; }
-
-        /// <summary>
-        /// Navigates to the next search result.
-        /// </summary>
-        public ICommand NavigateToNextResultCommand { get; }
-
         
-        #endregion
-
-        #region Events
-
-        /// <summary>
-        /// Event raised when navigation to a specific offset is requested.
-        /// </summary>
-        public event Action<long>? NavigateToOffsetRequested;
-
-        #endregion
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="HexViewerViewModel"/> class.
-        /// </summary>
-        /// <param name="dialogService">The dialog service.</param>
         public HexViewerViewModel(IDialogService dialogService)
         {
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
@@ -574,45 +272,28 @@ namespace S7_Csharp_Utility.ViewModels
             LoadFirstFileCommand = new AsyncRelayCommand(_ => LoadFirstFileAsync(), _ => !IsLoading);
             LoadSecondFileCommand = new AsyncRelayCommand(_ => LoadSecondFileAsync(), _ => !IsLoading && IsSideBySideMode);
             ExportSelectionCommand = new AsyncRelayCommand(_ => ExportSelectionAsync(), _ => !IsLoading && SelectionLength > 0);
-            SearchCommand = new AsyncRelayCommand(_ => SearchAsync(), _ => !IsLoading && !string.IsNullOrWhiteSpace(SearchText));
             RefreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), _ => !IsLoading);
-            GoToOffsetCommand = new AsyncRelayCommand(_ => GoToOffsetAsync(), _ => !IsLoading);
             ToggleInspectorCommand = new RelayCommand(_ => IsInspectorVisible = !IsInspectorVisible);
             SetSelectedOffsetCommand = new RelayCommand(param => HandleCellClick(param));
             
-            // Range selection commands
             HexCellMouseDownCommand = new RelayCommand(param => HandleMouseDown(param));
             HexCellMouseEnterCommand = new RelayCommand(param => HandleMouseEnter(param));
             HexCellMouseUpCommand = new RelayCommand(param => HandleMouseUp(param));
             
-            // Copy commands
             CopySelectionCommand = new AsyncRelayCommand(_ => CopySelectionAsync(), _ => SelectionLength > 0);
             CopyAsHexCommand = new AsyncRelayCommand(_ => CopyAsHexAsync(), _ => SelectionLength > 0);
             CopyAsAsciiCommand = new AsyncRelayCommand(_ => CopyAsAsciiAsync(), _ => SelectionLength > 0);
             
-            // Selection commands
-            SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => HexRows1.Count > 0);
+            SelectAllCommand = new RelayCommand(_ => SelectAll(), _ => HexRows1 != null && HexRows1.Count > 0);
             ClearSelectionCommand = new RelayCommand(_ => ClearSelection(), _ => SelectionLength > 0);
             
-            // Enhanced export and copy commands
             ExportToFileCommand = new AsyncRelayCommand(_ => ExportToFileAsync(), _ => SelectionLength > 0);
             CopyAsCArrayCommand = new AsyncRelayCommand(_ => CopyAsCArrayAsync(), _ => SelectionLength > 0);
             CopyAsBase64Command = new AsyncRelayCommand(_ => CopyAsBase64Async(), _ => SelectionLength > 0);
             UpdateKeyboardModifiersCommand = new RelayCommand(param => UpdateKeyboardModifiers(param));
-            
-            // Search result navigation commands
-            NavigateToPreviousResultCommand = new AsyncRelayCommand(_ => NavigateToPreviousResultAsync(), _ => CanNavigatePrevious);
-            NavigateToNextResultCommand = new AsyncRelayCommand(_ => NavigateToNextResultAsync(), _ => CanNavigateNext);
         }
 
-        /// <summary>
-        /// Loads a file into the hex viewer.
-        /// </summary>
-        /// <param name="filePath">The path to the file to load.</param>
-        /// <param name="gridNumber">The grid number (1 or 2).</param>
-        /// <param name="startOffset">The starting offset to load from (default: 0).</param>
-        /// <param name="maxRows">The maximum number of rows to load (default: MaxDisplayRows).</param>
-        public async Task LoadFileAsync(string filePath, int gridNumber = 1, long startOffset = 0, int maxRows = -1)
+        public async Task LoadFileAsync(string filePath, int gridNumber = 1)
         {
             if (string.IsNullOrEmpty(filePath))
             {
@@ -622,70 +303,48 @@ namespace S7_Csharp_Utility.ViewModels
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsLoading = true;
-                LoadingProgress = 0;
-                StatusText = $"Loading file {gridNumber}...";
+                StatusText = $"Analyzing file {gridNumber}...";
             });
 
             try
             {
-                var collection = gridNumber == 1 ? HexRows1 : HexRows2;
-                await Dispatcher.UIThread.InvokeAsync(() => collection.Clear());
-
-                // Load file information
-                var fileInfoLocal = new FileInfo(filePath);
-                var fileSize = fileInfoLocal.Length;
-                
-                var progress = new Progress<long>(bytes =>
+                if (gridNumber == 1)
                 {
-                    Dispatcher.UIThread.Post(() => 
-                    {
-                        if (fileSize > 0)
-                        {
-                            LoadingProgress = Math.Min(50.0, (double)bytes / fileSize * 50.0);
-                        }
-                        else
-                        {
-                            LoadingProgress = 0;
-                        }
-                    });
-                });
-
-                var fileInfo = await _hexViewerService.GetFileInfoAsync(filePath, _cancellationTokenSource.Token, progress);
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                    if (HexRows1 is IDisposable disposable1)
+                        disposable1.Dispose();
+                    HexRows1 = null;
+                    File1Path = string.Empty;
+                    File1Info = string.Empty;
+                    OnPropertyChanged(nameof(HexRows1));
+                }
+                else
                 {
-                    if (gridNumber == 1)
-                    {
-                        File1Path = filePath;
-                        File1Info = FormatFileInfo(fileInfo);
-                    }
-                    else
-                    {
-                        File2Path = filePath;
-                        File2Info = FormatFileInfo(fileInfo);
-                    }
-                    LoadingProgress = 60;
-                });
+                    if (HexRows2 is IDisposable disposable2)
+                        disposable2.Dispose();
+                    HexRows2 = null;
+                    File2Path = string.Empty;
+                    File2Info = string.Empty;
+                    OnPropertyChanged(nameof(HexRows2));
+                }
 
-                // Load hex data
-                var actualMaxRows = maxRows > 0 ? maxRows : MaxDisplayRows;
-                var rowProgress = new Progress<int>(rows =>
+                var fileInfo = await _hexViewerService.GetFileInfoAsync(filePath, _cancellationTokenSource.Token);
+
+                if (gridNumber == 1)
                 {
-                    Dispatcher.UIThread.Post(() => LoadingProgress = 60 + (rows / (double)actualMaxRows) * 40);
-                });
-
-                var hexRows = await _hexViewerService.LoadHexDataAsync(filePath, startOffset, actualMaxRows, _cancellationTokenSource.Token, rowProgress);
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                    HexRows1 = new VirtualizingHexList(filePath);
+                    File1Path = filePath;
+                    File1Info = FormatFileInfo(fileInfo);
+                    OnPropertyChanged(nameof(HexRows1));
+                }
+                else
                 {
-                    collection.Clear();
-                    foreach (var row in hexRows)
-                    {
-                        collection.Add(row);
-                    }
-                    LoadingProgress = 100;
-                    StatusText = $"✅ Loaded {collection.Count} rows from {fileInfo.FileName} ({fileInfo.FormattedSize})";
-                });
+                    HexRows2 = new VirtualizingHexList(filePath);
+                    File2Path = filePath;
+                    File2Info = FormatFileInfo(fileInfo);
+                    OnPropertyChanged(nameof(HexRows2));
+                }
+
+                StatusText = $"✅ Loaded {fileInfo.FileName} ({fileInfo.FormattedSize})";
             }
             catch (OperationCanceledException)
             {
@@ -707,21 +366,15 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Loads the first file.
-        /// </summary>
         private async Task LoadFirstFileAsync()
         {
             var filePath = await _dialogService.ShowOpenFileDialogAsync("Select File to View", "*", "All Files").ConfigureAwait(false);
             if (filePath != null)
             {
-                await LoadFileAsync(filePath, 1);
+                await LoadFileAsync(filePath);
             }
         }
 
-        /// <summary>
-        /// Loads the second file for side-by-side comparison.
-        /// </summary>
         private async Task LoadSecondFileAsync()
         {
             var filePath = await _dialogService.ShowOpenFileDialogAsync("Select Second File", "*", "All Files").ConfigureAwait(false);
@@ -731,88 +384,16 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Exports the current selection.
-        /// </summary>
         private async Task ExportSelectionAsync()
         {
-            // Implementation for exporting selection
             await _dialogService.ShowMessageAsync("Export", "Export functionality not yet implemented").ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Searches for hex patterns in the loaded files.
-        /// </summary>
-        private async Task SearchAsync()
-        {
-            if (string.IsNullOrWhiteSpace(SearchText) || string.IsNullOrEmpty(File1Path))
-            {
-                return;
-            }
-
-            try
-            {
-                IsLoading = true;
-                StatusText = "Searching...";
-
-                // Get file size for proper progress calculation
-                var fileInfo = new FileInfo(File1Path);
-                var fileSize = fileInfo.Length;
-
-                var progress = new Progress<long>(bytesProcessed =>
-                {
-                    Dispatcher.UIThread.Post(() => 
-                    {
-                        if (fileSize > 0)
-                        {
-                            LoadingProgress = Math.Min(100.0, (double)bytesProcessed / fileSize * 100.0);
-                        }
-                        else
-                        {
-                            LoadingProgress = 0;
-                        }
-                    });
-                });
-
-                var results = await _hexViewerService.SearchHexPatternAsync(File1Path, SearchText, 100, _cancellationTokenSource.Token, progress).ConfigureAwait(false);
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    SearchResults = results;
-                    if (results.Count > 0)
-                    {
-                        StatusText = $"✅ Found {results.Count} matches";
-                        // Navigate to first match
-                        CurrentSearchResultIndex = 0;
-                        _ = NavigateToSearchResultAsync(0);
-                    }
-                    else
-                    {
-                        StatusText = "❌ Pattern not found";
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    StatusText = $"❌ Search error: {ex.Message}";
-                });
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        /// <summary>
-        /// Refreshes the current view.
-        /// </summary>
         private async Task RefreshAsync()
         {
             if (!string.IsNullOrEmpty(File1Path))
             {
-                await LoadFileAsync(File1Path, 1);
+                await LoadFileAsync(File1Path);
             }
             if (!string.IsNullOrEmpty(File2Path) && IsSideBySideMode)
             {
@@ -820,18 +401,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Goes to a specific offset.
-        /// </summary>
-        private async Task GoToOffsetAsync()
-        {
-            // Implementation for going to specific offset
-            await _dialogService.ShowMessageAsync("Go To", "Go to offset functionality not yet implemented").ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Updates the inspector panel with data analysis based on current selection.
-        /// </summary>
         private async Task UpdateInspectorPanelAsync()
         {
             if (string.IsNullOrEmpty(File1Path) || SelectedOffset < 0)
@@ -842,23 +411,24 @@ namespace S7_Csharp_Utility.ViewModels
 
             try
             {
-                // Determine the offset and length to analyze
                 long analyzeOffset = SelectedOffset;
-                int analyzeLength = 16; // Default to 16 bytes for analysis
+                int analyzeLength = 16;
                 
-                // If we have a selection, use the selection for analysis
                 if (SelectionLength > 0)
                 {
                     analyzeOffset = Math.Min(SelectionStartOffset, SelectionEndOffset);
                     analyzeLength = (int)SelectionLength;
                 }
 
-                var analysis = await _hexViewerService.AnalyzeDataAsync(File1Path, analyzeOffset, analyzeLength, IsLittleEndian, _cancellationTokenSource.Token).ConfigureAwait(false);
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                if (HexRows1 is VirtualizingHexList virtualizingHexList)
                 {
-                    UpdateInspectorValues(analysis, analyzeLength);
-                });
+                    var analysis = await _hexViewerService.AnalyzeDataAsync(virtualizingHexList, analyzeOffset, analyzeLength, IsLittleEndian, _cancellationTokenSource.Token).ConfigureAwait(false);
+
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        UpdateInspectorValues(analysis, analyzeLength);
+                    });
+                }
             }
             catch (Exception ex)
             {
@@ -869,16 +439,11 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Updates inspector values based on analysis results and selection length.
-        /// </summary>
         private void UpdateInspectorValues(Dictionary<string, object> analysis, int dataLength)
         {
-            // String values - always show for any selection
             AsciiValue = analysis.GetValueOrDefault("ASCII", string.Empty).ToString() ?? string.Empty;
             Utf8Value = analysis.GetValueOrDefault("UTF8", string.Empty).ToString() ?? string.Empty;
             
-            // Single byte values - always available
             if (dataLength >= 1)
             {
                 CharValue = analysis.GetValueOrDefault("Char", string.Empty).ToString() ?? string.Empty;
@@ -892,7 +457,6 @@ namespace S7_Csharp_Utility.ViewModels
                 UInt8Value = 0;
             }
 
-            // 2-byte values (word) - available when selection is 2+ bytes
             if (dataLength >= 2)
             {
                 Int16Value = (short)analysis.GetValueOrDefault("Int16", (short)0);
@@ -904,7 +468,6 @@ namespace S7_Csharp_Utility.ViewModels
                 UInt16Value = 0;
             }
 
-            // 4-byte values (dword) - available when selection is 4+ bytes
             if (dataLength >= 4)
             {
                 Int32Value = (int)analysis.GetValueOrDefault("Int32", 0);
@@ -918,7 +481,6 @@ namespace S7_Csharp_Utility.ViewModels
                 FloatValue = 0.0f;
             }
 
-            // 8-byte values (qword) - available when selection is 8+ bytes
             if (dataLength >= 8)
             {
                 Int64Value = (long)analysis.GetValueOrDefault("Int64", 0L);
@@ -933,9 +495,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Clears the inspector panel.
-        /// </summary>
         private void ClearInspectorPanel()
         {
             AsciiValue = string.Empty;
@@ -953,9 +512,6 @@ namespace S7_Csharp_Utility.ViewModels
             DoubleValue = 0.0;
         }
 
-        /// <summary>
-        /// Formats file information for display.
-        /// </summary>
         private static string FormatFileInfo(HexViewerService.HexFileInfo fileInfo)
         {
             var sb = new StringBuilder();
@@ -969,43 +525,31 @@ namespace S7_Csharp_Utility.ViewModels
 
         #region Range Selection Methods
 
-        /// <summary>
-        /// Handles cell click events with keyboard modifier support.
-        /// </summary>
         private void HandleCellClick(object? parameter)
         {
             if (parameter is not long offset || offset < 0) return;
 
-            // TODO: In a real implementation, you would detect keyboard modifiers here
-            // For now, we'll simulate the behavior
             var shiftPressed = _shiftKeyPressed;
             var ctrlPressed = _ctrlKeyPressed;
 
             if (shiftPressed && _selectionAnchor >= 0)
             {
-                // Shift+Click: Extend selection from anchor to current offset
                 SelectionStartOffset = _selectionAnchor;
                 SelectionEndOffset = offset;
                 SelectedOffset = offset;
             }
             else if (ctrlPressed)
             {
-                // Ctrl+Click: Toggle selection (for future multi-selection support)
-                // For now, just treat as normal click
                 StartNewSelection(offset);
             }
             else
             {
-                // Normal click: Start new selection
                 StartNewSelection(offset);
             }
 
             UpdateStatusText();
         }
 
-        /// <summary>
-        /// Handles mouse down events for drag selection.
-        /// </summary>
         private void HandleMouseDown(object? parameter)
         {
             if (parameter is not long offset || offset < 0) return;
@@ -1015,31 +559,21 @@ namespace S7_Csharp_Utility.ViewModels
             StartNewSelection(offset);
         }
 
-        /// <summary>
-        /// Handles mouse enter events during drag selection.
-        /// </summary>
         private void HandleMouseEnter(object? parameter)
         {
             if (!_isSelecting || parameter is not long offset || offset < 0) return;
 
-            // Update selection range during drag
             SelectionStartOffset = _selectionAnchor;
             SelectionEndOffset = offset;
             SelectedOffset = offset;
             UpdateStatusText();
         }
 
-        /// <summary>
-        /// Handles mouse up events to end drag selection.
-        /// </summary>
         private void HandleMouseUp(object? parameter)
         {
             _isSelecting = false;
         }
 
-        /// <summary>
-        /// Starts a new selection at the specified offset.
-        /// </summary>
         private void StartNewSelection(long offset)
         {
             _selectionAnchor = offset;
@@ -1048,33 +582,17 @@ namespace S7_Csharp_Utility.ViewModels
             SelectedOffset = offset;
         }
 
-        /// <summary>
-        /// Selects all bytes in the current view.
-        /// </summary>
         private void SelectAll()
         {
-            if (HexRows1.Count == 0) return;
+            if (HexRows1 is not VirtualizingHexList virtualizingHexList || virtualizingHexList.FileSize == 0) return;
 
-            var firstRow = HexRows1.First();
-            var lastRow = HexRows1.Last();
-
-            // Find first and last valid offsets
-            var firstOffset = firstRow.Offsets.FirstOrDefault(o => o >= 0);
-            var lastOffset = lastRow.Offsets.LastOrDefault(o => o >= 0);
-
-            if (firstOffset >= 0 && lastOffset >= 0)
-            {
-                SelectionStartOffset = firstOffset;
-                SelectionEndOffset = lastOffset;
-                SelectedOffset = firstOffset;
-                _selectionAnchor = firstOffset;
-                UpdateStatusText();
-            }
+            SelectionStartOffset = 0;
+            SelectionEndOffset = virtualizingHexList.FileSize - 1;
+            SelectedOffset = 0;
+            _selectionAnchor = 0;
+            UpdateStatusText();
         }
 
-        /// <summary>
-        /// Clears the current selection.
-        /// </summary>
         private void ClearSelection()
         {
             SelectionStartOffset = -1;
@@ -1083,9 +601,6 @@ namespace S7_Csharp_Utility.ViewModels
             UpdateStatusText();
         }
 
-        /// <summary>
-        /// Updates the status text with selection information.
-        /// </summary>
         private void UpdateStatusText()
         {
             if (SelectionLength > 0)
@@ -1108,17 +623,11 @@ namespace S7_Csharp_Utility.ViewModels
 
         #region Copy Methods
 
-        /// <summary>
-        /// Copies the selected bytes to clipboard in hex format.
-        /// </summary>
         private async Task CopySelectionAsync()
         {
             await CopyAsHexAsync();
         }
 
-        /// <summary>
-        /// Copies the selected bytes as hex string to clipboard.
-        /// </summary>
         private async Task CopyAsHexAsync()
         {
             if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
@@ -1140,7 +649,6 @@ namespace S7_Csharp_Utility.ViewModels
 
                 var hexString = Convert.ToHexString(buffer, 0, bytesRead);
                 
-                // Format as space-separated hex bytes
                 var formattedHex = string.Join(" ", Enumerable.Range(0, bytesRead)
                     .Select(i => hexString.Substring(i * 2, 2)));
 
@@ -1153,9 +661,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Copies the selected bytes as ASCII string to clipboard.
-        /// </summary>
         private async Task CopyAsAsciiAsync()
         {
             if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
@@ -1175,7 +680,6 @@ namespace S7_Csharp_Utility.ViewModels
                 var buffer = new byte[length];
                 var bytesRead = await stream.ReadAsync(buffer, 0, length, _cancellationTokenSource.Token);
 
-                // Convert to ASCII, replacing non-printable characters with '.'
                 var asciiString = new StringBuilder();
                 for (int i = 0; i < bytesRead; i++)
                 {
@@ -1192,9 +696,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Sets text to the system clipboard.
-        /// </summary>
         private async Task SetClipboardTextAsync(string text)
         {
             await Dispatcher.UIThread.InvokeAsync(async () =>
@@ -1214,9 +715,6 @@ namespace S7_Csharp_Utility.ViewModels
 
         #region Enhanced Export and Copy Methods
 
-        /// <summary>
-        /// Exports the selected bytes to a file with various format options.
-        /// </summary>
         private async Task ExportToFileAsync()
         {
             if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
@@ -1240,7 +738,7 @@ namespace S7_Csharp_Utility.ViewModels
                 
                 sourceStream.Seek(start, SeekOrigin.Begin);
                 
-                var buffer = new byte[Math.Min(8192, length)]; // Use 8KB buffer
+                var buffer = new byte[Math.Min(8192, length)];
                 var totalBytesRead = 0;
                 
                 while (totalBytesRead < length)
@@ -1262,9 +760,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Copies the selected bytes as C array format to clipboard.
-        /// </summary>
         private async Task CopyAsCArrayAsync()
         {
             if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
@@ -1312,9 +807,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Copies the selected bytes as Base64 string to clipboard.
-        /// </summary>
         private async Task CopyAsBase64Async()
         {
             if (SelectionLength == 0 || string.IsNullOrEmpty(File1Path))
@@ -1345,9 +837,6 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Updates keyboard modifier states from UI events.
-        /// </summary>
         private void UpdateKeyboardModifiers(object? parameter)
         {
             if (parameter is string modifierState)
@@ -1363,72 +852,6 @@ namespace S7_Csharp_Utility.ViewModels
 
         #endregion
 
-        #region Search Result Navigation Methods
-
-        /// <summary>
-        /// Navigates to the previous search result.
-        /// </summary>
-        private async Task NavigateToPreviousResultAsync()
-        {
-            if (CurrentSearchResultIndex > 0)
-            {
-                CurrentSearchResultIndex--;
-                await NavigateToSearchResultAsync(CurrentSearchResultIndex);
-            }
-        }
-
-        /// <summary>
-        /// Navigates to the next search result.
-        /// </summary>
-        private async Task NavigateToNextResultAsync()
-        {
-            if (CurrentSearchResultIndex < SearchResults.Count - 1)
-            {
-                CurrentSearchResultIndex++;
-                await NavigateToSearchResultAsync(CurrentSearchResultIndex);
-            }
-        }
-
-        /// <summary>
-        /// Navigates to a specific search result by index.
-        /// </summary>
-        private async Task NavigateToSearchResultAsync(int index)
-        {
-            if (index < 0 || index >= SearchResults.Count)
-            {
-                return;
-            }
-
-            var targetOffset = SearchResults[index];
-            
-            try
-            {
-                StatusText = $"Navigating to result {index + 1} of {SearchResults.Count}...";
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    // Set the selected offset to highlight the search result
-                    SelectedOffset = targetOffset;
-                    SelectionStartOffset = targetOffset;
-                    SelectionEndOffset = targetOffset;
-                    
-                    // Trigger navigation to offset event
-                    NavigateToOffsetRequested?.Invoke(targetOffset);
-                    
-                    // Update status
-                    StatusText = $"✅ Result {index + 1} of {SearchResults.Count} at offset 0x{targetOffset:X8}";
-                });
-            }
-            catch (Exception ex)
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    StatusText = $"❌ Navigation error: {ex.Message}";
-                });
-            }
-        }
-
-        #endregion
 
         /// <summary>
         /// Disposes of resources used by the ViewModel.
@@ -1437,6 +860,10 @@ namespace S7_Csharp_Utility.ViewModels
         {
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();
+            if (HexRows1 is IDisposable disposable1)
+                disposable1.Dispose();
+            if (HexRows2 is IDisposable disposable2)
+                disposable2.Dispose();
         }
     }
 }

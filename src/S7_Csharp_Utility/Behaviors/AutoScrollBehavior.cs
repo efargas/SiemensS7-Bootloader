@@ -26,7 +26,7 @@ namespace S7_Csharp_Utility.Behaviors
         {
             if (listBox.Items is INotifyCollectionChanged notifyCollection)
             {
-                if ((bool)e.NewValue)
+                if (e.NewValue is bool and true)
                 {
                     notifyCollection.CollectionChanged += OnCollectionChanged;
                 }
