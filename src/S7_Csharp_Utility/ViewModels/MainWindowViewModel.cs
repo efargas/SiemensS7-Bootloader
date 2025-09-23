@@ -220,10 +220,9 @@ namespace S7_Csharp_Utility.ViewModels
             _ = ScanPayloadsAsync();
         }
 
-        private void HandleException(Exception ex)
+        private async void HandleException(Exception ex)
         {
-            Logging.Log($"An unexpected error occurred: {ex.ToString()}", LogCategory.Error);
-            _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
+            await NotificationService.Instance.ShowErrorAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}", ex);
         }
 
         private void ShowProfileManagement() => ViewService.ShowProfileManagementWindow(ConfigService, profile => LoadedProfile = profile);
@@ -284,14 +283,12 @@ namespace S7_Csharp_Utility.ViewModels
             catch (Exception ex) when (ex is TimeoutException || ex is System.IO.IOException)
             {
                 var errorType = ex is TimeoutException ? "Timeout" : "Connection";
-                Logging.Log($"[ERROR] ⏱️ {errorType} during stager sequence: {ex}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync($"{errorType} Error", $"The operation timed out. Error: {ex.Message}");
+                await NotificationService.Instance.ShowErrorAsync($"{errorType} Error", $"The operation timed out. Error: {ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                Logging.Log($"[ERROR] ❌ Unexpected error during stager sequence: {ex}", LogCategory.Error);
                 if (ex.InnerException != null) Logging.Log($"[ERROR] Inner exception: {ex.InnerException}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"An error occurred during the stager sequence: {ex.Message}");
+                await NotificationService.Instance.ShowErrorAsync("Error", $"An error occurred during the stager sequence: {ex.Message}", ex);
             }
             finally
             {
@@ -343,8 +340,7 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Logging.Log($"An error occurred during the dump sequence: {ex}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Error", ex.Message);
+                    await NotificationService.Instance.ShowErrorAsync("Error", ex.Message, ex);
                 }
                 finally
                 {
@@ -505,8 +501,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             catch (Exception ex)
             {
-                Logging.Log($"Error scanning payloads: {ex.ToString()}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"Error scanning payloads: {ex.Message}");
+                await NotificationService.Instance.ShowErrorAsync("Error", $"Error scanning payloads: {ex.Message}", ex);
             }
             finally
             {

@@ -42,6 +42,8 @@ namespace S7_Csharp_Utility
                 ConfigureServices(services);
                 Services = services.BuildServiceProvider();
 
+                NotificationService.Instance.Initialize(Services);
+
                 // This resolves the MainWindow, which in turn resolves its dependencies like the ViewModel.
                 desktop.MainWindow = Services.GetRequiredService<MainWindow>();
                 var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();

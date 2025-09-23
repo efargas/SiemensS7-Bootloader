@@ -107,8 +107,7 @@ namespace S7_Csharp_Utility.ViewModels
 
         private async void HandleException(System.Exception ex)
         {
-            _loggingService.Log($"An unexpected error occurred: {ex.ToString()}", LogCategory.Error);
-            await _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
+            await NotificationService.Instance.ShowErrorAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}", ex);
         }
 
         private bool CanExecute()
@@ -137,8 +136,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             catch (System.Exception ex)
             {
-                await _dialogService.ShowMessageAsync("Error", $"Error during folder compare: {ex.Message}");
-                _loggingService.Log($"Error during folder compare: {ex.ToString()}", LogCategory.Error);
+                await NotificationService.Instance.ShowErrorAsync("Error", $"Error during folder compare: {ex.Message}", ex);
             }
             finally
             {
@@ -173,8 +171,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             catch (System.Exception ex)
             {
-                await _dialogService.ShowMessageAsync("Error", $"Error during file compare: {ex.Message}");
-                _loggingService.Log($"Error during file compare: {ex.ToString()}", LogCategory.Error);
+                await NotificationService.Instance.ShowErrorAsync("Error", $"Error during file compare: {ex.Message}", ex);
             }
             finally
             {

@@ -77,5 +77,11 @@ namespace S7_Csharp_Utility
             // This method is not applicable for ProfileManagementWindow
             // It's only used in the main window context
         }
+
+        public async Task ShowErrorAsync(string title, string message, System.Exception ex)
+        {
+            // For now, just show the message. A proper implementation would log the exception.
+            await ShowMessageAsync(title, message);
+        }
     }
 }

@@ -1,13 +1,14 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Data;
 using System.Collections.Specialized;
+using System.Runtime.CompilerServices;
 
 namespace S7_Csharp_Utility.Behaviors
 {
     public static class AutoScrollBehavior
     {
+        private static readonly ConditionalWeakTable<INotifyCollectionChanged, ListBox> _associations = new();
+
         public static readonly AttachedProperty<bool> IsEnabledProperty =
             AvaloniaProperty.RegisterAttached<ListBox, bool>("IsEnabled", typeof(AutoScrollBehavior));
 
@@ -28,10 +29,12 @@ namespace S7_Csharp_Utility.Behaviors
             {
                 if ((bool)e.NewValue)
                 {
+                    _associations.Add(notifyCollection, listBox);
                     notifyCollection.CollectionChanged += OnCollectionChanged;
                 }
                 else
                 {
+                    _associations.Remove(notifyCollection);
                     notifyCollection.CollectionChanged -= OnCollectionChanged;
                 }
             }
@@ -39,15 +42,15 @@ namespace S7_Csharp_Utility.Behaviors
 
         private static void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (sender is System.Collections.IList items && items.Count > 0)
+            if (sender is INotifyCollectionChanged collection && _associations.TryGetValue(collection, out var listBox))
             {
-                var lastItem = items[items.Count - 1];
-                if (lastItem != null)
+                if (listBox.Items is System.Collections.IList items && items.Count > 0)
                 {
-                    // Find the ListBox that contains this collection
-                    // This is a simplified approach - in a real implementation you might need to track the ListBox reference
-                    // For now, we'll skip the scroll functionality to avoid the compilation error
-                    // TODO: Implement proper ListBox reference tracking
+                    var lastItem = items[items.Count - 1];
+                    if (lastItem != null)
+                    {
+                        listBox.ScrollIntoView(lastItem);
+                    }
                 }
             }
         }
