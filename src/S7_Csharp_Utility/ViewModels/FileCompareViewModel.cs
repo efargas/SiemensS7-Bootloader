@@ -105,10 +105,10 @@ namespace S7_Csharp_Utility.ViewModels
             CompareTwoFilesCommand = new AsyncRelayCommand(_ => CompareTwoFilesAsync(), _ => CanExecute() && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2), HandleException);
         }
 
-        private void HandleException(System.Exception ex)
+        private async void HandleException(System.Exception ex)
         {
             _loggingService.Log($"An unexpected error occurred: {ex.ToString()}", LogCategory.Error);
-            _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
+            await _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
         }
 
         private bool CanExecute()

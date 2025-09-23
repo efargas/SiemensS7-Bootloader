@@ -269,17 +269,17 @@ namespace S7_Csharp_Utility.ViewModels
 
             StartSocatCommand = new AsyncRelayCommand(_ => StartSocatAsync(), _ => SocatStatus != "Running");
             StopSocatCommand = new AsyncRelayCommand(_ => StopSocatAsync(), _ => SocatStatus == "Running");
-            RefreshSerialPortsCommand = new RelayCommand(_ => RefreshSerialPorts());
+            RefreshSerialPortsCommand = new RelayCommand(async _ => await RefreshSerialPortsAsync());
             ShowSocatLogCommand = new RelayCommand(_ => _dialogService.ShowSocatLogWindow());
-            CheckSocatProcessesCommand = new RelayCommand(_ => CheckSocatProcesses(), _ => true);
-            KillSocatProcessesCommand = new RelayCommand(_ => KillSocatProcesses(), _ => true);
+            CheckSocatProcessesCommand = new RelayCommand(async _ => await CheckSocatProcessesAsync(), _ => true);
+            KillSocatProcessesCommand = new RelayCommand(async _ => await KillSocatProcessesAsync(), _ => true);
 
-            RefreshSerialPorts();
+            RefreshSerialPortsAsync();
         }
 
-        private void CheckSocatProcesses()
+        private async Task CheckSocatProcessesAsync()
         {
-            Task.Run(() =>
+            await Task.Run(() =>
             {
                 var pids = SocatService.GetSocatProcessIds();
                 if (pids.Length == 0)
@@ -289,17 +289,17 @@ namespace S7_Csharp_Utility.ViewModels
             });
         }
 
-        private void KillSocatProcesses()
+        private async Task KillSocatProcessesAsync()
         {
-            Task.Run(() =>
+            await Task.Run(() =>
             {
                 SocatService.KillAllSocatProcesses(s => _loggingService.Log(s, LogCategory.Info));
             });
         }
 
-        private void RefreshSerialPorts()
+        private async Task RefreshSerialPortsAsync()
         {
-            Task.Run(() =>
+            await Task.Run(() =>
             {
                 var ports = System.IO.Ports.SerialPort.GetPortNames();
                 Dispatcher.UIThread.Post(() =>
@@ -338,24 +338,18 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private Task StopSocatAsync()
+        private async Task StopSocatAsync()
         {
-            return Task.Run(async () =>
+            try
             {
-                try
-                {
-                    _socatService.Stop();
-                    Dispatcher.UIThread.Post(() => SocatStatus = "Stopped");
-                }
-                catch (Exception ex)
-                {
-                    _loggingService.Log($"Error stopping socat: {ex.ToString()}", LogCategory.Error);
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
-                    });
-                }
-            });
+                await Task.Run(() => _socatService.Stop());
+                SocatStatus = "Stopped";
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Log($"Error stopping socat: {ex.ToString()}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
+            }
         }
     }
 }
