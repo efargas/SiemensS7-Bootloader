@@ -65,29 +65,29 @@ jobs:
             else
               echo "dotnet tool restore failed; installing dotnet-format globally as fallback"
               dotnet tool install -g dotnet-format
-              export PATH="$HOME/.dotnet/tools:$PATH"
             fi
           else
             echo "No tool manifest; installing dotnet-format globally for CI"
             dotnet tool install -g dotnet-format
-            export PATH="$HOME/.dotnet/tools:$PATH"
           fi
-          
-      - name: Format check (tests project) if dotnet-format present
-        working-directory: ./tests/S7.Tests
-        env:
-          PATH: ${{ runner.home }}/.dotnet/tools:${{ env.PATH }}
+
+      - name: Format check (run dotnet-format on solution/project)
         run: |
           set -e
-          if command -v dotnet-format >/dev/null 2>&1; then
-            echo "Running dotnet format --verify-no-changes in tests/S7.Tests"
-            if ! dotnet format --verify-no-changes; then
-              echo "Code formatting required. Run 'dotnet format' in tests/S7.Tests locally." >&2
-              exit 1
-            fi
-          else
-            echo "dotnet-format not found; skipping format check"
+          # Pick a solution if present, otherwise first csproj
+          SOLN=$(git ls-files '*.sln' | head -n1 || true)
+          if [ -n "$SOLN" ]; then
+            echo "Formatting solution: $SOLN"
+            dotnet format "$SOLN" --verify-no-changes
+            exit 0
           fi
+          CSPROJ=$(git ls-files '*.csproj' | head -n1 || true)
+          if [ -n "$CSPROJ" ]; then
+            echo "Formatting project: $CSPROJ"
+            dotnet format "$CSPROJ" --verify-no-changes
+            exit 0
+          fi
+          echo "No .sln or .csproj found; skipping dotnet format check."
 
       - name: Format check (tests project) if tool manifest present
         working-directory: ./tests/S7.Tests
