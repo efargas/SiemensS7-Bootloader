@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -9,12 +8,14 @@ on:
 
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
-  NUGET_PACKAGES: ${{ runner.temp }}/.nuget/packages
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # runner.* expressions are allowed at job-level env
+      NUGET_PACKAGES: ${{ runner.temp }}/.nuget/packages
     strategy:
       matrix:
         dotnet: [8.0.x]
@@ -45,9 +46,10 @@ jobs:
         working-directory: ./tests/S7.Tests
         run: |
           if [ -f .config/dotnet-tools.json ]; then
+            echo "Restoring dotnet tools in tests/S7.Tests"
             dotnet tool restore
           else
-            echo "No tool manifest; skipping dotnet tool restore."
+            echo "No tool manifest at tests/S7.Tests/.config/dotnet-tools.json; skipping dotnet tool restore."
           fi
 
       - name: Format check (tests project) if tool manifest present
@@ -55,13 +57,16 @@ jobs:
         run: |
           set -e
           if [ -f .config/dotnet-tools.json ]; then
+            echo "Running dotnet format --verify-no-changes in tests/S7.Tests"
             if ! dotnet format --verify-no-changes; then
-              echo "Formatting required. Run 'dotnet format' in tests/S7.Tests locally." >&2
+              echo "Code formatting required. Run 'dotnet format' in tests/S7.Tests locally." >&2
               exit 1
             fi
+          else
+            echo "No dotnet-format manifest; skipping format check."
           fi
 
-      - name: Build (Release)
+      - name: Build all projects (Release)
         run: |
           if [ -f ./src/Solution.sln ]; then
             dotnet build ./src/Solution.sln --configuration Release --no-restore
@@ -82,6 +87,7 @@ jobs:
       - name: Clean up stale partial files (best-effort)
         if: always()
         run: |
+          echo "Cleaning .partial files from workspace (best-effort)"
           find $RUNNER_TEMP -type f -name "*.partial" -maxdepth 4 -print -delete || true
 
       - name: Show disk usage (debug)
@@ -91,4 +97,3 @@ jobs:
       - name: List workspace (debug)
         if: always()
         run: ls -la || true
-        
