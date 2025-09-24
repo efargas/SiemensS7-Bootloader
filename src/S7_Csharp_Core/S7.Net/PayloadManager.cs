@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace S7.Net
@@ -35,68 +36,79 @@ namespace S7.Net
         }
 
         /// <summary>
-        /// Scans the payloads directory and returns information about all discovered payloads.
+        /// Asynchronously scans the payloads directory and returns information about all discovered payloads.
         /// </summary>
         /// <param name="payloadsBase">The base directory to scan for payloads.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A list of discovered payload information.</returns>
-        public List<PayloadInfo> ScanPayloads(string payloadsBase)
+        public Task<List<PayloadInfo>> ScanPayloadsAsync(string payloadsBase, CancellationToken cancellationToken = default)
         {
-            var payloads = new List<PayloadInfo>();
-
-            if (!Directory.Exists(payloadsBase))
+            return Task.Run(() =>
             {
-                return payloads; // Return empty list if directory doesn't exist
-            }
+                var payloads = new List<PayloadInfo>();
 
-            try
-            {
-                // Look for common payload file patterns
-                var payloadPatterns = new[]
+                if (!Directory.Exists(payloadsBase))
                 {
-                    "*.bin",
-                    "stager*",
-                    "dump_mem*",
-                    "hello_*",
-                    "tic_tac_toe*"
-                };
-
-                var foundFiles = new HashSet<string>();
-
-                foreach (var pattern in payloadPatterns)
-                {
-                    foreach (var file in Directory.GetFiles(payloadsBase, pattern, SearchOption.AllDirectories))
-                    {
-                        if (foundFiles.Add(file)) // Only add if not already found
-                        {
-                            var fileInfo = new FileInfo(file);
-                            var relativePath = Path.GetRelativePath(payloadsBase, file);
-                            
-                            payloads.Add(new PayloadInfo
-                            {
-                                Name = Path.GetFileName(file),
-                                FilePath = file,
-                                RelativePath = relativePath,
-                                Size = fileInfo.Length,
-                                Type = DeterminePayloadType(file)
-                            });
-                        }
-                    }
+                    return payloads; // Return empty list if directory doesn't exist
                 }
 
-                // Sort by type and then by name
-                payloads.Sort((a, b) =>
+                try
                 {
-                    var typeComparison = a.Type.CompareTo(b.Type);
-                    return typeComparison != 0 ? typeComparison : a.Name.CompareTo(b.Name);
-                });
-            }
-            catch (Exception ex)
-            {
-                // Log error but don't throw - return what we found so far
-                System.Diagnostics.Debug.WriteLine($"Error scanning payloads: {ex.Message}");
-            }
+                    // Look for common payload file patterns
+                    var payloadPatterns = new[]
+                    {
+                        "*.bin",
+                        "stager*",
+                        "dump_mem*",
+                        "hello_*",
+                        "tic_tac_toe*"
+                    };
 
-            return payloads;
+                    var foundFiles = new HashSet<string>();
+
+                    foreach (var pattern in payloadPatterns)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        foreach (var file in Directory.GetFiles(payloadsBase, pattern, SearchOption.AllDirectories))
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (foundFiles.Add(file)) // Only add if not already found
+                            {
+                                var fileInfo = new FileInfo(file);
+                                var relativePath = Path.GetRelativePath(payloadsBase, file);
+
+                                payloads.Add(new PayloadInfo
+                                {
+                                    Name = Path.GetFileName(file),
+                                    FilePath = file,
+                                    RelativePath = relativePath,
+                                    Size = fileInfo.Length,
+                                    Type = DeterminePayloadType(file)
+                                });
+                            }
+                        }
+                    }
+
+                    // Sort by type and then by name
+                    payloads.Sort((a, b) =>
+                    {
+                        var typeComparison = a.Type.CompareTo(b.Type);
+                        return typeComparison != 0 ? typeComparison : a.Name.CompareTo(b.Name);
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                    // Propagate cancellation
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // Log error but don't throw - return what we found so far
+                    System.Diagnostics.Debug.WriteLine($"Error scanning payloads: {ex.Message}");
+                }
+
+                return payloads;
+            }, cancellationToken);
         }
 
         /// <summary>

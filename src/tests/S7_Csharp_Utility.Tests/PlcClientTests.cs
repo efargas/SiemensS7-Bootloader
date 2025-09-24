@@ -17,13 +17,13 @@ namespace S7_Csharp_Utility.Tests
             var mockChannel = new Mock<ICommunicationChannel>();
             var cts = new CancellationTokenSource();
 
-            mockChannel.Setup(c => c.RawWriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            mockChannel.Setup(c => c.WriteAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .Returns<byte[], int, int, CancellationToken>(async (buffer, offset, count, cancellationToken) =>
                 {
                     await Task.Delay(100, cancellationToken);
                 });
 
-            mockChannel.Setup(c => c.RawReadAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            mockChannel.Setup(c => c.ReadAsync(It.IsAny<byte[]>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .Returns<byte[], int, int, CancellationToken>(async (buffer, offset, count, cancellationToken) =>
                 {
                     await Task.Delay(100, cancellationToken);
@@ -37,7 +37,7 @@ namespace S7_Csharp_Utility.Tests
             cts.Cancel();
 
             // Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(() => task);
+            await Assert.ThrowsAsync<TaskCanceledException>(() => task);
         }
     }
 }

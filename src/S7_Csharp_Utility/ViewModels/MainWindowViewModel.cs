@@ -1,6 +1,7 @@
 #nullable enable
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.Commands;
+using S7_Csharp_Utility.Extensions;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using System;
@@ -26,8 +27,8 @@ namespace S7_Csharp_Utility.ViewModels
     {
         private const string ConfigFileName = "config.json";
 
-        public PlcConnectionViewModel PlcConnectionViewModel { get; }
-        public ModbusPowerSupplyViewModel ModbusPowerSupplyViewModel { get; }
+        public PlcConnectionViewModel? PlcConnectionViewModel { get; }
+        public ModbusPowerSupplyViewModel? ModbusPowerSupplyViewModel { get; }
         public ConfigurationViewModel ConfigurationViewModel { get; }
         public FileCompareViewModel FileCompareViewModel { get; }
         public LoggingService Logging { get; }
@@ -144,10 +145,12 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand ShowHexViewerCommand { get; }
         public ICommand SaveConfigurationCommand { get; }
         public ICommand ExitCommand { get; }
+        public ICommand CancelScanCommand { get; }
 
         private readonly IDialogService _dialogService;
         public ConfigurationService ConfigService { get; }
 
+        private CancellationTokenSource? _scanCancellationTokenSource;
         private DeviceProfile? _loadedProfile;
         public DeviceProfile? LoadedProfile
         {
@@ -203,12 +206,19 @@ namespace S7_Csharp_Utility.ViewModels
             ConfigurationViewModel = configurationViewModel;
             FileCompareViewModel = fileCompareViewModel;
 
-            PlcConnectionViewModel.SocatStatusChanged += (string status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
-            ModbusPowerSupplyViewModel.ModbusStatusChanged += (string status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
+            if (PlcConnectionViewModel != null)
+            {
+                PlcConnectionViewModel.SocatStatusChanged += (status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
+            }
+            if (ModbusPowerSupplyViewModel != null)
+            {
+                ModbusPowerSupplyViewModel.ModbusStatusChanged += (status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
+            }
 
             StartExploitSequenceCommand = new AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => PlcConnectionViewModel?.SocatStatus == "Running" && ModbusPowerSupplyViewModel?.ModbusStatus == "Connected" && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
             DumpMemoryCommand = new AsyncRelayCommand(_ => DumpMemoryAsync(), _ => StagerInstalled && !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
             CancelDumpCommand = new RelayCommand(_ => CancelDump(), _ => IsDumpingMemory);
+            CancelScanCommand = new RelayCommand(_ => CancelScan(), _ => IsScanning);
             LoadProfileCommand = new AsyncRelayCommand(_ => LoadProfileAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
             SaveConfigurationCommand = new AsyncRelayCommand(_ => SaveConfigurationOnExit(), _ => true, HandleException);
 
@@ -217,7 +227,7 @@ namespace S7_Csharp_Utility.ViewModels
             ShowHexViewerCommand = new RelayCommand(_ => ShowHexViewer());
             ExitCommand = new RelayCommand(_ => Exit());
             
-            _ = ScanPayloadsAsync();
+            StartScanPayloads();
         }
 
         private void HandleException(Exception ex)
@@ -492,16 +502,26 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async Task ScanPayloadsAsync()
+        private void CancelScan() => _scanCancellationTokenSource?.Cancel();
+
+        private void StartScanPayloads()
+        {
+            _scanCancellationTokenSource?.Cancel();
+            _scanCancellationTokenSource = new CancellationTokenSource();
+            ScanPayloadsAsync(_scanCancellationTokenSource.Token).FireAndForget(ex => Logging.Log($"Error during payload scan: {ex.Message}", LogCategory.Error));
+        }
+
+        private async Task ScanPayloadsAsync(CancellationToken cancellationToken)
         {
             if (IsScanning || string.IsNullOrWhiteSpace(ConfigurationViewModel.PayloadsPath))
                 return;
 
             IsScanning = true;
-            
+            ((RelayCommand)CancelScanCommand).RaiseCanExecuteChanged();
+
             try
             {
-                var payloads = await Task.Run(() => _payloadManager.ScanPayloads(ConfigurationViewModel.PayloadsPath));
+                var payloads = await _payloadManager.ScanPayloadsAsync(ConfigurationViewModel.PayloadsPath, cancellationToken);
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -519,6 +539,10 @@ namespace S7_Csharp_Utility.ViewModels
                     Logging.Log($"  - {payload.Type}: {payload.RelativePath} ({payload.Size} bytes)", LogCategory.Debug);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                Logging.Log("Payload scan was cancelled.", LogCategory.Info);
+            }
             catch (Exception ex)
             {
                 Logging.Log($"Error scanning payloads: {ex.ToString()}", LogCategory.Error);
@@ -527,6 +551,7 @@ namespace S7_Csharp_Utility.ViewModels
             finally
             {
                 IsScanning = false;
+                ((RelayCommand)CancelScanCommand).RaiseCanExecuteChanged();
             }
         }
     }

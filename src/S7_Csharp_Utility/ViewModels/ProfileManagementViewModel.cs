@@ -1,4 +1,5 @@
 using S7_Csharp_Utility.Commands;
+using S7_Csharp_Utility.Extensions;
 using S7_Csharp_Utility.Services;
 using System;
 using System.Collections.ObjectModel;
@@ -64,10 +65,10 @@ namespace S7_Csharp_Utility.ViewModels
             RemoveRegionCommand = new RelayCommand(_ => RemoveRegion(), _ => SelectedRegion != null);
             SetActiveProfileCommand = new RelayCommand(_ => SetActiveProfile(), _ => SelectedProfile != null);
 
-            LoadProfilesAsync();
+            LoadProfilesAsync().FireAndForget(ex => _dialogService.ShowMessageAsync("Error Loading Profiles", $"An error occurred while loading device profiles: {ex.Message}"));
         }
 
-        private async void LoadProfilesAsync()
+        private async Task LoadProfilesAsync()
         {
             var profiles = await _configService.LoadAllProfilesAsync();
             Profiles.Clear();

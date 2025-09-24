@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace S7.Utils
 {
@@ -172,21 +174,30 @@ namespace S7.Utils
         private const int FwEntryNameSize = 6;
 
         /// <summary>
-        /// Parses the metadata of a firmware file.
+        /// Parses the metadata of a firmware file asynchronously.
         /// </summary>
         /// <param name="filePath">The path to the firmware file.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A list of raw firmware entries.</returns>
-        public List<FwRawEntry> ParseMetadata(string filePath)
+        public async Task<List<FwRawEntry>> ParseMetadataAsync(string filePath, CancellationToken cancellationToken = default)
         {
             var entries = new List<FwRawEntry>();
-            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-            using (var br = new BinaryReader(fs))
+            var entrySize = Marshal.SizeOf(typeof(FwRawEntry));
+            var buffer = new byte[entrySize];
+
+            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous))
             {
                 fs.Seek(FwHeaderSize, SeekOrigin.Begin);
                 for (int i = 0; i < FwNumEntries; i++)
                 {
-                    var entryBytes = br.ReadBytes(Marshal.SizeOf(typeof(FwRawEntry)));
-                    var handle = GCHandle.Alloc(entryBytes, GCHandleType.Pinned);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var bytesRead = await fs.ReadAsync(buffer, 0, entrySize, cancellationToken).ConfigureAwait(false);
+                    if (bytesRead < entrySize)
+                    {
+                        throw new EndOfStreamException("Could not read full firmware entry from file.");
+                    }
+
+                    var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
                     try
                     {
                         var entry = Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(FwRawEntry));
@@ -205,18 +216,19 @@ namespace S7.Utils
         }
 
         /// <summary>
-        /// Unpacks a firmware file.
+        /// Unpacks a firmware file asynchronously.
         /// </summary>
         /// <param name="inputPath">The path to the firmware file.</param>
         /// <param name="outputPath">The path to write the unpacked file to.</param>
         /// <param name="progress">An optional progress reporter.</param>
-        public void Unpack(string inputPath, string outputPath, IProgress<double>? progress = null)
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        public async Task UnpackAsync(string inputPath, string outputPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
         {
-            var metadata = ParseMetadata(inputPath);
+            var metadata = await ParseMetadataAsync(inputPath, cancellationToken).ConfigureAwait(false);
             long currentOffset = FwHeaderSize + (FwNumEntries * Marshal.SizeOf(typeof(FwRawEntry)));
             FwEntry? targetEntry = null;
 
-            foreach(var rawEntry in metadata)
+            foreach (var rawEntry in metadata)
             {
                 if (rawEntry.Name == "A00000")
                 {
@@ -237,31 +249,39 @@ namespace S7.Utils
                 throw new Exception("Could not find firmware code section 'A00000'.");
             }
 
-            using (var fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read))
-            using (var br = new BinaryReader(fs))
-            using (var outFile = new FileStream(outputPath, FileMode.Create, FileAccess.Write))
+            using (var fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous))
+            using (var outFile = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous))
             {
                 fs.Seek(targetEntry.Offset, SeekOrigin.Begin);
 
-                var sectionNameBytes = br.ReadBytes(FwEntryNameSize);
-                if (Encoding.ASCII.GetString(sectionNameBytes) != "A00000")
+                var sectionNameBuffer = new byte[FwEntryNameSize];
+                await fs.ReadAsync(sectionNameBuffer, 0, sectionNameBuffer.Length, cancellationToken).ConfigureAwait(false);
+                if (Encoding.ASCII.GetString(sectionNameBuffer) != "A00000")
                 {
                     throw new Exception("Invalid section header.");
                 }
 
                 long readBytes = 0;
+                var sizeBuffer = new byte[sizeof(uint)];
+
                 while (readBytes < targetEntry.Size)
                 {
-                    uint compressedSize = br.ReadUInt32();
-                    // The C code skips the first 2 bytes of the compressed chunk
-                    var compressedChunk = br.ReadBytes((int)compressedSize);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var bytesRead = await fs.ReadAsync(sizeBuffer, 0, sizeBuffer.Length, cancellationToken).ConfigureAwait(false);
+                    if (bytesRead < sizeof(uint)) throw new EndOfStreamException("Could not read compressed chunk size.");
+                    uint compressedSize = BitConverter.ToUInt32(sizeBuffer, 0);
+
+                    var compressedChunk = new byte[compressedSize];
+                    bytesRead = await fs.ReadAsync(compressedChunk, 0, compressedChunk.Length, cancellationToken).ConfigureAwait(false);
+                    if (bytesRead < compressedSize) throw new EndOfStreamException("Could not read full compressed chunk.");
 
                     if (compressedChunk.Length < 2)
                         throw new Exception($"Compressed chunk is too short ({compressedChunk.Length} bytes) at offset {fs.Position - compressedSize}.");
 
                     var decompressed = LzpDecompressor.Unpack(compressedChunk.Skip(2).ToArray());
 
-                    outFile.Write(decompressed, 0, decompressed.Length);
+                    await outFile.WriteAsync(decompressed, 0, decompressed.Length, cancellationToken).ConfigureAwait(false);
                     readBytes += compressedSize + sizeof(uint);
                     progress?.Report((double)readBytes / targetEntry.Size * 100);
                 }

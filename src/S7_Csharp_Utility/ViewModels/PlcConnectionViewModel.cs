@@ -1,5 +1,6 @@
 #nullable enable
 using S7_Csharp_Utility.Commands;
+using S7_Csharp_Utility.Extensions;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
 using System;
@@ -286,7 +287,7 @@ namespace S7_Csharp_Utility.ViewModels
                     _loggingService.Log("No running socat instances detected.", LogCategory.Info);
                 else
                     _loggingService.Log($"Socat running instances: {string.Join(", ", pids)}", LogCategory.Info);
-            });
+            }).FireAndForget(ex => _loggingService.Log($"Error checking socat processes: {ex.Message}", LogCategory.Error));
         }
 
         private void KillSocatProcesses()
@@ -294,7 +295,7 @@ namespace S7_Csharp_Utility.ViewModels
             Task.Run(() =>
             {
                 SocatService.KillAllSocatProcesses(s => _loggingService.Log(s, LogCategory.Info));
-            });
+            }).FireAndForget(ex => _loggingService.Log($"Error killing socat processes: {ex.Message}", LogCategory.Error));
         }
 
         private void RefreshSerialPorts()
@@ -314,7 +315,7 @@ namespace S7_Csharp_Utility.ViewModels
                         SelectedSerialPort = AvailableSerialPorts[0];
                     }
                 });
-            });
+            }).FireAndForget(ex => _loggingService.Log($"Error refreshing serial ports: {ex.Message}", LogCategory.Error));
         }
 
         private async Task StartSocatAsync()

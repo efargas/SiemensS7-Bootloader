@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.Net", "S7_Csharp_Core/S7
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7.Utils", "S7_Csharp_Core/S7.Utils/S7.Utils.csproj", "{4C6D8E1F-3A5B-7C9D-2E4F-6A8B0C2D4E6F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S7_Csharp_Utility.Tests", "tests/S7_Csharp_Utility.Tests/S7_Csharp_Utility.Tests.csproj", "{5B5C7D9E-2F4A-6B8C-1D3E-5F7A9B1C3D5F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -34,6 +36,10 @@ Global
 		{4C6D8E1F-3A5B-7C9D-2E4F-6A8B0C2D4E6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C6D8E1F-3A5B-7C9D-2E4F-6A8B0C2D4E6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C6D8E1F-3A5B-7C9D-2E4F-6A8B0C2D4E6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B5C7D9E-2F4A-6B8C-1D3E-5F7A9B1C3D5F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B5C7D9E-2F4A-6B8C-1D3E-5F7A9B1C3D5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B5C7D9E-2F4A-6B8C-1D3E-5F7A9B1C3D5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B5C7D9E-2F4A-6B8C-1D3E-5F7A9B1C3D5F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{16698461-1D97-4607-A434-77B26D29AF62} = {A15C1C63-9941-44D9-B5A3-716F2ACCC246}
