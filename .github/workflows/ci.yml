@@ -54,14 +54,39 @@ jobs:
           echo "No .sln or .csproj found. Aborting."
           exit 1
 
-      - name: Restore dotnet-format tool (tests project) if present
+      - name: Ensure dotnet-format available (manifest or fallback)
         working-directory: ./tests/S7.Tests
         run: |
+          set -e
           if [ -f .config/dotnet-tools.json ]; then
-            echo "Restoring dotnet tools in tests/S7.Tests"
-            dotnet tool restore
+            echo "Attempting dotnet tool restore in tests/S7.Tests"
+            if dotnet tool restore; then
+              echo "dotnet tool restore succeeded"
+            else
+              echo "dotnet tool restore failed; installing dotnet-format globally as fallback"
+              dotnet tool install -g dotnet-format
+              export PATH="$HOME/.dotnet/tools:$PATH"
+            fi
           else
-            echo "No tool manifest at tests/S7.Tests/.config/dotnet-tools.json; skipping dotnet tool restore."
+            echo "No tool manifest; installing dotnet-format globally for CI"
+            dotnet tool install -g dotnet-format
+            export PATH="$HOME/.dotnet/tools:$PATH"
+          fi
+          
+      - name: Format check (tests project) if dotnet-format present
+        working-directory: ./tests/S7.Tests
+        env:
+          PATH: ${{ runner.home }}/.dotnet/tools:${{ env.PATH }}
+        run: |
+          set -e
+          if command -v dotnet-format >/dev/null 2>&1; then
+            echo "Running dotnet format --verify-no-changes in tests/S7.Tests"
+            if ! dotnet format --verify-no-changes; then
+              echo "Code formatting required. Run 'dotnet format' in tests/S7.Tests locally." >&2
+              exit 1
+            fi
+          else
+            echo "dotnet-format not found; skipping format check"
           fi
 
       - name: Format check (tests project) if tool manifest present
