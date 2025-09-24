@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Threading;
@@ -67,7 +67,7 @@ namespace S7_Csharp_Utility.Commands
             {
                 _isExecuting = true;
                 RaiseCanExecuteChanged();
-                
+
                 await _execute(parameter).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -106,7 +106,7 @@ namespace S7_Csharp_Utility.Commands
             {
                 _isExecuting = true;
                 RaiseCanExecuteChanged();
-                
+
                 await _execute(parameter).ConfigureAwait(false);
             }
             finally

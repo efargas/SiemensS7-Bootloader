@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace S7.Net
 {

@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using S7_Csharp_Utility.ViewModels;
 
 namespace S7_Csharp_Utility

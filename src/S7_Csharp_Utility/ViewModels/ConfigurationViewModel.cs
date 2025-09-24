@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Models;
 using S7_Csharp_Utility.Services;

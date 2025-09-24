@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -359,14 +359,14 @@ namespace S7_Csharp_Utility.ViewModels
             LoadSecondFileCommand = new AsyncRelayCommand(async _ => await LoadFileAsync(2, null), _ => !IsLoading && IsSideBySideMode);
             ExportSelectionCommand = new AsyncRelayCommand(ExportSelectionAsync, _ => !IsLoading && SelectionLength > 0);
             ToggleInspectorCommand = new RelayCommand(_ => IsInspectorVisible = !IsInspectorVisible);
-            
+
             CopySelectionCommand = new AsyncRelayCommand(CopySelectionAsync, _ => SelectionLength > 0);
             CopyAsHexCommand = new AsyncRelayCommand(CopyAsHexAsync, _ => SelectionLength > 0);
             CopyAsAsciiCommand = new AsyncRelayCommand(CopyAsAsciiAsync, _ => SelectionLength > 0);
-            
+
             SelectAllCommand = new RelayCommand(SelectAll, _ => HexRows1 != null && HexRows1.Count > 0);
             ClearSelectionCommand = new RelayCommand(ClearSelection, _ => SelectionLength > 0);
-            
+
             ExportToFileCommand = new AsyncRelayCommand(ExportToFileAsync, _ => SelectionLength > 0);
             CopyAsCArrayCommand = new AsyncRelayCommand(CopyAsCArrayAsync, _ => SelectionLength > 0);
             CopyAsBase64Command = new AsyncRelayCommand(CopyAsBase64Async, _ => SelectionLength > 0);
@@ -464,7 +464,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 long analyzeOffset = SelectedOffset;
                 int analyzeLength = 16;
-                
+
                 if (SelectionLength > 0)
                 {
                     analyzeOffset = Math.Min(SelectionStartOffset, SelectionEndOffset);
@@ -487,7 +487,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             AsciiValue = analysis.GetValueOrDefault("ASCII", string.Empty).ToString() ?? string.Empty;
             Utf8Value = analysis.GetValueOrDefault("UTF8", string.Empty).ToString() ?? string.Empty;
-            
+
             if (dataLength >= 1)
             {
                 CharValue = analysis.GetValueOrDefault("Char", string.Empty).ToString() ?? string.Empty;
@@ -682,7 +682,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 var fileName = $"selection_0x{Math.Min(SelectionStartOffset, SelectionEndOffset):X8}_{SelectionLength}bytes.bin";
                 var filePath = await _dialogService.ShowSaveFileDialogAsync("Export Selection", "bin", "Binary Files").ConfigureAwait(false);
-                
+
                 if (string.IsNullOrEmpty(filePath)) return;
 
                 var start = Math.Min(SelectionStartOffset, SelectionEndOffset);
@@ -715,7 +715,7 @@ namespace S7_Csharp_Utility.ViewModels
                 var sb = new StringBuilder();
                 sb.AppendLine($"// Selection from offset 0x{start:X8}, {length} bytes");
                 sb.AppendLine($"unsigned char data[{length}] = {{");
-                
+
                 for (int i = 0; i < length; i++)
                 {
                     if (i % 16 == 0)
@@ -723,11 +723,11 @@ namespace S7_Csharp_Utility.ViewModels
                         if (i > 0) sb.AppendLine();
                         sb.Append("    ");
                     }
-                    
+
                     sb.Append($"0x{buffer[i]:X2}");
                     if (i < length - 1) sb.Append(", ");
                 }
-                
+
                 sb.AppendLine();
                 sb.AppendLine("};");
 
@@ -755,7 +755,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 var buffer = list.ReadRange(start, length);
                 var base64String = Convert.ToBase64String(buffer);
-                
+
                 await SetClipboardTextAsync(base64String);
                 StatusText = $"✅ Copied {length} bytes as Base64 to clipboard";
             }

@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;

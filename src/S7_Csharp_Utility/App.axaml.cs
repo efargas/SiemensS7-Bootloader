@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +17,7 @@ namespace S7_Csharp_Utility
     /// </summary>
     public partial class App : Application
     {
-        
+
         /// <summary>
         /// Gets the service provider.
         /// </summary>

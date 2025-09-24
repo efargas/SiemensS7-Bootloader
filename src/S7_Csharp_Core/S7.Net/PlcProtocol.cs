@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -130,7 +130,7 @@ namespace S7.Net
             fullPacket[0] = lengthByte[0];
 
             int bytesRead = 0;
-            while(bytesRead < bytesToRead)
+            while (bytesRead < bytesToRead)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 bytesRead += await _channel.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead, cancellationToken);

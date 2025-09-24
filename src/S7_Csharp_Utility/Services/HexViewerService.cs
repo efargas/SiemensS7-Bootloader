@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -67,7 +67,7 @@ namespace S7_Csharp_Utility.Services
             ArgumentNullException.ThrowIfNull(hexList);
 
             var result = new Dictionary<string, object>();
-            
+
             if (offset >= hexList.FileSize)
             {
                 return result;
@@ -88,7 +88,7 @@ namespace S7_Csharp_Utility.Services
         {
             using var md5 = MD5.Create();
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, DefaultChunkSize, FileOptions.SequentialScan);
-            
+
             var buffer = new byte[DefaultChunkSize];
             long totalBytesRead = 0;
             int bytesRead;
@@ -160,7 +160,7 @@ namespace S7_Csharp_Utility.Services
         private static string DetectFileType(string filePath)
         {
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            
+
             return extension switch
             {
                 ".exe" => "Executable",
@@ -181,17 +181,17 @@ namespace S7_Csharp_Utility.Services
         private static string FormatFileSize(long bytes)
         {
             if (bytes == 0) return "0 B";
-            
+
             string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
             int counter = 0;
             decimal number = bytes;
-            
+
             while (Math.Round(number / 1024) >= 1 && counter < suffixes.Length - 1)
             {
                 number /= 1024;
                 counter++;
             }
-            
+
             return $"{number:n1} {suffixes[counter]}";
         }
 

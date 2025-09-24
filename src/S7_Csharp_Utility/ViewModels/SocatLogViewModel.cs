@@ -1,4 +1,4 @@
-using S7_Csharp_Utility.Services;
+﻿using S7_Csharp_Utility.Services;
 using System.Collections.ObjectModel;
 
 namespace S7_Csharp_Utility.ViewModels

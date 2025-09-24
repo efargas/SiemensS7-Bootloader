@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Extensions;
@@ -89,7 +89,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isComparing = value;
                 OnPropertyChanged();
-                                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
+                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
                 ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
             }
         }
@@ -226,7 +226,7 @@ namespace S7_Csharp_Utility.ViewModels
             ShowFirmwareUnpackerCommand = new RelayCommand(_ => ShowFirmwareUnpacker());
             ShowHexViewerCommand = new RelayCommand(_ => ShowHexViewer());
             ExitCommand = new RelayCommand(_ => Exit());
-            
+
             StartScanPayloads();
         }
 
@@ -282,7 +282,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
             return null;
         }
-        
+
         private async Task StartExploitSequenceAsync()
         {
             IsUploadingStager = true;

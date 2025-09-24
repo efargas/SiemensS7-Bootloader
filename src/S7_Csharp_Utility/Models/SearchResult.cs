@@ -1,4 +1,4 @@
-namespace S7_Csharp_Utility.Models
+﻿namespace S7_Csharp_Utility.Models
 {
     public class SearchResult
     {

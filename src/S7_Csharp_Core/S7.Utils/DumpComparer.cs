@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -57,7 +57,7 @@ namespace S7.Utils
             var allFiles = Directory.GetFiles(folderPath, "*");
             var fileToHash = new Dictionary<string, string>();
             var fileToSize = new Dictionary<string, long>();
-            
+
             foreach (var kv in hashes)
             {
                 foreach (var f in kv.Value)
@@ -83,12 +83,12 @@ namespace S7.Utils
             sb.AppendLine($"🔍 Unique Hashes: {hashes.Count}");
             sb.AppendLine($"📅 Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine();
-            
+
             sb.AppendLine("📋 FILES AND THEIR MD5 HASHES:");
             sb.AppendLine("-" + new string('-', 80));
             sb.AppendLine($"{"File Name",-30} {"Size",-12} {"MD5 Hash",-32}");
             sb.AppendLine("-" + new string('-', 80));
-            
+
             foreach (var filePath in allFiles.OrderBy(f => Path.GetFileName(f)))
             {
                 var fileName = Path.GetFileName(filePath);
@@ -102,23 +102,23 @@ namespace S7.Utils
                     sb.AppendLine($"{fileName,-30} {"Error",-12} {"[ERROR COMPUTING HASH]",-32}");
                 }
             }
-            
+
             sb.AppendLine();
             sb.AppendLine("🔗 DUPLICATE GROUPS (Files with identical MD5 hashes):");
             sb.AppendLine("-" + new string('-', 60));
-            
+
             int groupNum = 1;
             int duplicateFiles = 0;
-            
+
             foreach (var kv in hashes.Where(h => h.Value.Count > 1))
             {
                 var hash = kv.Key;
                 var flist = kv.Value;
                 duplicateFiles += flist.Count;
-                
+
                 sb.AppendLine($"Group {groupNum++} - {flist.Count} identical files:");
                 sb.AppendLine($"  �� MD5: {hash.ToUpperInvariant()}");
-                
+
                 foreach (var filePath in flist.OrderBy(f => Path.GetFileName(f)))
                 {
                     var fileName = Path.GetFileName(filePath);
@@ -127,7 +127,7 @@ namespace S7.Utils
                 }
                 sb.AppendLine();
             }
-            
+
             if (duplicateFiles == 0)
             {
                 sb.AppendLine("✅ No duplicate files found - all files are unique!");
@@ -136,7 +136,7 @@ namespace S7.Utils
             {
                 sb.AppendLine($"⚠️  Found {duplicateFiles} duplicate files in {hashes.Count(h => h.Value.Count > 1)} groups");
             }
-            
+
             sb.AppendLine();
             sb.AppendLine("📈 SUMMARY:");
             sb.AppendLine("-" + new string('-', 30));
@@ -144,7 +144,7 @@ namespace S7.Utils
             sb.AppendLine($"Unique Files: {allFiles.Length - duplicateFiles + hashes.Count(h => h.Value.Count > 1)}");
             sb.AppendLine($"Duplicate Files: {duplicateFiles}");
             sb.AppendLine($"Space Savings Potential: {CalculateSpaceSavings(hashes, fileToSize)}");
-            
+
             return sb.ToString();
         }
 
@@ -156,17 +156,17 @@ namespace S7.Utils
         private static string FormatFileSize(long bytes)
         {
             if (bytes == 0) return "0 B";
-            
+
             string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
             int counter = 0;
             decimal number = bytes;
-            
+
             while (Math.Round(number / 1024) >= 1 && counter < suffixes.Length - 1)
             {
                 number /= 1024;
                 counter++;
             }
-            
+
             return $"{number:n1} {suffixes[counter]}";
         }
 
@@ -179,7 +179,7 @@ namespace S7.Utils
         private static string CalculateSpaceSavings(Dictionary<string, List<string>> hashes, Dictionary<string, long> fileToSize)
         {
             long totalSavings = 0;
-            
+
             foreach (var kv in hashes.Where(h => h.Value.Count > 1))
             {
                 var duplicateFiles = kv.Value;
@@ -193,7 +193,7 @@ namespace S7.Utils
                     }
                 }
             }
-            
+
             return totalSavings > 0 ? FormatFileSize(totalSavings) : "None";
         }
 

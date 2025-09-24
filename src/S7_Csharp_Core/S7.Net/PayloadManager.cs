@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -149,7 +149,7 @@ namespace S7.Net
                 return "Tic Tac Toe";
             if (fileName.EndsWith(".bin"))
                 return "Binary";
-            
+
             return "Unknown";
         }
 
