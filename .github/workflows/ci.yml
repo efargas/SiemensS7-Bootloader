@@ -51,17 +51,7 @@ jobs:
             project_path=$(git ls-files '*.sln' | head -n 1 || true)
           fi
           if [ -z "$project_path" ]; then
-            project_path=$(git ls-files '*.csproj' | head -n 1 || true)
-          fi
-          if [ -n "$project_path" ]; then
-            echo "project_path=$project_path" >> $GITHUB_OUTPUT
-            echo "Found project: $project_path"
-            exit 0
-          fi
-          echo "No .sln or .csproj found in repository"
-          exit 1
-
-      - name: Ensure UTF-8 encoding and commit changes
+            project_path=$(git ls-files '*.csproj' | head -- name: Ensure UTF-8 encoding and commit changes
         env:
           GIT_COMMITTER_NAME: github-actions
           GIT_COMMITTER_EMAIL: actions@github.com
@@ -73,17 +63,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends file git python3 python3-pip libc-bin
           python3 -m pip install --user chardet --disable-pip-version-check >/dev/null
 
-          # Write python helper via base64 to avoid heredoc/YAML parsing problems
-          cat > /tmp/convert_to_utf8.py <<'BASE64_DECODE' >/dev/null
-          IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwppbXBvcnQgc3lzLCBjaGFyZGV0LCBpbwppZiBfX25hbWVfXyA9PSAnX19t
-          YWluX18nOgogICAgcGF0aCA9IHN5cy5hcmd2WzFdCiAgICB3aXRoIG9wZW4ocGF0aCwgJiciKSBhcyBmOgogICAg
-          ICAgZGF0YSA9IGYucmVhZCgpCiAgICBkZXQgPSBjaGFyZGV0LmRldGVjdChkYXRhKQogICAgZW5jID0gZGV0Lmdl
-          dCgnZW5jb2RpbmcnKSBvciAndXRmLTgnCiAgICB0cnk6CiAgICAgICAgdGV4dCA9IGRhdGEuZGVjb2RlKGVuYywg
-          IGVycm9ycz0nc3RyaWN0JykKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgdGV4dCA9IGRhdGEuZGVjb2Rl
-          KGVuYywgIGVycm9ycz0ncmVwbGFjZScpCiAgICB3aXRoIG9wZW4ocGF0aCwgJ3cnLCBlbmNvZGluZz0ndXRmLTgn
-          LCBuZXdsaW5lPScnKSBhcyBmOgogICAgICAgIGYud3JpdGUodGV4dCkKBASE64_DECODE
-          base64 -d /tmp/convert_to_utf8.py > /tmp/convert_to_utf8.py.decoded
-          mv /tmp/convert_to_utf8.py.decoded /tmp/convert_to_utf8.py
+          # Write python helper via safe base64 -> avoid heredoc parsing issues
+          printf '%s' "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwppbXBvcnQgc3lzLCBjaGFyZGV0LCBpbwppZiBfX25hbWVfXyA9PSAn
+          X19tYWluX18nOgogICAgcGF0aCA9IHN5cy5hcmd2WzFdCiAgICB3aXRoIG9wZW4ocGF0aCwgJiciKSBhcyBmOgog
+          ICAgICAgZGF0YSA9IGYucmVhZCgpCiAgICBkZXQgPSBjaGFyZGV0LmRldGVjdChkYXRhKQogICAgZW5jID0gZGV0
+          LmdldCgnZW5jb2RpbmcnKSBvciAndXRmLTgnCiAgICB0cnk6CiAgICAgICAgdGV4dCA9IGRhdGEuZGVjb2RlKGVu
+          YywgZXJyb3JzPSdzdHJpY3QnKQogICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICB0ZXh0ID0gZGF0YS5kZWNv
+          ZGUoZW5jLCBlcnJvcnM9J3JlcGxhY2UnKQogICAgd2l0aCBvcGVuKHBhdGgsICd3JywgaW5jb2Rpbmc9J3V0Zi04
+          JywgbmV3bGluZT0nJykgYXMgZjoKICAgICAgICBmLndyaXRlKHRleHQpCg==" | base64 -d > /tmp/convert_to_utf8.py
           chmod +x /tmp/convert_to_utf8.py
 
           globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
@@ -145,7 +132,17 @@ jobs:
             echo "Committed and pushed encoding fixes."
           else
             echo "No encoding changes needed."
+          fin 1 || true)
           fi
+          if [ -n "$project_path" ]; then
+            echo "project_path=$project_path" >> $GITHUB_OUTPUT
+            echo "Found project: $project_path"
+            exit 0
+          fi
+          echo "No .sln or .csproj found in repository"
+          exit 1
+
+      
 
       - name: Restore
         run: |
