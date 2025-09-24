@@ -52,3 +52,10 @@ src/bootloader-payloads/docker-scripts/compiled_payloads/**/build/*
 # Ignore test results
 TestResults/
 
+
+# Agent ephemeral workspace and tracking artifacts
+agents/workspace/
+.copilot-tracking/changes/*.md
+reports/*.csv
+reports/*.txt
+docs/REPO_LAYOUT_CURRENT.md

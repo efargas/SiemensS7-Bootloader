@@ -1,1 +1,2 @@
-No 'async void' occurrences found.
+/home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/Commands/AsyncRelayCommand.cs:56:        /// Uses async void pattern for ICommand implementation with proper exception handling.
+/home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/Commands/AsyncRelayCommand.cs:59:        public async void Execute(object? parameter)
