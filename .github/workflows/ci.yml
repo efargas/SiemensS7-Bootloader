@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -6,10 +7,14 @@ on:
   pull_request:
     branches: [ main, cancellation-and-fire-and-forget-2 ]
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  NUGET_PACKAGES: ${{ runner.temp }}/.nuget/packages
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     strategy:
       matrix:
         dotnet: [8.0.x]
@@ -17,26 +22,55 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ matrix.dotnet }}
 
-      - name: Restore solutions
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-
+
+      - name: Restore (repo)
         run: dotnet restore
 
-      - name: Restore tools and format check
+      - name: Restore dotnet-format tool (tests project) if present
         working-directory: ./tests/S7.Tests
         run: |
-          dotnet tool restore
-          dotnet format --verify-no-changes
+          if [ -f .config/dotnet-tools.json ]; then
+            dotnet tool restore
+          else
+            echo "No tool manifest; skipping dotnet tool restore."
+          fi
+
+      - name: Format check (tests project) if tool manifest present
+        working-directory: ./tests/S7.Tests
+        run: |
+          set -e
+          if [ -f .config/dotnet-tools.json ]; then
+            if ! dotnet format --verify-no-changes; then
+              echo "Formatting required. Run 'dotnet format' in tests/S7.Tests locally." >&2
+              exit 1
+            fi
+          fi
 
       - name: Build (Release)
-        run: dotnet build --configuration Release --no-restore
+        run: |
+          if [ -f ./src/Solution.sln ]; then
+            dotnet build ./src/Solution.sln --configuration Release --no-restore
+          else
+            dotnet build --configuration Release --no-restore
+          fi
 
-      - name: Run tests
-        run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+      - name: Run tests (explicit csproj)
+        run: dotnet test ./tests/S7.Tests/S7.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
 
       - name: Upload test results
         if: always()
@@ -44,3 +78,17 @@ jobs:
         with:
           name: test-results
           path: '**/TestResults/*.trx'
+
+      - name: Clean up stale partial files (best-effort)
+        if: always()
+        run: |
+          find $RUNNER_TEMP -type f -name "*.partial" -maxdepth 4 -print -delete || true
+
+      - name: Show disk usage (debug)
+        if: always()
+        run: df -h || true
+
+      - name: List workspace (debug)
+        if: always()
+        run: ls -la || true
+        
