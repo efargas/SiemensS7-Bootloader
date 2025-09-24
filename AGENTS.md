@@ -1,206 +1,165 @@
-# AGENTS.md
+### Purpose
+Describe what the program is, why it exists, and the long-term intent.
 
-This file provides guidance for AI agents working with the Siemens S7 Bootloader Utility repository.
-
-## Repository Overview
-
-This repository contains a C# cross-platform utility for gaining non-invasive arbitrary code execution on Siemens S7 PLCs using an undocumented bootloader protocol over UART. It's a C# rewrite and enhancement of the original Python-based tool targeting the vulnerability SSA-686531 (CVE-2019-13945).
-
-**Repository URL**: https://github.com/efargas/SiemensS7-Bootloader.git
-
-## Project Structure
-
-```
-SiemensS7-Bootloader/
-├── src/                           # Main C# application source code
-│   ├── S7_Csharp_Utility/        # Main GUI application (Avalonia UI)
-│   ├── S7_Csharp_Core/           # Core libraries
-│   │   ├── S7.Net/               # PLC communication protocol
-│   │   └── S7.Utils/             # Utility functions
-│   └── Resources/                # Application resources and payloads
-├── bootloader-payloads/          # ARM payload source code and build system
-│   ├── payloads/                 # ARM payload implementations
-│   │   ├── dump_mem/             # Memory dumping payload
-│   │   ├── hello_loop/           # Demo loop payload
-│   │   ├── hello_world/          # Basic test payload
-│   │   ├── stager/               # Initial staging payload
-│   │   ├── tic_tac_toe/          # Interactive game payload
-│   │   └── lib/                  # Shared ARM libraries
-│   └── docker-scripts/           # Docker build automation
-├── Legacy/                       # Original Python implementation
-├── pics/                         # Documentation images
-└── README.md                     # Main documentation
-```
-
-## Technology Stack
-
-### Main Application
-- **Framework**: .NET 8 with Avalonia UI (cross-platform GUI)
-- **Language**: C# with nullable reference types enabled
-- **Architecture**: MVVM pattern with ViewModels and Services
-- **Dependencies**:
-  - Avalonia 11.3.2 (UI framework)
-  - NModbus 3.0.81 (Modbus communication)
-  - DiffPlex 1.9.0 (File comparison)
-  - System.IO.Ports 9.0.9 (Serial communication)
-
-### ARM Payloads
-- **Language**: C and ARM Assembly
-- **Toolchain**: ARM GCC (gcc-arm-none-eabi)
-- **Build System**: Docker-based with Make
-- **Target**: ARM Cortex-R4 (ARMv7-R architecture)
-
-## Key Components
-
-### Core Functionality
-1. **PLC Communication** (`S7.Net`): Implements the undocumented bootloader protocol
-2. **Power Management**: Modbus/TCP controlled power cycling
-3. **Memory Operations**: Arbitrary memory read/write capabilities
-4. **Payload Management**: ARM payload compilation and deployment
-5. **File Analysis**: Hex viewer and binary comparison tools
-
-### GUI Application Features
-- **Connection Management**: Serial-to-TCP proxy configuration
-- **Profile Management**: Device memory layout profiles
-- **Memory Dumping**: Interactive memory extraction with progress tracking
-- **File Comparison**: Binary diff and hash-based duplicate detection
-- **Hex Viewer**: Binary file analysis with data inspector
-
-## Development Guidelines
-
-### Code Style
-- Follow C# naming conventions (PascalCase for public members, camelCase for private)
-- Use nullable reference types (`#nullable enable`)
-- Implement proper async/await patterns for I/O operations
-- Use MVVM pattern for UI components
-
-### Architecture Patterns
-- **Services**: Dependency injection for cross-cutting concerns
-- **Commands**: RelayCommand/AsyncRelayCommand for UI actions
-- **ViewModels**: Business logic and data binding
-- **Models**: Data structures and configuration
-
-### Error Handling
-- Use structured exception handling with user-friendly messages
-- Log errors to the integrated logging system
-- Provide meaningful feedback for network and hardware failures
-
-## Common Tasks
-
-### Building the Application
-```bash
-# Build the main application
-dotnet build src/S7_Csharp_Utility/S7_Csharp_Utility.csproj --configuration Release
-
-# Build ARM payloads (requires Docker)
-cd bootloader-payloads/docker-scripts
-./extract_payloads.sh
-```
-
-### Adding New Payloads
-1. Create payload directory in `bootloader-payloads/payloads/`
-2. Implement ARM code with proper memory layout
-3. Add Makefile or build script
-4. Update Docker build process if needed
-
-### Extending GUI Features
-1. Create ViewModel in `S7_Csharp_Utility/ViewModels/`
-2. Implement corresponding View in `Views/`
-3. Add services in `Services/` for business logic
-4. Update MainWindow bindings as needed
-
-## Security Considerations
-
-### Responsible Disclosure
-This tool is for authorized security research and testing only. The vulnerability (CVE-2019-13945) has been disclosed to Siemens and affects:
-- Siemens S7-1200 (all variants including SIPLUS)
-- Siemens S7-200 Smart
-
-### Usage Guidelines
-- Only use on systems you own or have explicit permission to test
-- Follow responsible disclosure practices for any new vulnerabilities
-- Respect industrial control system safety requirements
-- Document and report any safety-critical findings appropriately
-
-## Hardware Requirements
-
-### Target Devices
-- Siemens S7-1200 CPU 1212C DC/DC/DC (6ES7 212-1AE40-0XB0)
-- ARM Cortex-R4 based SoC (Renesas 811005)
-- UART interface access required
-
-### Test Setup
-- TTL 3.3V serial adapter
-- Modbus/TCP controlled power supply
-- Serial-to-TCP proxy (socat recommended)
-
-## Troubleshooting
-
-### Common Issues
-1. **Browse buttons disabled**: Check DialogService implementation and command bindings
-2. **Hex viewer not loading**: Verify file paths and DataContext bindings
-3. **Serial connection failures**: Confirm socat proxy and port configuration
-4. **Power cycling issues**: Validate Modbus/TCP settings and network connectivity
-
-### Debug Features
-- Integrated logging system with multiple categories
-- Real-time progress tracking for memory operations
-- Detailed error messages with stack traces
-- Debug output for protocol communication
-
-## Testing
-
-### Unit Testing
-- Focus on core protocol implementation
-- Test payload management and file operations
-- Validate configuration serialization/deserialization
-
-### Integration Testing
-- Test with actual hardware when available
-- Validate serial communication protocols
-- Verify power management integration
-
-### UI Testing
-- Test all browse dialogs and file operations
-- Validate data binding and command execution
-- Ensure proper error handling and user feedback
-
-## Contributing
-
-### Code Contributions
-1. Follow existing code style and patterns
-2. Add appropriate error handling and logging
-3. Update documentation for new features
-4. Test with both Windows and Linux platforms
-
-### Documentation
-- Update README.md for user-facing changes
-- Add inline code documentation for complex logic
-- Include examples for new API features
-
-### Security Research
-- Follow responsible disclosure practices
-- Document findings thoroughly
-- Consider safety implications for industrial systems
-
-## Resources
-
-### Documentation
-- [Main README](README.md): User guide and setup instructions
-- [Payload README](bootloader-payloads/README.md): ARM payload development
-- [.NET 8 Documentation](https://docs.microsoft.com/en-us/dotnet/)
-- [Avalonia UI Documentation](https://docs.avaloniaui.net/)
-
-### Research Papers
-- Black Hat Europe 2019: "Doors of Durin: The Veiled Gate to Siemens S7 Silicon"
-- 36C3 2019: "A Deep Dive Into Unconstrained Code Execution on Siemens S7 PLCs"
-- S4 2020: "Special Access Features on PLC's"
-
-### External Dependencies
-- [socat](http://www.dest-unreach.org/socat/): Serial-to-TCP proxy
-- [ARM GCC Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm): ARM cross-compilation
-- [Docker](https://www.docker.com/): Payload build environment
+- Purpose: a cross-platform .NET utility (Avalonia UI) to interact with Siemens S7 bootloaders and to inspect, edit, compare, and upload binary/hex images to PLC devices. It must be responsive with large files, robust against unreliable I/O (serial/USB/ethernet), and easy to test and extend.
+- Long-term intent: clean MVVM architecture with testable services for protocol and file I/O, a virtualized, low-memory hex viewer, reliable bootloader operations with progress/cancellation/retries, and a maintainable CI-backed codebase.
 
 ---
 
-*This file follows the [agents.md](https://agents.md/) specification for AI agent guidance.*
+### Current status and high-level review
+Where the repo stands today and core findings from the recent refactor work.
+
+- Good improvements already made: async naming, FireAndForget helper, ViewModel CTS plumbing, initial virtualization work for the hex viewer, and domain separation attempts.
+- Remaining gaps:
+  - Command ergonomics and cancellation coordination need stabilization.
+  - Lower-level I/O/services are not yet consistently cancellation-aware or async-first.
+  - Some fire-and-forget and async void patterns still exist in places.
+  - Page-loading/deduplication and MMF-backed reader are not yet implemented or are partial.
+  - Tests and CI guards for these concurrency issues are incomplete.
+- Risk summary: without consistent token propagation, ConfigureAwait usage, and service-level async I/O, cancellation will be ineffective and background exceptions may be lost or mishandled.
+
+---
+
+### Target architecture and project structure
+How the codebase should look when the refactor is complete.
+
+- High-level layers
+  1. UI (Avalonia Views) — XAML and minimal code-behind only for platform specifics.
+  2. Presentation (ViewModels) — thin orchestration layer, exposes commands and observable state, owns CancellationTokenSource lifecycle and UI progress marshalling.
+  3. Services (domain & I/O) — protocol clients, serial/ethernet transport, file providers, hashing/diff utilities; all async-first and cancellation-aware.
+  4. Infrastructure — logging/notification, concurrency utilities (TaskExtensions), caching primitives (LRU/page cache), DI wiring.
+  5. Core domain (pure logic) — hex formatting, diff/search algorithms, checksum computation; pure functions covered by unit tests.
+- Key interfaces (examples)
+  - ITransportClient (ConnectAsync, ReadAsync, WriteAsync with CancellationToken)
+  - IVirtualFileReader (ReadPageAsync(pageIndex, pageSize, ct) -> Page)
+  - IHexSearchService (SearchAsync(pattern, ct) -> matches as offsets)
+  - INotificationService (LogInfo/Warning/Error thread-safe)
+- Hex Viewer design
+  - Data virtualization + UI virtualization: an items provider that exposes row count, placeholder rows, and asynchronously populates pages.
+  - MMF-backed reader with page cache: ConcurrentDictionary<long, Task<Page>> dedupe + SemaphoreSlim throttle + LRU eviction.
+  - Search operates on pages with overlap window to avoid misses across page boundaries.
+- Concurrency model
+  - VMs manage CTS and call async service methods with ct.
+  - Services use async I/O (ReadAsync + ct) and ConfigureAwait(false).
+  - IProgress<T> or Dispatcher used only in VMs to marshal UI updates.
+
+---
+
+### All points to address (detailed checklist)
+A comprehensive list of code/behavioral items to fix or implement.
+
+- Async/Cancellation
+  - Convert all non-framework async void to Task.
+  - Ensure all long-running public methods accept CancellationToken and respect it.
+  - Use ConfigureAwait(false) in non-UI library code.
+- Commands & ViewModels
+  - Stabilize AsyncRelayCommand ergonomics: prefer VM StartX wrappers that manage CTS; provide adapters for simple fire-and-forget commands.
+  - Keep ICommand.Execute as thin async void only, calling Task-returning methods.
+  - Ensure CTS lifecycle: cancel previous, dispose, null-out, and dispose on VM cleanup.
+- Services & I/O
+  - Make all I/O services async-first and accept CancellationToken.
+  - Replace blocking reads with ReadAsync and MMF async reads.
+  - Implement IVirtualFileReader with MemoryMappedFile-backed implementation.
+- Caching & Concurrency
+  - Page-load deduplication: ConcurrentDictionary<long, Task<Page>> to avoid duplicate loads.
+  - Throttle concurrent I/O with SemaphoreSlim (configurable).
+  - Use ReadOnlyMemory<byte> or immutable Page objects to avoid sharing mutable buffers.
+- Hex viewer & UI
+  - Ensure UI virtualization in XAML; implement placeholder rows on cache misses.
+  - Precompute hex string table for bytes 0..255 to avoid repeated allocations.
+  - Search: page-overlap scanning; return absolute offsets for jump-to-result.
+- Exception handling & logging
+  - Use TaskExtensions.FireAndForget everywhere and route exceptions to INotificationService.LogError.
+  - Make NotificationService safe for background threads (thread-safe queue or lock).
+  - Centralize unobserved task exception logging.
+- Tests & CI
+  - Unit tests for pure functions (hex formatting, checksum).
+  - Tests for page cache dedupe, cancellation, and search across pages.
+  - CI job to detect stray "async void" and run dotnet format.
+- Code style & maintainability
+  - Async naming suffixes.
+  - Consolidate duplicated utilities into single modules.
+  - Add EditorConfig / dotnet format, treat key warnings as errors in CI.
+
+---
+
+### Gradual implementation plan (phased, incremental PRs)
+Concrete phases with goals, deliverables, acceptance criteria and estimated effort.
+
+Phase 0 — Stabilize current branch (1–3 days)
+- Tasks
+  - Repo-wide search/fix for "async void" and Task.Run used for I/O.
+  - Ensure FireAndForget usages pass a logging handler and add a unit test for FireAndForget.
+  - Add ViewModelBase Dispose/DisposeAsync to cleanup CTS and resources.
+- Acceptance
+  - No non-framework async void left.
+  - FireAndForget test passes.
+  - CTS disposed when VMs are disposed.
+
+Phase 1 — Command ergonomics and CTS patterns (PR 1.5-A, 1–2 days)
+- Tasks
+  - Add AsyncRelayCommand overloads/adapters or add a small RelayCommand wrapper so ViewModels call StartX().
+  - Update command wiring to use VM StartX patterns when cancellation is needed.
+  - Small docs/usage example in README.
+- Acceptance
+  - Commands call VM StartX and CTS cancellation works from UI Cancel buttons.
+
+Phase 2 — Service cancellation audit (PR 1.5-C, 2–4 days)
+- Tasks
+  - Update bootloader/serial/file services to accept CancellationToken.
+  - Replace blocking reads with ReadAsync and pass ct.
+  - Add ConfigureAwait(false) in non-UI code paths.
+  - Add unit test that cancels a service read and verifies resources freed.
+- Acceptance
+  - At least file read and bootloader read support cancellation and pass cancellation tests.
+
+Phase 3 — IVirtualFileReader + page cache (PR #2, 3–5 days)
+- Tasks
+  - Design IVirtualFileReader and implement MemoryMappedFile reader returning Page objects.
+  - Implement dedupe (ConcurrentDictionary<long, Task<Page>>) and throttling (SemaphoreSlim).
+  - Add LRU eviction policy for page cache.
+  - Add unit tests for dedupe, throttling, cancellation.
+- Acceptance
+  - Concurrent page requests dedupe to one read; cancellation during load cancels page load; tests pass.
+
+Phase 4 — Hex viewer integration & UI polish (PR #3, 2–4 days)
+- Tasks
+  - Wire HexViewerViewModel to IVirtualFileReader; show placeholder rows for missing pages.
+  - Implement IProgress<PageLoaded> updates and batch UI updates to throttle UI churn.
+  - Implement precomputed byte->hex string cache and optimize row rendering.
+  - Add search implementing page-overlap scanning.
+- Acceptance
+  - Scrolling large files is smooth; placeholders show while loading; search finds matches across page boundaries; UI responsiveness validated with large synthetic files.
+
+Phase 5 — Logging, tests, CI, and polish (PR #4, 1–2 days)
+- Tasks
+  - Centralize logging and NotificationService improvements.
+  - Add CI guard for "async void" and run dotnet format.
+  - Finish unit/integration tests and add a large-file stress integration test.
+- Acceptance
+  - CI green, formatting enforced, tests passing.
+
+Phase 6 — Optional micro-optimizations & feature parity (PR #5, ongoing)
+- Tasks
+  - Precompute/compact hex rendering caches; performance tune memory usage; add benchmarks.
+  - Improve UX: diff views, better error messages, retry/backoff policies for transient transport errors.
+- Acceptance
+  - Benchmarks show improved memory and CPU usage on large files.
+
+---
+
+### Acceptance criteria before merging each major PR
+- All async public methods return Task/Task<T> (no stray async void).
+- CancellationToken flows from UI down to I/O and services respond promptly to cancellation.
+- Fire-and-forget tasks log exceptions via NotificationService; no silent failures.
+- Unit tests for core behaviors (cancellation, dedupe, search) are present and pass.
+- CI builds, format, and tests pass.
+
+---
+
+### Roles and responsibilities (concise)
+- Maintainer: merges PRs, assigns reviewers, oversees CI.
+- Async/Cancellation engineer: Phases 0–2 (stabilize commands, services).
+- I/O/Virtualization engineer: Phases 3–4 (MMF, page cache, hex viewer integration).
+- QA/Test owner: write/verify unit + integration tests, run stress tests.
+- DevOps: add CI guards, formatting checks.
