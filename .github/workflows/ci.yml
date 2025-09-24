@@ -51,7 +51,19 @@ jobs:
             project_path=$(git ls-files '*.sln' | head -n 1 || true)
           fi
           if [ -z "$project_path" ]; then
-            project_path=$(git ls-files '*.csproj' | head -- name: Ensure UTF-8 encoding and commit changes
+            project_path=$(git ls-files '*.csproj' | head -n 1 || true)
+          fi
+
+          if [ -n "$project_path" ]; then
+            echo "project_path=$project_path" >> $GITHUB_OUTPUT
+            echo "Found project: $project_path"
+            exit 0
+          fi
+
+          echo "No .sln or .csproj found in repository"
+          exit 1
+          
+      - name: Ensure UTF-8 encoding and commit changes
         env:
           GIT_COMMITTER_NAME: github-actions
           GIT_COMMITTER_EMAIL: actions@github.com
