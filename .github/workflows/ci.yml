@@ -67,126 +67,93 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Files to consider (space-separated globs)
-          globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
+          # Install required packages explicitly
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libc-bin file git python3 python3-pip
+          # verify iconv
+          if ! command -v iconv >/dev/null 2>&1; then
+            echo "iconv not found after install; aborting this step."
+            exit 1
+          fi
 
-          # Temporary file for conversion
+          # Ensure python chardet fallback is available
+          python3 -m pip install --user chardet --disable-pip-version-check >/dev/null
+
+          globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
           changed=false
           tmpfile=$(mktemp)
 
-          # Find candidate files, excluding .git, bin, obj
           find_files() {
             for g in "${globs[@]}"; do
-              # use git ls-files if available to limit to tracked files
-              if command -v git >/dev/null 2>&1; then
-                git ls-files -- "$g" || true
-              else
-                find . -type f -name "$g" -not -path './.git/*' -not -path '*/bin/*' -not -path '*/obj/*' -print
-              fi
+              git ls-files -- "$g" || true
             done | sort -u
           }
 
           files=$(find_files)
-
           if [ -z "$files" ]; then
             echo "No candidate files found; skipping encoding normalization."
             exit 0
           fi
 
-          echo "Checking encoding for candidate files..."
-
-          # Ensure iconv is present
-          if ! command -v iconv >/dev/null 2>&1; then
-            echo "Installing iconv (libc-bin provided) on runner..."
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends libc-bin
-          fi
-
           for f in $files; do
-            # skip if file removed or not regular
             [ -f "$f" ] || continue
+            size=$(stat -c%s "$f" || echo 0)
+            [ "$size" -le $((1024*1024)) ] || continue
 
-            # skip large files > 1MB (likely not source)
-            size=$(stat -c%s "$f")
-            if [ "$size" -gt $((1024*1024)) ]; then
-              continue
-            fi
-
-            # detect mime/charset
-            # file -i returns like: text/plain; charset=us-ascii
-            mime=$(file -i --mime-encoding -b "$f" 2>/dev/null || true)
-            # Normalize output: some systems return "binary", others "unknown-8bit"
-            if [ -z "$mime" ]; then
-              mime="unknown"
-            fi
-
-            # If tool claims binary, skip
-            case "$mime" in
-              binary|unknown|application/*) continue ;;
-            esac
-
-            # Try to detect common encodings with file -i (fallback if inaccurate)
             enc=$(file -i "$f" 2>/dev/null | awk -F'charset=' '{print $2}' | tr -d ' \n' || true)
-            if [ -z "$enc" ]; then
-              enc="utf-8"
-            fi
-
-            # Normalize enc to lower
+            enc=${enc:-utf-8}
             enc=$(echo "$enc" | tr '[:upper:]' '[:lower:]')
 
-            # If already utf-8 or us-ascii, skip conversion
             if [[ "$enc" == "utf-8" || "$enc" == "us-ascii" ]]; then
               continue
             fi
 
-            # Attempt conversion: iconv -f <enc> -t UTF-8
             echo "Converting $f from $enc to UTF-8..."
             if iconv -f "$enc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
-              # Replace only if content changed
               if ! cmp -s "$f" "$tmpfile"; then
                 mv "$tmpfile" "$f"
                 changed=true
                 echo "Converted: $f"
-              else
-                echo "No change after conversion: $f"
               fi
             else
-              echo "iconv failed for $f with encoding $enc; trying fallback guesses..."
-
-              # Try common fallbacks
-              for tryenc in windows-1252 iso-8859-1 cp1252 latin1; do
-                if iconv -f "$tryenc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
-                  if ! cmp -s "$f" "$tmpfile"; then
-                    mv "$tmpfile" "$f"
-                    changed=true
-                    echo "Converted $f using fallback $tryenc"
-                  fi
-                  break
-                fi
-              done
+              # Python fallback using chardet to detect encoding and rewrite as UTF-8
+              echo "iconv failed for $f; trying python fallback..."
+              python3 - <<PY
+import chardet,sys
+p=sys.argv[1]
+with open(p,'rb') as b:
+    data=b.read()
+enc=chardet.detect(data)['encoding'] or 'utf-8'
+try:
+    text=data.decode(enc, errors='strict')
+except Exception:
+    text=data.decode(enc, errors='replace')
+with open(p,'w', encoding='utf-8', newline='') as o:
+    o.write(text)
+PY
+              if ! cmp -s "$f" <(python3 -c "print(open('$f','rb').read().decode('utf-8',errors='ignore')[:1])"); then
+                changed=true
+                echo "Converted via python: $f"
+              fi
             fi
           done
 
           rm -f "$tmpfile"
 
           if [ "$changed" = true ] ; then
-            echo "Encoding conversions made; committing changes..."
             git config user.name "$GIT_COMMITTER_NAME"
             git config user.email "$GIT_COMMITTER_EMAIL"
             git add -A
-            # Show short diff for CI log
             git --no-pager diff --staged --name-only || true
             git commit -m "ci: normalize text file encodings to UTF-8 (automated)" || true
-            # Push back using workflow token
             git push origin HEAD:"${GITHUB_REF##*/}" || {
-              echo "Push failed; you may need to enable write permissions for GITHUB_TOKEN or use a personal access token."
+              echo "Push failed; check repository Actions permissions (write permission required for GITHUB_TOKEN)."
               exit 1
             }
             echo "Committed and pushed encoding fixes."
           else
             echo "No encoding changes needed."
-          fi
-          
+          fi          
       - name: Restore
         run: |
           dotnet restore "${{ steps.findproj.outputs.project_path }}"
