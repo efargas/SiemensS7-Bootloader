@@ -36,8 +36,23 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-
 
-      - name: Restore (repo)
-        run: dotnet restore
+      - name: Restore (auto-detect .sln/.csproj)
+        run: |
+          set -e
+          SOLN=$(git ls-files '*.sln' | head -n 1 || true)
+          if [ -n "$SOLN" ]; then
+            echo "Restoring solution: $SOLN"
+            dotnet restore "$SOLN"
+            exit 0
+          fi
+          CSPROJ=$(git ls-files '*.csproj' | head -n 1 || true)
+          if [ -n "$CSPROJ" ]; then
+            echo "Restoring from project dir: $(dirname "$CSPROJ")"
+            dotnet restore "$(dirname "$CSPROJ")"
+            exit 0
+          fi
+          echo "No .sln or .csproj found. Aborting."
+          exit 1
 
       - name: Restore dotnet-format tool (tests project) if present
         working-directory: ./tests/S7.Tests
