@@ -1,5 +1,6 @@
 using System;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using NModbus;
 
@@ -25,14 +26,14 @@ namespace S7_Csharp_Utility.Services
             _log = logger;
         }
 
-        public async Task ConnectAsync(string host, int port)
+        public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default)
         {
             if (IsConnected) return;
             try
             {
                 _log($"Connecting to Modbus host {host}:{port}...", false);
                 _client = new TcpClient();
-                await _client.ConnectAsync(host, port);
+                await _client.ConnectAsync(host, port, cancellationToken);
 
                 if (_client.Connected)
                 {

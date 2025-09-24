@@ -1,5 +1,6 @@
 using S7.Net.Interfaces;
 using System.IO.Ports;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace S7.Net.Channels
@@ -45,7 +46,7 @@ namespace S7.Net.Channels
         /// <summary>
         /// Connects to the serial port.
         /// </summary>
-        public Task ConnectAsync()
+        public Task ConnectAsync(CancellationToken cancellationToken = default)
         {
             if (IsConnected) Disconnect();
             _serialPort = new SerialPort(_portName, _baudRate, _parity, 8, _stopBits)
@@ -71,11 +72,12 @@ namespace S7.Net.Channels
         /// <param name="buffer">The buffer to read data into.</param>
         /// <param name="offset">The offset in the buffer to start writing to.</param>
         /// <param name="count">The number of bytes to read.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The number of bytes read.</returns>
-        public async Task<int> ReadAsync(byte[] buffer, int offset, int count)
+        public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_serialPort == null) throw new System.IO.IOException("Not connected.");
-            return await _serialPort.BaseStream.ReadAsync(buffer, offset, count);
+            return await _serialPort.BaseStream.ReadAsync(buffer, offset, count, cancellationToken);
         }
 
         /// <summary>
@@ -84,10 +86,11 @@ namespace S7.Net.Channels
         /// <param name="buffer">The buffer containing the data to write.</param>
         /// <param name="offset">The offset in the buffer to start writing from.</param>
         /// <param name="count">The number of bytes to write.</param>
-        public async Task WriteAsync(byte[] buffer, int offset, int count)
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_serialPort == null) throw new System.IO.IOException("Not connected.");
-            await _serialPort.BaseStream.WriteAsync(buffer, offset, count);
+            await _serialPort.BaseStream.WriteAsync(buffer, offset, count, cancellationToken);
         }
     }
 }

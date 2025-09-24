@@ -52,11 +52,11 @@ namespace S7.Net
         /// <param name="sleepMs">The number of milliseconds to sleep between steps.</param>
         // The default values for step (2) and sleepMs (10) are based on the Python
         // client's `send_packet` function, which uses a step of 2 and a sleep_amt of 0.01s.
-        public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10)
+        public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10, CancellationToken cancellationToken = default)
         {
             // This initial delay mirrors the Python client's SEND_REQ_SAFETY_SLEEP_AMT
             // and is critical for stability.
-            await Task.Delay(10);
+            await Task.Delay(10, cancellationToken);
 
             if (contents.Length > PlcConstants.MAX_MSG_LEN)
             {
@@ -73,11 +73,12 @@ namespace S7.Net
             // Send the packet in small chunks to avoid overflowing the PLC's UART buffer
             for (int i = 0; i < packet.Length; i += step)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 int bytesToSend = Math.Min(step, packet.Length - i);
-                await _channel.WriteAsync(packet, i, bytesToSend);
+                await _channel.WriteAsync(packet, i, bytesToSend, cancellationToken);
                 if (sleepMs > 0)
                 {
-                    await Task.Delay(sleepMs);
+                    await Task.Delay(sleepMs, cancellationToken);
                 }
             }
         }
@@ -93,9 +94,10 @@ namespace S7.Net
         /// <param name="buffer">The buffer containing the data to write.</param>
         /// <param name="offset">The offset in the buffer to start writing from.</param>
         /// <param name="count">The number of bytes to write.</param>
-        public async Task RawWriteAsync(byte[] buffer, int offset, int count)
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task RawWriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
-            await _channel.WriteAsync(buffer, offset, count);
+            await _channel.WriteAsync(buffer, offset, count, cancellationToken);
         }
 
         /// <summary>
@@ -104,26 +106,22 @@ namespace S7.Net
         /// <param name="buffer">The buffer to read the data into.</param>
         /// <param name="offset">The offset in the buffer to start writing to.</param>
         /// <param name="count">The number of bytes to read.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The number of bytes read.</returns>
-        public async Task<int> RawReadAsync(byte[] buffer, int offset, int count)
+        public async Task<int> RawReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
-            return await _channel.ReadAsync(buffer, offset, count);
+            return await _channel.ReadAsync(buffer, offset, count, cancellationToken);
         }
 
         /// <summary>
         /// Receives a packet from the PLC.
         /// </summary>
-        /// <param name="timeoutMs">The timeout in milliseconds.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The contents of the packet, or null if a checksum error occurred.</returns>
-        public async Task<byte[]?> ReceivePacketAsync(int timeoutMs = 2000)
+        public async Task<byte[]?> ReceivePacketAsync(CancellationToken cancellationToken = default)
         {
-            // CancellationToken is not easily compatible with the custom ICommunicationChannel
-            // so we'll rely on the underlying implementation's timeouts for now.
-            // var cancellationTokenSource = new CancellationTokenSource(timeoutMs);
-            // var token = cancellationTokenSource.Token;
-
             var lengthByte = new byte[1];
-            await _channel.ReadAsync(lengthByte, 0, 1);
+            await _channel.ReadAsync(lengthByte, 0, 1, cancellationToken);
             int bytesToRead = lengthByte[0];
 
             if (bytesToRead == 0) return Array.Empty<byte>();
@@ -134,7 +132,8 @@ namespace S7.Net
             int bytesRead = 0;
             while(bytesRead < bytesToRead)
             {
-                bytesRead += await _channel.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead);
+                cancellationToken.ThrowIfCancellationRequested();
+                bytesRead += await _channel.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead, cancellationToken);
             }
 
             _log($"<- RECV: {BitConverter.ToString(fullPacket).Replace("-", "")}");

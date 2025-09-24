@@ -1,5 +1,6 @@
 using S7.Net.Interfaces;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace S7.Net.Channels
@@ -37,11 +38,11 @@ namespace S7.Net.Channels
         /// <summary>
         /// Connects to the TCP host.
         /// </summary>
-        public async Task ConnectAsync()
+        public async Task ConnectAsync(CancellationToken cancellationToken = default)
         {
             if (IsConnected) Disconnect();
             _client = new TcpClient();
-            await _client.ConnectAsync(_host, _port);
+            await _client.ConnectAsync(_host, _port, cancellationToken);
             _stream = _client.GetStream();
         }
 
@@ -62,11 +63,12 @@ namespace S7.Net.Channels
         /// <param name="buffer">The buffer to read data into.</param>
         /// <param name="offset">The offset in the buffer to start writing to.</param>
         /// <param name="count">The number of bytes to read.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The number of bytes read.</returns>
-        public async Task<int> ReadAsync(byte[] buffer, int offset, int count)
+        public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");
-            return await _stream.ReadAsync(buffer, offset, count);
+            return await _stream.ReadAsync(buffer, offset, count, cancellationToken);
         }
 
         /// <summary>
@@ -75,10 +77,11 @@ namespace S7.Net.Channels
         /// <param name="buffer">The buffer containing the data to write.</param>
         /// <param name="offset">The offset in the buffer to start writing from.</param>
         /// <param name="count">The number of bytes to write.</param>
-        public async Task WriteAsync(byte[] buffer, int offset, int count)
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");
-            await _stream.WriteAsync(buffer, offset, count);
+            await _stream.WriteAsync(buffer, offset, count, cancellationToken);
         }
     }
 }

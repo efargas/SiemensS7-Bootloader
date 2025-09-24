@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace S7.Net.Interfaces
@@ -19,7 +20,7 @@ namespace S7.Net.Interfaces
         /// <summary>
         /// Connects to the PLC.
         /// </summary>
-        Task ConnectAsync();
+        Task ConnectAsync(CancellationToken cancellationToken = default);
         /// <summary>
         /// Disconnects from the PLC.
         /// </summary>
@@ -30,14 +31,16 @@ namespace S7.Net.Interfaces
         /// <param name="buffer">The buffer to read data into.</param>
         /// <param name="offset">The offset in the buffer to start writing to.</param>
         /// <param name="count">The number of bytes to read.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The number of bytes read.</returns>
-        Task<int> ReadAsync(byte[] buffer, int offset, int count);
+        Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default);
         /// <summary>
         /// Writes data to the PLC.
         /// </summary>
         /// <param name="buffer">The buffer containing the data to write.</param>
         /// <param name="offset">The offset in the buffer to start writing from.</param>
         /// <param name="count">The number of bytes to write.</param>
-        Task WriteAsync(byte[] buffer, int offset, int count);
+        /// <param name="cancellationToken">The cancellation token.</param>
+        Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default);
     }
 }
