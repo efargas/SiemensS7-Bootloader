@@ -11,9 +11,20 @@ jobs:
     strategy:
       matrix:
         dotnet-version: [ '8.0.x' ]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install ripgrep
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ripgrep
+          else
+            echo "rg already installed"
+          fi
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -24,19 +35,28 @@ jobs:
         id: findproj
         run: |
           set -e
-          # Look for a solution first, then a csproj
-          sln=$(git ls-files '*.sln' | head -n 1 || true)
-          if [ -n "$sln" ]; then
-            echo "project_path=$sln" >> $GITHUB_OUTPUT
-            echo "Found solution: $sln"
+          # Try using rg (fast). If rg finds nothing, fall back to git ls-files.
+          project_path=""
+          if command -v rg >/dev/null 2>&1; then
+            project_path=$(rg --files --glob '**/*.sln' --glob '!**/bin/**' --glob '!**/obj/**' | head -n 1 || true)
+            if [ -z "$project_path" ]; then
+              project_path=$(rg --files --glob '**/*.csproj' --glob '!**/bin/**' --glob '!**/obj/**' | head -n 1 || true)
+            fi
+          fi
+
+          if [ -z "$project_path" ]; then
+            project_path=$(git ls-files '*.sln' | head -n 1 || true)
+          fi
+          if [ -z "$project_path" ]; then
+            project_path=$(git ls-files '*.csproj' | head -n 1 || true)
+          fi
+
+          if [ -n "$project_path" ]; then
+            echo "project_path=$project_path" >> $GITHUB_OUTPUT
+            echo "Found project: $project_path"
             exit 0
           fi
-          csproj=$(git ls-files '*.csproj' | head -n 1 || true)
-          if [ -n "$csproj" ]; then
-            echo "project_path=$csproj" >> $GITHUB_OUTPUT
-            echo "Found project: $csproj"
-            exit 0
-          fi
+
           echo "No .sln or .csproj found in repository"
           exit 1
 
@@ -50,11 +70,9 @@ jobs:
 
       - name: Test
         run: |
-          # If a solution was used the test runner will discover test projects automatically
           if [[ "${{ steps.findproj.outputs.project_path }}" == *.sln ]]; then
             dotnet test "${{ steps.findproj.outputs.project_path }}" --no-build -c Release --verbosity normal
           else
-            # Run tests by discovering test projects in the repo
             dotnet test --no-build -c Release --verbosity normal
           fi
 
