@@ -86,5 +86,14 @@ jobs:
 
       - name: Format check
         run: |
+          set -euo pipefail
+          proj="${{ steps.findproj.outputs.project_path }}"
+          if [ -z "$proj" ]; then
+            echo "No project_path found; skipping format check"
+            exit 0
+          fi
+          projdir=$(dirname "$proj")
+          echo "Running format in: $projdir (workspace: $proj)"
+          cd "$projdir"
           dotnet tool restore || true
-          dotnet format --verify-no-changes || true
+          dotnet format "$proj" --verify-no-changes
