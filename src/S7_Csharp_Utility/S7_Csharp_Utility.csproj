@@ -44,5 +44,7 @@
   <ItemGroup>
     <ProjectReference Include="..\S7_Csharp_Core\S7.Net\S7.Net.csproj" />
     <ProjectReference Include="..\S7_Csharp_Core\S7.Utils\S7.Utils.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Services\S7.Services.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Infrastructure\S7.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
