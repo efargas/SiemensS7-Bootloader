@@ -68,30 +68,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Install prerequisites explicitly
+          # Install prerequisites
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends file git python3 python3-pip libc-bin
-
-          # Install python chardet for fallback detection
           python3 -m pip install --user chardet --disable-pip-version-check >/dev/null
 
-          # Write python helper script using a proper quoted heredoc
-          cat > /tmp/convert_to_utf8.py <<'PY'
-#!/usr/bin/env python3
-import sys, chardet, io
-p = sys.argv[1]
-with open(p, 'rb') as f:
-    data = f.read()
-det = chardet.detect(data)
-enc = det.get('encoding') or 'utf-8'
-try:
-    text = data.decode(enc, errors='strict')
-except Exception:
-    text = data.decode(enc, errors='replace')
-# Write back as UTF-8
-with open(p, 'w', encoding='utf-8', newline='') as f:
-    f.write(text)
-PY
+          # Write python helper via base64 to avoid heredoc/YAML parsing problems
+          cat > /tmp/convert_to_utf8.py <<'BASE64_DECODE' >/dev/null
+          IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwppbXBvcnQgc3lzLCBjaGFyZGV0LCBpbwppZiBfX25hbWVfXyA9PSAnX19t
+          YWluX18nOgogICAgcGF0aCA9IHN5cy5hcmd2WzFdCiAgICB3aXRoIG9wZW4ocGF0aCwgJiciKSBhcyBmOgogICAg
+          ICAgZGF0YSA9IGYucmVhZCgpCiAgICBkZXQgPSBjaGFyZGV0LmRldGVjdChkYXRhKQogICAgZW5jID0gZGV0Lmdl
+          dCgnZW5jb2RpbmcnKSBvciAndXRmLTgnCiAgICB0cnk6CiAgICAgICAgdGV4dCA9IGRhdGEuZGVjb2RlKGVuYywg
+          IGVycm9ycz0nc3RyaWN0JykKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgdGV4dCA9IGRhdGEuZGVjb2Rl
+          KGVuYywgIGVycm9ycz0ncmVwbGFjZScpCiAgICB3aXRoIG9wZW4ocGF0aCwgJ3cnLCBlbmNvZGluZz0ndXRmLTgn
+          LCBuZXdsaW5lPScnKSBhcyBmOgogICAgICAgIGYud3JpdGUodGV4dCkKBASE64_DECODE
+          base64 -d /tmp/convert_to_utf8.py > /tmp/convert_to_utf8.py.decoded
+          mv /tmp/convert_to_utf8.py.decoded /tmp/convert_to_utf8.py
           chmod +x /tmp/convert_to_utf8.py
 
           globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
@@ -124,14 +116,14 @@ PY
             fi
 
             echo "Converting $f from $enc to UTF-8..."
-            if iconv -f "$enc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
+            if command -v iconv >/dev/null 2>&1 && iconv -f "$enc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
               if ! cmp -s "$f" "$tmpfile"; then
                 mv "$tmpfile" "$f"
                 changed=true
                 echo "Converted: $f"
               fi
             else
-              echo "iconv failed for $f; trying python fallback..."
+              echo "Fallback python conversion for $f..."
               python3 /tmp/convert_to_utf8.py "$f"
               changed=true
               echo "Converted via python: $f"
@@ -146,7 +138,6 @@ PY
             git add -A
             git --no-pager diff --staged --name-only || true
             git commit -m "ci: normalize text file encodings to UTF-8 (automated)" || true
-            # Push back using workflow token; ensure Actions has write permission
             git push origin HEAD:"${GITHUB_REF##*/}" || {
               echo "Push failed; check repository Actions write permissions for GITHUB_TOKEN."
               exit 1
