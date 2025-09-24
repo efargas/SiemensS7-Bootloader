@@ -144,18 +144,8 @@ jobs:
             echo "Committed and pushed encoding fixes."
           else
             echo "No encoding changes needed."
-          fin 1 || true)
           fi
-          if [ -n "$project_path" ]; then
-            echo "project_path=$project_path" >> $GITHUB_OUTPUT
-            echo "Found project: $project_path"
-            exit 0
-          fi
-          echo "No .sln or .csproj found in repository"
-          exit 1
-
-      
-
+          
       - name: Restore
         run: |
           dotnet restore "${{ steps.findproj.outputs.project_path }}"
