@@ -1,5 +1,4 @@
 name: CI
-
 on:
   push:
     branches: [ main, develop, feature/*, chore/*, fix/* ]
@@ -11,19 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dotnet-version: [8.0.1xx]
+        dotnet-version: [ '8.0.x' ]
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: \${{ matrix.dotnet-version }}
+          dotnet-version: ${{ matrix.dotnet-version }}
+
       - name: Restore
         run: dotnet restore
+
       - name: Build
         run: dotnet build --no-restore -c Release
+
       - name: Test
         run: dotnet test --no-build -c Release --verbosity normal
+
       - name: Async void guard
         run: |
           if [ -f ./scripts/find_async_void.sh ]; then
@@ -31,8 +35,8 @@ jobs:
           else
             echo "No async-void guard script found"
           fi
+
       - name: Format check
         run: |
           dotnet tool restore || true
           dotnet format --verify-no-changes || true
-
