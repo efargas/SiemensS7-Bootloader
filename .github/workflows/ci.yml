@@ -67,17 +67,26 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Install required packages explicitly
+          # Install required packages
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libc-bin file git python3 python3-pip
-          # verify iconv
-          if ! command -v iconv >/dev/null 2>&1; then
-            echo "iconv not found after install; aborting this step."
-            exit 1
-          fi
-
-          # Ensure python chardet fallback is available
+          sudo apt-get install -y --no-install-recommends file git python3 python3-pip libc-bin
           python3 -m pip install --user chardet --disable-pip-version-check >/dev/null
+
+          # Prepare python helper script (safe heredoc quoting)
+          cat > /tmp/convert_to_utf8.py <<'PY'
+import sys, chardet
+path = sys.argv[1]
+with open(path, 'rb') as f:
+    data = f.read()
+det = chardet.detect(data)
+enc = det.get('encoding') or 'utf-8'
+try:
+    text = data.decode(enc, errors='strict')
+except Exception:
+    text = data.decode(enc, errors='replace')
+with open(path, 'w', encoding='utf-8', newline='') as f:
+    f.write(text)
+PY
 
           globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
           changed=false
@@ -116,29 +125,14 @@ jobs:
                 echo "Converted: $f"
               fi
             else
-              # Python fallback using chardet to detect encoding and rewrite as UTF-8
               echo "iconv failed for $f; trying python fallback..."
-              python3 - <<PY
-import chardet,sys
-p=sys.argv[1]
-with open(p,'rb') as b:
-    data=b.read()
-enc=chardet.detect(data)['encoding'] or 'utf-8'
-try:
-    text=data.decode(enc, errors='strict')
-except Exception:
-    text=data.decode(enc, errors='replace')
-with open(p,'w', encoding='utf-8', newline='') as o:
-    o.write(text)
-PY
-              if ! cmp -s "$f" <(python3 -c "print(open('$f','rb').read().decode('utf-8',errors='ignore')[:1])"); then
-                changed=true
-                echo "Converted via python: $f"
-              fi
+              python3 /tmp/convert_to_utf8.py "$f"
+              changed=true
+              echo "Converted via python: $f"
             fi
           done
 
-          rm -f "$tmpfile"
+          rm -f "$tmpfile" /tmp/convert_to_utf8.py
 
           if [ "$changed" = true ] ; then
             git config user.name "$GIT_COMMITTER_NAME"
@@ -147,13 +141,14 @@ PY
             git --no-pager diff --staged --name-only || true
             git commit -m "ci: normalize text file encodings to UTF-8 (automated)" || true
             git push origin HEAD:"${GITHUB_REF##*/}" || {
-              echo "Push failed; check repository Actions permissions (write permission required for GITHUB_TOKEN)."
+              echo "Push failed; check repository Actions write permissions for GITHUB_TOKEN."
               exit 1
             }
             echo "Committed and pushed encoding fixes."
           else
             echo "No encoding changes needed."
-          fi          
+          fi
+          
       - name: Restore
         run: |
           dotnet restore "${{ steps.findproj.outputs.project_path }}"
