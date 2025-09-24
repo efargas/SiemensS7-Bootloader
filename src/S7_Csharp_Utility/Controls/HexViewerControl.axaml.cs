@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
@@ -49,17 +49,17 @@ namespace S7_Csharp_Utility.Controls
         private void OnHexListBoxPointerPressed(object? sender, PointerPressedEventArgs e)
         {
             if (_hexListBox == null) return;
-            
+
             var position = e.GetPosition(_hexListBox);
             var offset = GetOffsetFromPosition(position);
-            
+
             if (offset >= 0)
             {
                 _isDragging = true;
                 _dragStartPoint = position;
                 _selectionStartOffset = offset;
                 _selectionEndOffset = offset;
-                
+
                 UpdateSelectionInViewModel();
                 e.Pointer.Capture(_hexListBox);
                 e.Handled = true;
@@ -72,7 +72,7 @@ namespace S7_Csharp_Utility.Controls
             {
                 var position = e.GetPosition(_hexListBox);
                 var offset = GetOffsetFromPosition(position);
-                
+
                 if (offset >= 0)
                 {
                     _selectionEndOffset = offset;
@@ -176,7 +176,7 @@ namespace S7_Csharp_Utility.Controls
             {
                 var start = Math.Min(_selectionStartOffset, _selectionEndOffset);
                 var end = Math.Max(_selectionStartOffset, _selectionEndOffset);
-                
+
                 viewModel.SelectionStartOffset = start;
                 viewModel.SelectionEndOffset = end;
                 viewModel.SelectedOffset = end;
@@ -194,7 +194,7 @@ namespace S7_Csharp_Utility.Controls
         private void ClearSelectionRectangles()
         {
             if (_selectionCanvas == null) return;
-            
+
             foreach (var rect in _selectionRectangles)
             {
                 _selectionCanvas.Children.Remove(rect);
@@ -229,7 +229,7 @@ namespace S7_Csharp_Utility.Controls
                 }
                 return row.ByteOffset; // Fallback to row start
             }
-            
+
             return -1;
         }
     }

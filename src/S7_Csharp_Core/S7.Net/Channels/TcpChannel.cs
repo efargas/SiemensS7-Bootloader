@@ -1,4 +1,4 @@
-using S7.Net.Interfaces;
+﻿using S7.Net.Interfaces;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;

@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using S7_Csharp_Utility.Services;
 using System;
 

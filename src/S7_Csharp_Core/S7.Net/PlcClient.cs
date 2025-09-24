@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using S7.Net.Interfaces;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -17,7 +17,7 @@ namespace S7.Net
     public sealed class PlcClient(ICommunicationChannel channel, Action<string> logger)
     {
         private readonly ICommunicationChannel _channel = channel ?? throw new ArgumentNullException(nameof(channel));
-        private readonly PlcProtocol _protocol = new(channel ?? throw new ArgumentNullException(nameof(channel)), 
+        private readonly PlcProtocol _protocol = new(channel ?? throw new ArgumentNullException(nameof(channel)),
                                                      logger ?? throw new ArgumentNullException(nameof(logger)));
         private readonly Action<string> _log = logger ?? throw new ArgumentNullException(nameof(logger));
         private uint _nextPayloadLocation = PlcConstants.DUMPER_PAYLOAD_LOCATION;
@@ -140,7 +140,7 @@ namespace S7.Net
             string version = "(invalid)";
             if (idxV >= 0 && response.Length >= idxV + 4)
             {
-                version = $"V{response[idxV+1]}.{response[idxV+2]}.{response[idxV+3]}";
+                version = $"V{response[idxV + 1]}.{response[idxV + 2]}.{response[idxV + 3]}";
             }
             else if (response.Length >= 6)
             {
@@ -333,12 +333,12 @@ namespace S7.Net
                 cancellationToken.ThrowIfCancellationRequested();
                 // Add safety delay between chunks (matches Python SEND_REQ_SAFETY_SLEEP_AMT)
                 await Task.Delay(10, cancellationToken);
-                
+
                 int size = Math.Min(maxChunkSize, msg.Length - i);
                 var chunk = new byte[size];
                 Array.Copy(msg, i, chunk, 0, size);
 
-                _log($"[BYTES] Send progress: 0x{i:X6}/0x{msg.Length:X6} ({(float)i/msg.Length:P2})");
+                _log($"[BYTES] Send progress: 0x{i:X6}/0x{msg.Length:X6} ({(float)i / msg.Length:P2})");
                 var encoded = EncodePacketForStager(chunk);
                 _log($"[BYTES] Encoded chunk (with XOR key): {BitConverter.ToString(encoded)}");
                 await _protocol.SendPacketAsync(encoded, 8, 10, cancellationToken);
@@ -359,7 +359,7 @@ namespace S7.Net
                     _log($"[BYTES][ERROR] Expected single-byte ACK, got: {(ack != null ? BitConverter.ToString(ack) : "<null>")}");
                     throw new Exception($"Did not receive expected empty ACK from stager at chunk offset {i}");
                 }
-                
+
                 byte ackValue = ack[0];
                 _log($"[BYTES][ACK] Value received: 0x{ackValue:X2}");
                 if (ackValue == 0xFF)

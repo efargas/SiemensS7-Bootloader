@@ -1,4 +1,4 @@
-using S7_Csharp_Utility.Models;
+﻿using S7_Csharp_Utility.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,8 +21,8 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         public ConfigurationService()
         {
-            _jsonOptions = new JsonSerializerOptions 
-            { 
+            _jsonOptions = new JsonSerializerOptions
+            {
                 WriteIndented = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
@@ -153,12 +153,12 @@ namespace S7_Csharp_Utility.Services
         {
             string baseDirectory = AppContext.BaseDirectory;
             string profilesPath = Path.Combine(baseDirectory, "Profiles");
-            
+
             if (!Directory.Exists(profilesPath))
             {
                 Directory.CreateDirectory(profilesPath);
             }
-            
+
             return profilesPath;
         }
 
@@ -171,7 +171,7 @@ namespace S7_Csharp_Utility.Services
         {
             var profilesDirectory = GetProfilesDirectory();
             var profiles = new List<DeviceProfile>();
-            
+
             if (!Directory.Exists(profilesDirectory))
             {
                 return profiles;
@@ -180,7 +180,7 @@ namespace S7_Csharp_Utility.Services
             try
             {
                 var profileFiles = Directory.GetFiles(profilesDirectory, "*.json");
-                
+
                 foreach (var filePath in profileFiles)
                 {
                     try
@@ -203,7 +203,7 @@ namespace S7_Csharp_Utility.Services
             {
                 throw new IOException($"Failed to load profiles from directory '{profilesDirectory}'.", ex);
             }
-            
+
             return profiles;
         }
 
@@ -232,5 +232,5 @@ namespace S7_Csharp_Utility.Services
             }
         }
 
-            }
+    }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -85,7 +85,7 @@ namespace S7_Csharp_Utility.Services
 
             using var md5 = MD5.Create();
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, DefaultChunkSize, FileOptions.SequentialScan);
-            
+
             var buffer = new byte[DefaultChunkSize];
             long totalBytesRead = 0;
             int bytesRead;
@@ -114,7 +114,7 @@ namespace S7_Csharp_Utility.Services
             ArgumentNullException.ThrowIfNull(filePath);
 
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            
+
             if (offset >= stream.Length)
             {
                 return new FileChunk
@@ -152,12 +152,12 @@ namespace S7_Csharp_Utility.Services
         private static string ConvertToHexString(byte[] data, int startIndex, int length, long baseAddress)
         {
             var sb = new StringBuilder();
-            
+
             for (int i = 0; i < length; i += HexBytesPerLine)
             {
                 // Address
                 sb.AppendFormat("0x{0:X8}: ", baseAddress + i);
-                
+
                 // Hex bytes
                 for (int j = 0; j < HexBytesPerLine; j++)
                 {
@@ -170,9 +170,9 @@ namespace S7_Csharp_Utility.Services
                         sb.Append("   ");
                     }
                 }
-                
+
                 sb.Append(" | ");
-                
+
                 // ASCII representation
                 for (int j = 0; j < HexBytesPerLine; j++)
                 {
@@ -186,10 +186,10 @@ namespace S7_Csharp_Utility.Services
                         sb.Append(' ');
                     }
                 }
-                
+
                 sb.AppendLine();
             }
-            
+
             return sb.ToString();
         }
 
@@ -203,13 +203,13 @@ namespace S7_Csharp_Utility.Services
             string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
             int counter = 0;
             decimal number = bytes;
-            
+
             while (Math.Round(number / 1024) >= 1)
             {
                 number /= 1024;
                 counter++;
             }
-            
+
             return $"{number:n1} {suffixes[counter]}";
         }
 

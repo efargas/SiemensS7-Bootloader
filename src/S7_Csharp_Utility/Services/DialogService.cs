@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using S7_Csharp_Utility.Interfaces;
 using System.Collections.Generic;
@@ -71,7 +71,7 @@ namespace S7_Csharp_Utility.Services
             var storageProvider = mainWindow.StorageProvider;
 
             var fileTypes = new List<FilePickerFileType>();
-            
+
             if (!string.IsNullOrEmpty(defaultExtension) && !string.IsNullOrEmpty(fileType))
             {
                 fileTypes.Add(new FilePickerFileType(fileType)
@@ -79,7 +79,7 @@ namespace S7_Csharp_Utility.Services
                     Patterns = new[] { $"*.{defaultExtension.TrimStart('.')}" }
                 });
             }
-            
+
             fileTypes.Add(FilePickerFileTypes.All);
 
             var options = new FilePickerOpenOptions
@@ -99,7 +99,7 @@ namespace S7_Csharp_Utility.Services
             var storageProvider = mainWindow.StorageProvider;
 
             var fileTypes = new List<FilePickerFileType>();
-            
+
             if (!string.IsNullOrEmpty(defaultExtension) && !string.IsNullOrEmpty(fileType))
             {
                 fileTypes.Add(new FilePickerFileType(fileType)
@@ -107,7 +107,7 @@ namespace S7_Csharp_Utility.Services
                     Patterns = new[] { $"*.{defaultExtension.TrimStart('.')}" }
                 });
             }
-            
+
             fileTypes.Add(FilePickerFileTypes.All);
 
             var options = new FilePickerSaveOptions
@@ -123,7 +123,7 @@ namespace S7_Csharp_Utility.Services
         public async Task ShowMessageAsync(string title, string message)
         {
             var mainWindow = GetMainWindow();
-            
+
             var messageBox = new Window
             {
                 Title = title,

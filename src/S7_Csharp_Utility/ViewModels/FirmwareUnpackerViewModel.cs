@@ -1,4 +1,4 @@
-using S7_Csharp_Utility.Commands;
+﻿using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Extensions;
 using S7_Csharp_Utility.Interfaces;
 using S7.Utils;

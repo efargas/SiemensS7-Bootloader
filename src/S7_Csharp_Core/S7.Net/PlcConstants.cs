@@ -1,4 +1,4 @@
-namespace S7.Net
+﻿namespace S7.Net
 {
     /// <summary>
     /// Contains constants used throughout the application.

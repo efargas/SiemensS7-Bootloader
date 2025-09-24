@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -76,7 +76,7 @@ namespace S7_Csharp_Utility.ViewModels
         {
             File1Path = file1Path ?? throw new ArgumentNullException(nameof(file1Path));
             File2Path = file2Path ?? throw new ArgumentNullException(nameof(file2Path));
-            
+
             _fileComparisonService = new FileComparisonService();
             _cancellationTokenSource = new CancellationTokenSource();
 

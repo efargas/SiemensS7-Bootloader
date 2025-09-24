@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -16,7 +16,7 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly IDialogService? _dialogService;
         private string _comparisonResult;
         private string _originalResult;
-        
+
         public string ComparisonResult
         {
             get => _comparisonResult;
@@ -115,9 +115,9 @@ namespace S7_Csharp_Utility.ViewModels
             _dialogService = dialogService;
             _originalResult = comparisonResult;
             _comparisonResult = comparisonResult;
-            
+
             AnalyzeResults();
-            
+
             CopyToClipboardCommand = new AsyncRelayCommand(_ => CopyToClipboardAsync());
             ExportToTextCommand = new AsyncRelayCommand(_ => ExportToTextAsync());
             ExportToCsvCommand = new AsyncRelayCommand(_ => ExportToCsvAsync());
@@ -164,7 +164,7 @@ namespace S7_Csharp_Utility.ViewModels
                     return false;
                 if (!ShowDifferent && (line.Contains("❌ DIFFERENT") || line.Contains("DIFFERENT")))
                     return false;
-                if (!ShowUnique && (line.Contains("🔵 UNIQUE A") || line.Contains("UNIQUE A") || 
+                if (!ShowUnique && (line.Contains("🔵 UNIQUE A") || line.Contains("UNIQUE A") ||
                                    line.Contains("🔴 UNIQUE B") || line.Contains("UNIQUE B")))
                     return false;
                 return true;
@@ -193,8 +193,8 @@ namespace S7_Csharp_Utility.ViewModels
             try
             {
                 var filePath = await _dialogService.ShowSaveFileDialogAsync(
-                    "Export Comparison Results", 
-                    "txt", 
+                    "Export Comparison Results",
+                    "txt",
                     "Text Files");
 
                 if (!string.IsNullOrEmpty(filePath))
@@ -216,10 +216,10 @@ namespace S7_Csharp_Utility.ViewModels
                     content.AppendLine(ComparisonResult);
 
                     await File.WriteAllTextAsync(filePath, content.ToString());
-                    
+
                     if (_dialogService != null)
                     {
-                        await _dialogService.ShowMessageAsync("Export Complete", 
+                        await _dialogService.ShowMessageAsync("Export Complete",
                             $"Results exported to:\n{filePath}");
                     }
                 }
@@ -228,7 +228,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 if (_dialogService != null)
                 {
-                    await _dialogService.ShowMessageAsync("Export Error", 
+                    await _dialogService.ShowMessageAsync("Export Error",
                         $"Failed to export results:\n{ex.Message}");
                 }
             }
@@ -241,8 +241,8 @@ namespace S7_Csharp_Utility.ViewModels
             try
             {
                 var filePath = await _dialogService.ShowSaveFileDialogAsync(
-                    "Export Comparison Results as CSV", 
-                    "csv", 
+                    "Export Comparison Results as CSV",
+                    "csv",
                     "CSV Files");
 
                 if (!string.IsNullOrEmpty(filePath))
@@ -259,16 +259,16 @@ namespace S7_Csharp_Utility.ViewModels
                             var status = parts[1]; // IDENTICAL, DIFFERENT, etc.
                             var fileName = parts[2];
                             var details = parts.Length > 3 ? string.Join(" ", parts.Skip(3)) : "";
-                            
+
                             csv.AppendLine($"\"{status}\",\"{fileName}\",\"{details}\"");
                         }
                     }
 
                     await File.WriteAllTextAsync(filePath, csv.ToString());
-                    
+
                     if (_dialogService != null)
                     {
-                        await _dialogService.ShowMessageAsync("Export Complete", 
+                        await _dialogService.ShowMessageAsync("Export Complete",
                             $"CSV exported to:\n{filePath}");
                     }
                 }
@@ -277,7 +277,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 if (_dialogService != null)
                 {
-                    await _dialogService.ShowMessageAsync("Export Error", 
+                    await _dialogService.ShowMessageAsync("Export Error",
                         $"Failed to export CSV:\n{ex.Message}");
                 }
             }

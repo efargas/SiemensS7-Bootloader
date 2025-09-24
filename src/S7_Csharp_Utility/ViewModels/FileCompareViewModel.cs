@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Services;
 using System.Collections.ObjectModel;
@@ -15,7 +15,7 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly Interfaces.IDialogService _dialogService;
         private readonly LoggingService _loggingService;
         private readonly Interfaces.IViewService _viewService;
-        
+
         private bool _isComparing;
         public bool IsComparing
         {
@@ -167,7 +167,7 @@ namespace S7_Csharp_Utility.ViewModels
                     DataContext = diffViewModel
                 };
                 await diffView.ShowDialog(_viewService.GetMainWindow());
-                
+
                 // Clean up the ViewModel when dialog closes
                 diffViewModel.Dispose();
             }
