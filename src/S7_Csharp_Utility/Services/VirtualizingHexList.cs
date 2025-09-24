@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -110,7 +110,7 @@ namespace S7_Csharp_Utility.Services
         {
             var buffer = new byte[length];
             int read_total = 0;
-            while(read_total < length)
+            while (read_total < length)
             {
                 var pageIndex = offset / _reader.PageSize;
                 var offsetInPage = (int)(offset % _reader.PageSize);

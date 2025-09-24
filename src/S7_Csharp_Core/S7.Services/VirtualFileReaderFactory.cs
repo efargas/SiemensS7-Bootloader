@@ -1,4 +1,4 @@
-using S7.Infrastructure;
+﻿using S7.Infrastructure;
 using S7.Utils.Interfaces;
 
 namespace S7.Services

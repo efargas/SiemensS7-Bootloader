@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,7 +45,8 @@ namespace S7.Core.Tests
             // Arrange
             var cache = new PageCache(_mockReader.Object);
             _mockReader.Setup(r => r.ReadPageAsync(0, 1024, It.IsAny<CancellationToken>()))
-                       .Returns(async () => {
+                       .Returns(async () =>
+                       {
                            await Task.Delay(100);
                            return new Page(0, new byte[] { 1, 2, 3 }, 3);
                        });
@@ -70,7 +71,8 @@ namespace S7.Core.Tests
             var readLock = new object();
 
             _mockReader.Setup(r => r.ReadPageAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                       .Returns(async (long idx, int size, CancellationToken ct) => {
+                       .Returns(async (long idx, int size, CancellationToken ct) =>
+                       {
                            lock (readLock)
                            {
                                activeReads++;
@@ -103,7 +105,8 @@ namespace S7.Core.Tests
             var cts = new CancellationTokenSource();
             var cache = new PageCache(_mockReader.Object);
             _mockReader.Setup(r => r.ReadPageAsync(It.IsAny<long>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                       .Returns(async (long i, int s, CancellationToken ct) => {
+                       .Returns(async (long i, int s, CancellationToken ct) =>
+                       {
                            await Task.Delay(1000, ct);
                            return new Page(i, new byte[0], 0);
                        });
