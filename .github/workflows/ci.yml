@@ -93,7 +93,8 @@ jobs:
             exit 0
           fi
           projdir=$(dirname "$proj")
-          echo "Running format in: $projdir (workspace: $proj)"
+          workspace=$(basename "$proj")
+          echo "Running format in: $projdir (workspace: $workspace)"
           cd "$projdir"
           dotnet tool restore || true
-          dotnet format "$proj" --verify-no-changes
+          dotnet format "$workspace" --verify-no-changes
