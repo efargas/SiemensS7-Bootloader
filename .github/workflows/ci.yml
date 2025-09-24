@@ -190,25 +190,35 @@ jobs:
           echo "Running dotnet format in: $projdir (workspace: $workspace)"
           cd "$projdir"
 
-          # Try to restore tools if manifest exists; ignore failure if none
           dotnet tool restore || true
-
-          # Run dotnet format and allow it to change files
           dotnet format "$workspace" --verbosity minimal
 
-          # If formatting changed files, commit and push them
-          if ! git diff --quiet --exit-code; then
-            echo "Formatting changes detected; committing them"
-            git config user.name "$GIT_COMMITTER_NAME"
-            git config user.email "$GIT_COMMITTER_EMAIL"
-            git add -A
-            git commit -m "ci: apply dotnet format fixes (automated)" || true
-            # Push back to the branch — requires Workflow permissions: write
-            git push origin "HEAD:${GITHUB_REF##*/}" || {
-              echo "Push failed; check Actions workflow permissions for GITHUB_TOKEN (write access required)."
-              exit 1
-            }
-            echo "Committed and pushed formatting fixes."
-          else
+          if git diff --quiet --exit-code; then
             echo "No formatting changes needed."
+            exit 0
           fi
+
+          echo "Formatting changes detected; committing them"
+          git config user.name "$GIT_COMMITTER_NAME"
+          git config user.email "$GIT_COMMITTER_EMAIL"
+          git add -A
+          git commit -m "ci: apply dotnet format fixes (automated)" || true
+
+          # Determine target branch ref (works for push runs and PR branch refs)
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "Target branch: $BRANCH"
+
+          # Fetch remote and rebase local formatting commit on top
+          git fetch origin "$BRANCH" --depth=1
+          # If remote has commits, rebase on top; if no remote, this is a no-op
+          if git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
+            git rebase --rebase-merges "origin/$BRANCH"
+          fi
+
+          # Push safely using force-with-lease to avoid overwriting new remote commits unexpectedly
+          git push --force-with-lease origin "HEAD:${BRANCH}" || {
+            echo "Push failed after rebase; aborting to avoid overwriting remote. Please merge/rebase changes locally."
+            exit 1
+          }
+
+          echo "Committed and pushed formatting fixes."

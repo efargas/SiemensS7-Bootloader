@@ -371,7 +371,7 @@ namespace S7_Csharp_Utility.ViewModels
             CopyAsCArrayCommand = new AsyncRelayCommand(CopyAsCArrayAsync, _ => SelectionLength > 0);
             CopyAsBase64Command = new AsyncRelayCommand(CopyAsBase64Async, _ => SelectionLength > 0);
 
-            SearchCommand = new AsyncRelayCommand(SearchAsync, _ => !IsSearching && !string.IsNullOrWhiteSpace(SearchText));
+            SearchCommand = new AsyncRelayCommand(SearchAsync, _ => false); // Search is disabled for now
             StopSearchCommand = new RelayCommand(StopSearch, _ => IsSearching);
             ClearSearchCommand = new RelayCommand(ClearSearch);
             NavigateToNextResultCommand = new RelayCommand(NavigateToNextResult, _ => SearchResults.Count > 0);
@@ -418,14 +418,16 @@ namespace S7_Csharp_Utility.ViewModels
 
                 if (gridNumber == 1)
                 {
-                    HexRows1 = new VirtualizingHexList(filePath);
+                    var reader = S7.Services.VirtualFileReaderFactory.Create(filePath);
+                    HexRows1 = new VirtualizingHexList(reader);
                     File1Path = filePath;
                     File1Info = FormatFileInfo(fileInfo);
                     OnPropertyChanged(nameof(HexRows1));
                 }
                 else
                 {
-                    HexRows2 = new VirtualizingHexList(filePath);
+                    var reader = S7.Services.VirtualFileReaderFactory.Create(filePath);
+                    HexRows2 = new VirtualizingHexList(reader);
                     File2Path = filePath;
                     File2Info = FormatFileInfo(fileInfo);
                     OnPropertyChanged(nameof(HexRows2));
