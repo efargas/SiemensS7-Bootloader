@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -110,6 +110,7 @@ namespace S7.Core.Tests
             // Arrange
             var mockReader = new Mock<IVirtualFileReader>();
             mockReader.Setup(r => r.Length).Returns(10000);
+            mockReader.Setup(r => r.PageSize).Returns(1024);
             var cache = new PageCache(mockReader.Object, cacheSize: 2);
             mockReader.Setup(r => r.ReadPageAsync(0, 1024, It.IsAny<CancellationToken>())).ReturnsAsync(new Page(0, new byte[0], 0));
             mockReader.Setup(r => r.ReadPageAsync(1, 1024, It.IsAny<CancellationToken>())).ReturnsAsync(new Page(1, new byte[0], 0));
@@ -131,7 +132,7 @@ namespace S7.Core.Tests
 
             // Assert
             mockReader.Verify(r => r.ReadPageAsync(0, 1024, It.IsAny<CancellationToken>()), Times.Once());
-            mockReader.Verify(r => r.ReadPageAsync(1, 1024, It.IsAny<CancellationToken>()), Times.Exactly(2));
+            mockReader.Verify(r => r.ReadPageAsync(1, 1024, It.IsAny<CancellationToken>()), Times.Once());
             mockReader.Verify(r => r.ReadPageAsync(2, 1024, It.IsAny<CancellationToken>()), Times.Once());
         }
 

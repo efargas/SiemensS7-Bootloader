@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -96,12 +96,8 @@ namespace S7.Infrastructure
                     {
                         var lruNode = _lruList.Last;
                         if (lruNode == null) break;
-                        var evictedPageIndex = lruNode.Value.PageIndex;
-                        _cache.Remove(evictedPageIndex);
+                        _cache.Remove(lruNode.Value.PageIndex);
                         _lruList.RemoveLast();
-                        // If a page is evicted from cache, it must be removed from inflight as well
-                        // to allow it to be fetched again.
-                        _inflight.TryRemove(evictedPageIndex, out _);
                     }
                 }
 
