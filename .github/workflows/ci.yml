@@ -72,22 +72,12 @@ jobs:
 
           # Install prerequisites
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends file git python3 python3-pip libc-bin
-          python3 -m pip install --user chardet --disable-pip-version-check >/dev/null
-
-          # Write python helper via safe base64 -> avoid heredoc parsing issues
-          printf '%s' "IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwppbXBvcnQgc3lzLCBjaGFyZGV0LCBpbwppZiBfX25hbWVfXyA9PSAn
-          X19tYWluX18nOgogICAgcGF0aCA9IHN5cy5hcmd2WzFdCiAgICB3aXRoIG9wZW4ocGF0aCwgJiciKSBhcyBmOgog
-          ICAgICAgZGF0YSA9IGYucmVhZCgpCiAgICBkZXQgPSBjaGFyZGV0LmRldGVjdChkYXRhKQogICAgZW5jID0gZGV0
-          LmdldCgnZW5jb2RpbmcnKSBvciAndXRmLTgnCiAgICB0cnk6CiAgICAgICAgdGV4dCA9IGRhdGEuZGVjb2RlKGVu
-          YywgZXJyb3JzPSdzdHJpY3QnKQogICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICB0ZXh0ID0gZGF0YS5kZWNv
-          ZGUoZW5jLCBlcnJvcnM9J3JlcGxhY2UnKQogICAgd2l0aCBvcGVuKHBhdGgsICd3JywgaW5jb2Rpbmc9J3V0Zi04
-          JywgbmV3bGluZT0nJykgYXMgZjoKICAgICAgICBmLndyaXRlKHRleHQpCg==" | base64 -d > /tmp/convert_to_utf8.py
-          chmod +x /tmp/convert_to_utf8.py
+          sudo apt-get install -y --no-install-recommends file git libc-bin
 
           globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
           changed=false
           tmpfile=$(mktemp)
+          failed_conversions_file=$(mktemp)
 
           find_files() {
             for g in "${globs[@]}"; do
@@ -98,38 +88,50 @@ jobs:
           files=$(find_files)
           if [ -z "$files" ]; then
             echo "No candidate files found; skipping encoding normalization."
+            rm -f "$tmpfile" "$failed_conversions_file"
             exit 0
           fi
 
           for f in $files; do
             [ -f "$f" ] || continue
+
+            # Skip big files
             size=$(stat -c%s "$f" || echo 0)
             [ "$size" -le $((1024*1024)) ] || continue
 
+            # Detect charset; fallback to utf-8 if detection fails
             enc=$(file -i "$f" 2>/dev/null | awk -F'charset=' '{print $2}' | tr -d ' \n' || true)
             enc=${enc:-utf-8}
             enc=$(echo "$enc" | tr '[:upper:]' '[:lower:]')
 
+            # Skip already utf-8/us-ascii
             if [[ "$enc" == "utf-8" || "$enc" == "us-ascii" ]]; then
               continue
             fi
 
-            echo "Converting $f from $enc to UTF-8..."
-            if command -v iconv >/dev/null 2>&1 && iconv -f "$enc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
+            echo "Attempting conversion: $f from $enc -> UTF-8"
+            if iconv -f "$enc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
+              # Only replace file if content changed after conversion
               if ! cmp -s "$f" "$tmpfile"; then
                 mv "$tmpfile" "$f"
                 changed=true
                 echo "Converted: $f"
+              else
+                echo "No content change after conversion: $f"
               fi
             else
-              echo "Fallback python conversion for $f..."
-              python3 /tmp/convert_to_utf8.py "$f"
-              changed=true
-              echo "Converted via python: $f"
+              echo "iconv failed for $f (detected encoding: $enc); skipping and logging"
+              printf '%s\n' "$f (detected: $enc)" >> "$failed_conversions_file"
             fi
           done
 
-          rm -f "$tmpfile" /tmp/convert_to_utf8.py
+          rm -f "$tmpfile"
+
+          if [ -s "$failed_conversions_file" ]; then
+            echo "The following files could not be converted by iconv (left unchanged):"
+            sed -n '1,200p' "$failed_conversions_file" || true
+          fi
+          rm -f "$failed_conversions_file"
 
           if [ "$changed" = true ] ; then
             git config user.name "$GIT_COMMITTER_NAME"
@@ -138,7 +140,7 @@ jobs:
             git --no-pager diff --staged --name-only || true
             git commit -m "ci: normalize text file encodings to UTF-8 (automated)" || true
             git push origin HEAD:"${GITHUB_REF##*/}" || {
-              echo "Push failed; check repository Actions write permissions for GITHUB_TOKEN."
+              echo "Push failed; check Actions workflow permissions for GITHUB_TOKEN (write access required)."
               exit 1
             }
             echo "Committed and pushed encoding fixes."
