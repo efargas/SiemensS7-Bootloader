@@ -13,9 +13,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      # runner.* expressions are allowed at job-level env
-      NUGET_PACKAGES: ${{ runner.temp }}/.nuget/packages
     strategy:
       matrix:
         dotnet: [8.0.x]
@@ -34,7 +31,7 @@ jobs:
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
-          path: ${{ env.NUGET_PACKAGES }}
+          path: ${{ runner.temp }}/.nuget/packages
           key: nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
           restore-keys: |
             nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-
