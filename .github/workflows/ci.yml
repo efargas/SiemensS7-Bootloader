@@ -1,224 +1,46 @@
 name: CI
+
 on:
   push:
-    branches: [ main, develop, feature/*, chore/*, fix/* ]
+    branches: [ main, cancellation-and-fire-and-forget-2 ]
   pull_request:
-    branches: [ main, develop ]
-
-env:
-  FAIL_ON_ASYNC_VOID: 'false'
+    branches: [ main, cancellation-and-fire-and-forget-2 ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
-        dotnet-version: [ '8.0.x' ]
+        dotnet: [8.0.x]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-
-      - name: Install ripgrep
-        if: runner.os == 'Linux'
-        run: |
-          if ! command -v rg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y ripgrep
-          else
-            echo "rg already installed"
-          fi
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
+          dotnet-version: ${{ matrix.dotnet }}
 
-      - name: Find solution or project
-        id: findproj
+      - name: Restore solutions
+        run: dotnet restore
+
+      - name: Restore tools and format check
+        working-directory: ./tests/S7.Tests
         run: |
-          set -e
-          project_path=""
-          if command -v rg >/dev/null 2>&1; then
-            project_path=$(rg --files --glob '**/*.sln' --glob '!**/bin/**' --glob '!**/obj/**' | head -n 1 || true)
-            if [ -z "$project_path" ]; then
-              project_path=$(rg --files --glob '**/*.csproj' --glob '!**/bin/**' --glob '!**/obj/**' | head -n 1 || true)
-            fi
-          fi
-          if [ -z "$project_path" ]; then
-            project_path=$(git ls-files '*.sln' | head -n 1 || true)
-          fi
-          if [ -z "$project_path" ]; then
-            project_path=$(git ls-files '*.csproj' | head -n 1 || true)
-          fi
+          dotnet tool restore
+          dotnet format --verify-no-changes
 
-          if [ -n "$project_path" ]; then
-            echo "project_path=$project_path" >> $GITHUB_OUTPUT
-            echo "Found project: $project_path"
-            exit 0
-          fi
+      - name: Build (Release)
+        run: dotnet build --configuration Release --no-restore
 
-          echo "No .sln or .csproj found in repository"
-          exit 1
-          
-      - name: Ensure UTF-8 encoding and commit changes
-        env:
-          GIT_COMMITTER_NAME: github-actions
-          GIT_COMMITTER_EMAIL: actions@github.com
-        run: |
-          set -euo pipefail
+      - name: Run tests
+        run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
 
-          # Install prerequisites
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends file git libc-bin
-
-          globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
-          changed=false
-          tmpfile=$(mktemp)
-          failed_conversions_file=$(mktemp)
-
-          find_files() {
-            for g in "${globs[@]}"; do
-              git ls-files -- "$g" || true
-            done | sort -u
-          }
-
-          files=$(find_files)
-          if [ -z "$files" ]; then
-            echo "No candidate files found; skipping encoding normalization."
-            rm -f "$tmpfile" "$failed_conversions_file"
-            exit 0
-          fi
-
-          for f in $files; do
-            [ -f "$f" ] || continue
-
-            # Skip big files
-            size=$(stat -c%s "$f" || echo 0)
-            [ "$size" -le $((1024*1024)) ] || continue
-
-            # Detect charset; fallback to utf-8 if detection fails
-            enc=$(file -i "$f" 2>/dev/null | awk -F'charset=' '{print $2}' | tr -d ' \n' || true)
-            enc=${enc:-utf-8}
-            enc=$(echo "$enc" | tr '[:upper:]' '[:lower:]')
-
-            # Skip already utf-8/us-ascii
-            if [[ "$enc" == "utf-8" || "$enc" == "us-ascii" ]]; then
-              continue
-            fi
-
-            echo "Attempting conversion: $f from $enc -> UTF-8"
-            if iconv -f "$enc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
-              # Only replace file if content changed after conversion
-              if ! cmp -s "$f" "$tmpfile"; then
-                mv "$tmpfile" "$f"
-                changed=true
-                echo "Converted: $f"
-              else
-                echo "No content change after conversion: $f"
-              fi
-            else
-              echo "iconv failed for $f (detected encoding: $enc); skipping and logging"
-              printf '%s\n' "$f (detected: $enc)" >> "$failed_conversions_file"
-            fi
-          done
-
-          rm -f "$tmpfile"
-
-          if [ -s "$failed_conversions_file" ]; then
-            echo "The following files could not be converted by iconv (left unchanged):"
-            sed -n '1,200p' "$failed_conversions_file" || true
-          fi
-          rm -f "$failed_conversions_file"
-
-          if [ "$changed" = true ] ; then
-            git config user.name "$GIT_COMMITTER_NAME"
-            git config user.email "$GIT_COMMITTER_EMAIL"
-            git add -A
-            git --no-pager diff --staged --name-only || true
-            git commit -m "ci: normalize text file encodings to UTF-8 (automated)" || true
-            git push origin HEAD:"${GITHUB_REF##*/}" || {
-              echo "Push failed; check Actions workflow permissions for GITHUB_TOKEN (write access required)."
-              exit 1
-            }
-            echo "Committed and pushed encoding fixes."
-          else
-            echo "No encoding changes needed."
-          fi
-          
-      - name: Restore
-        run: |
-          dotnet restore "${{ steps.findproj.outputs.project_path }}"
-
-      - name: Build
-        run: |
-          dotnet build "${{ steps.findproj.outputs.project_path }}" --no-restore -c Release
-
-      - name: Test
-        run: |
-          if [[ "${{ steps.findproj.outputs.project_path }}" == *.sln ]]; then
-            dotnet test "${{ steps.findproj.outputs.project_path }}" --no-build -c Release --verbosity normal
-          else
-            dotnet test --no-build -c Release --verbosity normal
-          fi
-
-      - name: Async void guard
-        run: |
-          if [ -f ./scripts/find_async_void.sh ]; then
-            bash ./scripts/find_async_void.sh
-          else
-            echo "No async-void guard script found"
-          fi
-
-      - name: Auto-fix formatting and commit
-        env:
-          GIT_COMMITTER_NAME: github-actions
-          GIT_COMMITTER_EMAIL: actions@github.com
-        run: |
-          set -euo pipefail
-
-          proj="${{ steps.findproj.outputs.project_path }}"
-          if [ -z "$proj" ]; then
-            echo "No project_path found; skipping format step"
-            exit 0
-          fi
-
-          projdir=$(dirname "$proj")
-          workspace=$(basename "$proj")
-          echo "Running dotnet format in: $projdir (workspace: $workspace)"
-          cd "$projdir"
-
-          dotnet tool restore || true
-          dotnet format "$workspace" --verbosity minimal
-
-          if git diff --quiet --exit-code; then
-            echo "No formatting changes needed."
-            exit 0
-          fi
-
-          echo "Formatting changes detected; committing them"
-          git config user.name "$GIT_COMMITTER_NAME"
-          git config user.email "$GIT_COMMITTER_EMAIL"
-          git add -A
-          git commit -m "ci: apply dotnet format fixes (automated)" || true
-
-          # Determine target branch ref (works for push runs and PR branch refs)
-          BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "Target branch: $BRANCH"
-
-          # Fetch remote and rebase local formatting commit on top
-          git fetch origin "$BRANCH" --depth=1
-          # If remote has commits, rebase on top; if no remote, this is a no-op
-          if git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
-            git rebase --rebase-merges "origin/$BRANCH"
-          fi
-
-          # Push safely using force-with-lease to avoid overwriting new remote commits unexpectedly
-          git push --force-with-lease origin "HEAD:${BRANCH}" || {
-            echo "Push failed after rebase; aborting to avoid overwriting remote. Please merge/rebase changes locally."
-            exit 1
-          }
-
-          echo "Committed and pushed formatting fixes."
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'

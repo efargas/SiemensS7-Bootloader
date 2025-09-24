@@ -483,6 +483,8 @@ namespace S7.Net
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             _log("Installing memory dumper payload...");
             await InstallAddHookViaStager(_nextPayloadLocation, dumpMemPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, cancellationToken);
             _nextPayloadLocation += (uint)dumpMemPayload.Length;
@@ -492,6 +494,8 @@ namespace S7.Net
                 _nextPayloadLocation = _nextPayloadLocation - (_nextPayloadLocation % 4) + 4;
             }
             _log("Memory dumper payload installed.");
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             _log($"Requesting memory dump of {length} bytes from 0x{address:X8}...");
             // Prepare arguments: "A" + address + length
@@ -509,6 +513,8 @@ namespace S7.Net
                 var responseStr = response != null ? BitConverter.ToString(response) : "<null>";
                 throw new Exception($"Failed to start memory dump. Unexpected response: {responseStr}");
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             _log("Memory dump started. Receiving data...");
             var data = await ReceiveMany(progress, cancellationToken);

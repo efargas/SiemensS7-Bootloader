@@ -15,6 +15,7 @@ namespace S7.Core.Commands
     public class MemoryDumpCommandHandler : CommandHandler<MemoryDumpOptions>
     {
         private readonly PayloadManager _payloadManager;
+        private readonly PlcClient? _plcClient;
 
         /// <summary>
         /// Initializes a new instance of the MemoryDumpCommandHandler class.
@@ -25,6 +26,15 @@ namespace S7.Core.Commands
             : base(logger)
         {
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
+        }
+
+        private readonly ICommunicationChannel? _testChannel;
+
+        internal MemoryDumpCommandHandler(ILogger<MemoryDumpCommandHandler> logger, PayloadManager payloadManager, ICommunicationChannel testChannel)
+            : base(logger)
+        {
+            _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
+            _testChannel = testChannel;
         }
 
         /// <summary>
@@ -97,13 +107,13 @@ namespace S7.Core.Commands
         /// <param name="options">The command options</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>A command result with the output file path</returns>
-        protected override async Task<CommandResult> ExecuteAsync(MemoryDumpOptions options, CancellationToken cancellationToken)
+        public override async Task<CommandResult> ExecuteAsync(MemoryDumpOptions options, CancellationToken cancellationToken)
         {
             ICommunicationChannel? channel = null;
             try
             {
                 LogProgress("Creating communication channel", options.CorrelationId);
-                channel = CreateCommunicationChannel(options.ChannelConfig);
+                channel = _testChannel ?? CreateCommunicationChannel(options.ChannelConfig);
 
                 LogProgress("Connecting to PLC", options.CorrelationId);
                 await channel.ConnectAsync().ConfigureAwait(false);
@@ -115,7 +125,7 @@ namespace S7.Core.Commands
 
                 LogProgress("Connection established successfully", options.CorrelationId);
 
-                var plcClient = new PlcClient(channel, message => 
+                var plcClient = _plcClient ?? new PlcClient(channel, message =>
                     Logger.LogInformation("PLC: {Message} [CorrelationId: {CorrelationId}]", message, options.CorrelationId));
 
                 LogProgress("Loading memory dumper payload", options.CorrelationId);
@@ -138,15 +148,18 @@ namespace S7.Core.Commands
                         bytesRead, options.Length, percentage, elapsed.TotalSeconds, remainingSeconds, options.CorrelationId);
                 });
 
-                var dumpedData = await plcClient.DumpMemoryAsync(options.Address, options.Length, dumperPayload, progress).ConfigureAwait(false);
+                var outputFilename = GenerateOutputFilename(options);
+                var fullOutputPath = Path.Combine(options.OutputPath, outputFilename);
+                var partialFilePath = fullOutputPath + ".partial";
+
+                var dumpedData = await plcClient.DumpMemoryAsync(options.Address, options.Length, dumperPayload, progress, cancellationToken).ConfigureAwait(false);
                 stopwatch.Stop();
 
                 LogProgress("Memory dump completed, saving to file", options.CorrelationId);
 
-                var outputFilename = GenerateOutputFilename(options);
-                var fullOutputPath = Path.Combine(options.OutputPath, outputFilename);
+                await File.WriteAllBytesAsync(partialFilePath, dumpedData, cancellationToken).ConfigureAwait(false);
+                File.Move(partialFilePath, fullOutputPath, true);
 
-                await File.WriteAllBytesAsync(fullOutputPath, dumpedData, cancellationToken).ConfigureAwait(false);
 
                 Logger.LogInformation("Memory dump saved successfully: {FilePath} ({FileSize} bytes) in {Duration:F1}s [CorrelationId: {CorrelationId}]",
                     fullOutputPath, dumpedData.Length, stopwatch.Elapsed.TotalSeconds, options.CorrelationId);

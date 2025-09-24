@@ -34,39 +34,13 @@ namespace S7.Net
         /// <param name="offset">The offset to start calculating from.</param>
         /// <param name="length">The number of bytes to include in the calculation.</param>
         /// <returns>The calculated checksum.</returns>
-        private byte CalculateChecksum(byte[] packetData, int offset, int length)
-        {
-            int sum = 0;
-            for (int i = 0; i < length; i++)
-            {
-                sum += packetData[offset + i];
-            }
-            return (byte)-sum;
-        }
-
-        /// <summary>
-        /// Sends a packet to the PLC.
-        /// </summary>
-        /// <param name="contents">The contents of the packet.</param>
-        /// <param name="step">The number of bytes to send at a time.</param>
-        /// <param name="sleepMs">The number of milliseconds to sleep between steps.</param>
-        // The default values for step (2) and sleepMs (10) are based on the Python
-        // client's `send_packet` function, which uses a step of 2 and a sleep_amt of 0.01s.
         public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10, CancellationToken cancellationToken = default)
         {
             // This initial delay mirrors the Python client's SEND_REQ_SAFETY_SLEEP_AMT
             // and is critical for stability.
             await Task.Delay(10, cancellationToken);
 
-            if (contents.Length > PlcConstants.MAX_MSG_LEN)
-            {
-                throw new ArgumentException($"Packet contents too large. Max size is {PlcConstants.MAX_MSG_LEN} bytes.", nameof(contents));
-            }
-
-            var packet = new byte[contents.Length + 2];
-            packet[0] = (byte)(contents.Length + 1);
-            Array.Copy(contents, 0, packet, 1, contents.Length);
-            packet[packet.Length - 1] = CalculateChecksum(packet, 0, packet.Length - 1);
+            var packet = ProtocolUtils.EncodePacket(contents);
 
             _log($"-> SEND: {BitConverter.ToString(packet).Replace("-", "")}");
 
@@ -138,18 +112,7 @@ namespace S7.Net
 
             _log($"<- RECV: {BitConverter.ToString(fullPacket).Replace("-", "")}");
 
-            byte receivedChecksum = fullPacket.Last();
-            byte calculatedChecksum = CalculateChecksum(fullPacket, 0, fullPacket.Length - 1);
-
-            if (receivedChecksum != calculatedChecksum)
-            {
-                _log("CHECKSUM ERROR!");
-                throw new ChecksumMismatchException();
-            }
-
-            var contents = new byte[bytesToRead - 1];
-            Array.Copy(fullPacket, 1, contents, 0, contents.Length);
-            return contents;
+            return ProtocolUtils.DecodePacket(fullPacket);
         }
     }
 }
