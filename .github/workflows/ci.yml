@@ -172,17 +172,43 @@ jobs:
             echo "No async-void guard script found"
           fi
 
-      - name: Format check
+      - name: Auto-fix formatting and commit
+        env:
+          GIT_COMMITTER_NAME: github-actions
+          GIT_COMMITTER_EMAIL: actions@github.com
         run: |
           set -euo pipefail
+
           proj="${{ steps.findproj.outputs.project_path }}"
           if [ -z "$proj" ]; then
-            echo "No project_path found; skipping format check"
+            echo "No project_path found; skipping format step"
             exit 0
           fi
+
           projdir=$(dirname "$proj")
           workspace=$(basename "$proj")
-          echo "Running format in: $projdir (workspace: $workspace)"
+          echo "Running dotnet format in: $projdir (workspace: $workspace)"
           cd "$projdir"
+
+          # Try to restore tools if manifest exists; ignore failure if none
           dotnet tool restore || true
-          dotnet format "$workspace" --verify-no-changes
+
+          # Run dotnet format and allow it to change files
+          dotnet format "$workspace" --verbosity minimal
+
+          # If formatting changed files, commit and push them
+          if ! git diff --quiet --exit-code; then
+            echo "Formatting changes detected; committing them"
+            git config user.name "$GIT_COMMITTER_NAME"
+            git config user.email "$GIT_COMMITTER_EMAIL"
+            git add -A
+            git commit -m "ci: apply dotnet format fixes (automated)" || true
+            # Push back to the branch — requires Workflow permissions: write
+            git push origin "HEAD:${GITHUB_REF##*/}" || {
+              echo "Push failed; check Actions workflow permissions for GITHUB_TOKEN (write access required)."
+              exit 1
+            }
+            echo "Committed and pushed formatting fixes."
+          else
+            echo "No formatting changes needed."
+          fi
