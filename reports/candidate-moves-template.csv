@@ -1,0 +1,8 @@
+# candidate-moves-template.csv
+# Fill or generate using the reports from scripts/collect-architecture.sh
+# Columns:
+# current_path,target_project,reason,move_risk,notes
+# move_risk: Low/Medium/High
+src/S7_Csharp_Utility/Models/Profile.cs,S7.Core,DTO - pure model; no UI deps,Low,"Move to S7.Core; update references in UI project to S7.Core.Models"
+src/S7_csharp_utility/Services/SerialChannel.cs,S7.Services,Serial transport - contains SerialPort usages,Medium,"Move implementation; leave adapter in UI for compatibility for 1 release"
+# Add more rows below as you evaluate the reports

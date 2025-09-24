@@ -1,0 +1,1 @@
+No 'async void' occurrences found.
