@@ -12,21 +12,51 @@ jobs:
       matrix:
         dotnet-version: [ '8.0.x' ]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ matrix.dotnet-version }}
 
+      - name: Find solution or project
+        id: findproj
+        run: |
+          set -e
+          # Look for a solution first, then a csproj
+          sln=$(git ls-files '*.sln' | head -n 1 || true)
+          if [ -n "$sln" ]; then
+            echo "project_path=$sln" >> $GITHUB_OUTPUT
+            echo "Found solution: $sln"
+            exit 0
+          fi
+          csproj=$(git ls-files '*.csproj' | head -n 1 || true)
+          if [ -n "$csproj" ]; then
+            echo "project_path=$csproj" >> $GITHUB_OUTPUT
+            echo "Found project: $csproj"
+            exit 0
+          fi
+          echo "No .sln or .csproj found in repository"
+          exit 1
+
       - name: Restore
-        run: dotnet restore
+        run: |
+          dotnet restore "${{ steps.findproj.outputs.project_path }}"
 
       - name: Build
-        run: dotnet build --no-restore -c Release
+        run: |
+          dotnet build "${{ steps.findproj.outputs.project_path }}" --no-restore -c Release
 
       - name: Test
-        run: dotnet test --no-build -c Release --verbosity normal
+        run: |
+          # If a solution was used the test runner will discover test projects automatically
+          if [[ "${{ steps.findproj.outputs.project_path }}" == *.sln ]]; then
+            dotnet test "${{ steps.findproj.outputs.project_path }}" --no-build -c Release --verbosity normal
+          else
+            # Run tests by discovering test projects in the repo
+            dotnet test --no-build -c Release --verbosity normal
+          fi
 
       - name: Async void guard
         run: |
