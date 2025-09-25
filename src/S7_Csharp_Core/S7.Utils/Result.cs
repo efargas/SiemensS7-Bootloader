@@ -17,7 +17,6 @@ namespace S7.Utils
         /// <summary>
         /// Gets a value indicating whether the operation was successful.
         /// </summary>
-        [MemberNotNullWhen(true, nameof(_value))]
         [MemberNotNullWhen(false, nameof(_error))]
         public bool IsSuccess { get; }
 
@@ -29,12 +28,22 @@ namespace S7.Utils
         /// <summary>
         /// Gets the success value. Only valid when IsSuccess is true.
         /// </summary>
-        public T Value => IsSuccess ? _value : throw new InvalidOperationException("Cannot access Value when Result is in failure state. Check IsSuccess first.");
+        public T Value
+        {
+            get
+            {
+                if (!IsSuccess)
+                    throw new InvalidOperationException("Cannot access Value when Result is in failure state. Check IsSuccess first.");
+                if (_value is null)
+                    throw new NullReferenceException("Value is unexpectedly null in a successful Result.");
+                return _value;
+            }
+        }
 
         /// <summary>
         /// Gets the error. Only valid when IsFailure is true.
         /// </summary>
-        public Exception Error => IsFailure ? _error : throw new InvalidOperationException("Cannot access Error when Result is in success state. Check IsFailure first.");
+        public Exception Error => IsFailure ? _error! : throw new InvalidOperationException("Cannot access Error when Result is in success state. Check IsFailure first.");
 
         private Result(T value)
         {
@@ -47,7 +56,7 @@ namespace S7.Utils
         {
             _value = default;
             _error = error ?? throw new ArgumentNullException(nameof(error));
-            IsSuccess = false;
+            IsSuccess = false;IsSuccess ? _value : throw new InvalidOperationException("Cannot access Value when Result is in failure state. Check IsSuccess first.")
         }
 
         /// <summary>
@@ -169,7 +178,7 @@ namespace S7.Utils
         /// <summary>
         /// Gets the error. Only valid when IsFailure is true.
         /// </summary>
-        public Exception Error => IsFailure ? _error : throw new InvalidOperationException("Cannot access Error when Result is in success state. Check IsFailure first.");
+        public Exception Error => IsFailure ? _error! : throw new InvalidOperationException("Cannot access Error when Result is in success state. Check IsFailure first.");
 
         private Result(Exception? error)
         {
