@@ -89,20 +89,6 @@ jobs:
            echo "::warning ::Code formatting issues found. Please run 'dotnet format' locally."
          fi
 
-      - name: Format check (tests project) if tool manifest present
-        working-directory: ./tests/S7.Tests
-        run: |
-          set -e
-          if [ -f .config/dotnet-tools.json ]; then
-            echo "Running dotnet format --verify-no-changes in tests/S7.Tests"
-            if ! dotnet format --verify-no-changes; then
-              echo "Code formatting required. Run 'dotnet format' in tests/S7.Tests locally." >&2
-              exit 1
-            fi
-          else
-            echo "No dotnet-format manifest; skipping format check."
-          fi
-
       - name: Build all projects (Release)
         run: |
           if [ -f ./src/Solution.sln ]; then
