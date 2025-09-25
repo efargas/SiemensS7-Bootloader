@@ -434,7 +434,7 @@ namespace S7_Csharp_Utility.ViewModels
 
                 if (gridNumber == 1)
                 {
-                    var reader = S7.Services.VirtualFileReaderFactory.Create(filePath);
+                    var reader = S7.Services.VirtualFileReaderFactoryLegacy.Create(filePath);
                     HexRows1 = new VirtualizingHexList(reader);
                     File1Path = filePath;
                     File1Info = FormatFileInfo(fileInfo);
@@ -442,7 +442,7 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 else
                 {
-                    var reader = S7.Services.VirtualFileReaderFactory.Create(filePath);
+                    var reader = S7.Services.VirtualFileReaderFactoryLegacy.Create(filePath);
                     HexRows2 = new VirtualizingHexList(reader);
                     File2Path = filePath;
                     File2Info = FormatFileInfo(fileInfo);
