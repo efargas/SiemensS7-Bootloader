@@ -12,9 +12,11 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Include="NModbus" Version="3.0.81" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\S7.Core.Abstractions\S7.Core.Abstractions.csproj" />
     <ProjectReference Include="..\S7.Net\S7.Net.csproj" />
     <ProjectReference Include="..\S7.Utils\S7.Utils.csproj" />
   </ItemGroup>

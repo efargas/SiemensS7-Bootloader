@@ -33,6 +33,7 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _hexRows1 = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(HexRows)); // Notify that the alias property has changed too
             }
         }
 
@@ -133,8 +134,23 @@ namespace S7_Csharp_Utility.ViewModels
         public bool IsLoading
         {
             get => _isLoading;
-            set { _isLoading = value; OnPropertyChanged(); }
+            set 
+            { 
+                _isLoading = value; 
+                OnPropertyChanged(); 
+                OnPropertyChanged(nameof(LoadingProgress));
+            }
         }
+
+        /// <summary>
+        /// Gets the loading progress as a percentage (0-100).
+        /// </summary>
+        public double LoadingProgress => IsLoading ? 50.0 : 0.0; // Simplified progress indicator
+
+        /// <summary>
+        /// Gets the primary hex rows collection for single-file view compatibility.
+        /// </summary>
+        public IList<HexViewerService.HexRow>? HexRows => HexRows1;
 
         private string _statusText = "Ready";
         public string StatusText

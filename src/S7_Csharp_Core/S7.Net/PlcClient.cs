@@ -16,7 +16,7 @@ namespace S7.Net
     /// The main client for communicating with Siemens S7 PLCs using the undocumented bootloader protocol.
     /// Provides methods for handshake, stager installation, memory operations, and payload management.
     /// </summary>
-    public sealed class PlcClient(ICommunicationChannel channel, Action<string> logger)
+    public sealed class PlcClient(ICommunicationChannel channel, Action<string> logger) : IDisposable
     {
         private readonly ICommunicationChannel _channel = channel ?? throw new ArgumentNullException(nameof(channel));
         private readonly PlcProtocol _protocol = new(channel ?? throw new ArgumentNullException(nameof(channel)),
@@ -558,6 +558,37 @@ namespace S7.Net
             var data = await ReceiveMany(progress, cancellationToken);
             _log($"Memory dump complete. Received {data.Length} bytes.");
             return data;
+        }
+        #endregion
+
+        #region IDisposable Implementation
+        private bool _disposed = false;
+
+        /// <summary>
+        /// Releases all resources used by the PlcClient.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases the unmanaged resources used by the PlcClient and optionally releases the managed resources.
+        /// </summary>
+        /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
+        private void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources
+                    _channel?.Dispose();
+                }
+
+                _disposed = true;
+            }
         }
         #endregion
     }

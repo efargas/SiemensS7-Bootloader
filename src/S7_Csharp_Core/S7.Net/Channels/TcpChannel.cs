@@ -83,5 +83,13 @@ namespace S7.Net.Channels
             if (_stream == null) throw new System.IO.IOException("Not connected.");
             await _stream.WriteAsync(buffer, offset, count, cancellationToken);
         }
+
+        /// <summary>
+        /// Releases all resources used by the TcpChannel.
+        /// </summary>
+        public void Dispose()
+        {
+            Disconnect();
+        }
     }
 }

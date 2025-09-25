@@ -132,6 +132,36 @@ namespace S7.Net
         }
 
         /// <summary>
+        /// Asynchronously loads a payload from the specified file path.
+        /// </summary>
+        /// <param name="payloadPath">The path to the payload file.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>The payload data as a byte array.</returns>
+        /// <exception cref="FileNotFoundException">Thrown when the payload file is not found.</exception>
+        /// <exception cref="UnauthorizedAccessException">Thrown when access to the file is denied.</exception>
+        public async Task<byte[]> LoadPayloadAsync(string payloadPath, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(payloadPath))
+                throw new ArgumentException("Payload path cannot be null or empty.", nameof(payloadPath));
+
+            if (!File.Exists(payloadPath))
+                throw new FileNotFoundException($"Payload file not found: {payloadPath}");
+
+            try
+            {
+                return await File.ReadAllBytesAsync(payloadPath, cancellationToken).ConfigureAwait(false);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new UnauthorizedAccessException($"Access denied to payload file: {payloadPath}. {ex.Message}", ex);
+            }
+            catch (IOException ex)
+            {
+                throw new IOException($"Error reading payload file: {payloadPath}. {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         /// Determines the type of payload based on the file name and path.
         /// </summary>
         private static string DeterminePayloadType(string filePath)

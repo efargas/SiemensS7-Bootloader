@@ -44,6 +44,16 @@ namespace S7.Net.Channels
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="SerialChannel"/> class with default settings.
+        /// </summary>
+        /// <param name="portName">The name of the serial port.</param>
+        /// <param name="baudRate">The baud rate.</param>
+        public SerialChannel(string portName, int baudRate) 
+            : this(portName, baudRate, Parity.None, StopBits.One, Handshake.None)
+        {
+        }
+
+        /// <summary>
         /// Connects to the serial port.
         /// </summary>
         public Task ConnectAsync(CancellationToken cancellationToken = default)
@@ -91,6 +101,15 @@ namespace S7.Net.Channels
         {
             if (_serialPort == null) throw new System.IO.IOException("Not connected.");
             await _serialPort.BaseStream.WriteAsync(buffer, offset, count, cancellationToken);
+        }
+
+        /// <summary>
+        /// Releases all resources used by the SerialChannel.
+        /// </summary>
+        public void Dispose()
+        {
+            Disconnect();
+            _serialPort?.Dispose();
         }
     }
 }

@@ -29,6 +29,14 @@ namespace S7_Csharp_Utility
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
-                .LogToTrace();
+                .LogToTrace()
+                .With(new Win32PlatformOptions
+                {
+                    RenderingMode = new[] { Win32RenderingMode.Software, Win32RenderingMode.Wgl }
+                })
+                .With(new X11PlatformOptions
+                {
+                    RenderingMode = new[] { X11RenderingMode.Software, X11RenderingMode.Glx }
+                });
     }
 }
