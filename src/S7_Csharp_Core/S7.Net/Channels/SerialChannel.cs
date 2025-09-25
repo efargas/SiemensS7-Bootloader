@@ -87,7 +87,7 @@ namespace S7.Net.Channels
         public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_serialPort == null) throw new System.IO.IOException("Not connected.");
-            return await _serialPort.BaseStream.ReadAsync(buffer, offset, count, cancellationToken);
+            return await _serialPort.BaseStream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -100,7 +100,7 @@ namespace S7.Net.Channels
         public async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_serialPort == null) throw new System.IO.IOException("Not connected.");
-            await _serialPort.BaseStream.WriteAsync(buffer, offset, count, cancellationToken);
+            await _serialPort.BaseStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>

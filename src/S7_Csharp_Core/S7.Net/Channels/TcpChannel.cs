@@ -42,7 +42,7 @@ namespace S7.Net.Channels
         {
             if (IsConnected) Disconnect();
             _client = new TcpClient();
-            await _client.ConnectAsync(_host, _port, cancellationToken);
+            await _client.ConnectAsync(_host, _port, cancellationToken).ConfigureAwait(false);
             _stream = _client.GetStream();
         }
 
@@ -68,7 +68,7 @@ namespace S7.Net.Channels
         public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");
-            return await _stream.ReadAsync(buffer, offset, count, cancellationToken);
+            return await _stream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace S7.Net.Channels
         public async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");
-            await _stream.WriteAsync(buffer, offset, count, cancellationToken);
+            await _stream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
