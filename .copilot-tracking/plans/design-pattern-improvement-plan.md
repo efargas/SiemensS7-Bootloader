@@ -23,8 +23,20 @@ This plan addresses the critical design pattern implementation gaps and architec
 
 ## Strategic Objectives
 
-### Phase 1: Foundation Fixes (Weeks 1-2)
+### Phase 0: ConfigureAwait Corrections (Days 1-3) 🔴 NEW CRITICAL PHASE
+**Goal**: Fix 87 ConfigureAwait(false) violations before proceeding with pattern implementation
+**Priority**: CRITICAL - Must complete before any other phases
+**Status**: 📋 PLANNING
+
+#### 0.1 Critical Infrastructure Corrections
+- **Priority**: CRITICAL
+- **Impact**: High - eliminates deadlock risk and performance issues
+- **Effort**: High (87 violations across entire codebase)
+- **Dependencies**: None - can start immediately
+
+### Phase 1: Foundation Fixes (Weeks 2-3) - UPDATED TIMELINE
 **Goal**: Fix critical missing implementations that break existing functionality
+**Dependencies**: Phase 0 completion required
 
 #### 1.1 Resource Pattern Completion
 - **Priority**: CRITICAL
