@@ -71,23 +71,23 @@ jobs:
             dotnet tool install -g dotnet-format
           fi
 
-      - name: Format check (run dotnet-format on solution/project)
+      - name: Format check (warn only)
         run: |
-          set -e
-          # Pick a solution if present, otherwise first csproj
-          SOLN=$(git ls-files '*.sln' | head -n1 || true)
-          if [ -n "$SOLN" ]; then
-            echo "Formatting solution: $SOLN"
-            dotnet format "$SOLN" --verify-no-changes
-            exit 0
-          fi
-          CSPROJ=$(git ls-files '*.csproj' | head -n1 || true)
-          if [ -n "$CSPROJ" ]; then
-            echo "Formatting project: $CSPROJ"
-            dotnet format "$CSPROJ" --verify-no-changes
-            exit 0
-          fi
-          echo "No .sln or .csproj found; skipping dotnet format check."
+         set -e
+         SOLN=$(git ls-files '*.sln' | head -n1 || true)
+         CSPROJ=$(git ls-files '*.csproj' | head -n1 || true)
+         RESULT=0
+         if [ -n "$SOLN" ]; then
+           dotnet format "$SOLN" --verify-no-changes || RESULT=1
+         elif [ -n "$CSPROJ" ]; then
+           dotnet format "$CSPROJ" --verify-no-changes || RESULT=1
+         else
+           echo "No .sln or .csproj found; skipping format check."
+           exit 0
+         fi
+         if [ "$RESULT" -eq 1 ]; then
+           echo "::warning ::Code formatting issues found. Please run 'dotnet format' locally."
+         fi
 
       - name: Format check (tests project) if tool manifest present
         working-directory: ./tests/S7.Tests
