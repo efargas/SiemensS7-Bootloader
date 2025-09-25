@@ -43,6 +43,7 @@ namespace S7_Csharp_Utility.Services
         private readonly object _sync = new object();
         private const int MaxLogLines = 2000;
         private readonly Dispatcher _dispatcher;
+        private readonly ResourceManagerService? _resourceManager;
         private string _mainLogFile;
         private string _logsPath;
         private const long MaxLogFileSize = 5 * 1024 * 1024; // 5MB
@@ -128,10 +129,12 @@ namespace S7_Csharp_Utility.Services
         /// Initializes a new instance of the <see cref="LoggingService"/> class.
         /// </summary>
         /// <param name="dispatcher">The dispatcher to use for UI updates.</param>
+        /// <param name="resourceManager">The resource manager service for localized messages. Optional for backward compatibility.</param>
         /// <param name="logsPath">The path where log files should be saved. If null, uses default path.</param>
-        public LoggingService(Dispatcher dispatcher, string? logsPath = null)
+        public LoggingService(Dispatcher dispatcher, ResourceManagerService? resourceManager = null, string? logsPath = null)
         {
             _dispatcher = dispatcher;
+            _resourceManager = resourceManager;
             _logsPath = logsPath ?? Path.Combine(AppContext.BaseDirectory, "logs");
             Directory.CreateDirectory(_logsPath);
             _mainLogFile = Path.Combine(_logsPath, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
@@ -206,6 +209,61 @@ namespace S7_Csharp_Utility.Services
                     }
                 }
             }, Avalonia.Threading.DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Logs a message using a resource key.
+        /// </summary>
+        /// <param name="resourceKey">The resource key for the message.</param>
+        /// <param name="category">The category of the message.</param>
+        /// <param name="args">Optional format arguments for the message.</param>
+        public void LogWithKey(string resourceKey, LogCategory category = LogCategory.Info, params object[] args)
+        {
+            if (string.IsNullOrEmpty(resourceKey)) return;
+
+            string message;
+            if (_resourceManager != null)
+            {
+                message = args.Length > 0 
+                    ? _resourceManager.GetFormattedLogMessage(resourceKey, args)
+                    : _resourceManager.GetLogMessage(resourceKey);
+            }
+            else
+            {
+                // Fallback when ResourceManagerService is not available
+                message = args.Length > 0 
+                    ? $"{resourceKey} [{string.Join(", ", args)}]"
+                    : resourceKey;
+            }
+
+            Log(message, category);
+        }
+
+        /// <summary>
+        /// Logs an error message using a resource key.
+        /// </summary>
+        /// <param name="resourceKey">The resource key for the error message.</param>
+        /// <param name="args">Optional format arguments for the message.</param>
+        public void LogError(string resourceKey, params object[] args)
+        {
+            if (string.IsNullOrEmpty(resourceKey)) return;
+
+            string message;
+            if (_resourceManager != null)
+            {
+                message = args.Length > 0 
+                    ? _resourceManager.GetFormattedErrorMessage(resourceKey, args)
+                    : _resourceManager.GetErrorMessage(resourceKey);
+            }
+            else
+            {
+                // Fallback when ResourceManagerService is not available
+                message = args.Length > 0 
+                    ? $"{resourceKey} [{string.Join(", ", args)}]"
+                    : resourceKey;
+            }
+
+            Log(message, LogCategory.Error);
         }
 
         /// <summary>

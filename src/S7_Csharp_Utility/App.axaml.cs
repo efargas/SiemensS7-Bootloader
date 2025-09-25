@@ -64,8 +64,15 @@ namespace S7_Csharp_Utility
         /// <param name="services">The service collection to configure.</param>
         private void ConfigureServices(IServiceCollection services)
         {
+            // Register Resource Management Services
+            services.AddSingleton<ResourceManagerService>();
+
             // Register Services
-            services.AddSingleton<LoggingService>(_ => new LoggingService(Dispatcher.UIThread));
+            services.AddSingleton<LoggingService>(sp => 
+            {
+                var resourceManager = sp.GetRequiredService<ResourceManagerService>();
+                return new LoggingService(Dispatcher.UIThread, resourceManager);
+            });
             services.AddSingleton<SocatLoggerService>(_ => new SocatLoggerService(Dispatcher.UIThread));
             services.AddSingleton<ConfigurationService>();
             services.AddSingleton<PayloadManager>(_ => new PayloadManager(AppContext.BaseDirectory));

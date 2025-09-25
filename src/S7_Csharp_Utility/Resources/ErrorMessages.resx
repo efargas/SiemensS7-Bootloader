@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion. The mimetype is used for serialized objects, 
+    and tells the ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  
+  <!-- Validation Errors -->
+  <data name="Validation_Required_Field" xml:space="preserve">
+    <value>The field '{0}' is required and cannot be empty</value>
+    <comment>Error message for required field validation. {0} is the field name.</comment>
+  </data>
+  <data name="Validation_Invalid_Range" xml:space="preserve">
+    <value>The value for '{0}' must be between {1} and {2}</value>
+    <comment>Error message for range validation. {0} is field name, {1} is min value, {2} is max value.</comment>
+  </data>
+  <data name="Validation_File_Not_Found" xml:space="preserve">
+    <value>The file '{0}' does not exist or cannot be accessed</value>
+    <comment>Error message when a required file is not found. {0} is the file path.</comment>
+  </data>
+  <data name="Validation_Directory_Not_Found" xml:space="preserve">
+    <value>The directory '{0}' does not exist or cannot be accessed</value>
+    <comment>Error message when a required directory is not found. {0} is the directory path.</comment>
+  </data>
+  <data name="Validation_Invalid_Format" xml:space="preserve">
+    <value>The value '{0}' is not in a valid format for field '{1}'</value>
+    <comment>Error message for format validation. {0} is the invalid value, {1} is the field name.</comment>
+  </data>
+  <data name="Validation_Invalid_Length" xml:space="preserve">
+    <value>The field '{0}' must be between {1} and {2} characters long</value>
+    <comment>Error message for length validation. {0} is field name, {1} is min length, {2} is max length.</comment>
+  </data>
+  <data name="Validation_Invalid_Email" xml:space="preserve">
+    <value>The email address '{0}' is not in a valid format</value>
+    <comment>Error message for email validation. {0} is the invalid email address.</comment>
+  </data>
+  <data name="Validation_Invalid_Url" xml:space="preserve">
+    <value>The URL '{0}' is not in a valid format</value>
+    <comment>Error message for URL validation. {0} is the invalid URL.</comment>
+  </data>
+  
+  <!-- Connection Errors -->
+  <data name="Connection_Timeout" xml:space="preserve">
+    <value>Connection to PLC at '{0}' timed out after {1} seconds</value>
+    <comment>Error message when connection times out. {0} is PLC address, {1} is timeout duration.</comment>
+  </data>
+  <data name="Connection_Refused" xml:space="preserve">
+    <value>Connection to PLC at '{0}' was refused. Please check if the PLC is running and accessible</value>
+    <comment>Error message when connection is refused. {0} is the PLC address.</comment>
+  </data>
+  <data name="Connection_Lost" xml:space="preserve">
+    <value>Connection to PLC at '{0}' was lost unexpectedly</value>
+    <comment>Error message when connection is lost. {0} is the PLC address.</comment>
+  </data>
+  <data name="Connection_Authentication_Failed" xml:space="preserve">
+    <value>Authentication failed for PLC at '{0}'. Please check credentials</value>
+    <comment>Error message when authentication fails. {0} is the PLC address.</comment>
+  </data>
+  <data name="Connection_Network_Error" xml:space="preserve">
+    <value>Network error occurred while connecting to PLC at '{0}': {1}</value>
+    <comment>Error message for network errors. {0} is PLC address, {1} is the specific error.</comment>
+  </data>
+  
+  <!-- Protocol Errors -->
+  <data name="Protocol_Error" xml:space="preserve">
+    <value>Protocol error occurred: {0}</value>
+    <comment>General protocol error message. {0} is the specific error description.</comment>
+  </data>
+  <data name="Protocol_Checksum_Mismatch" xml:space="preserve">
+    <value>Checksum mismatch detected. Expected: {0:X8}, Received: {1:X8}</value>
+    <comment>Error message for checksum mismatch. {0} is expected checksum, {1} is received checksum.</comment>
+  </data>
+  <data name="Protocol_Invalid_Packet" xml:space="preserve">
+    <value>Invalid packet received: {0}</value>
+    <comment>Error message for invalid packet. {0} is the packet description or error details.</comment>
+  </data>
+  <data name="Protocol_Unsupported_Version" xml:space="preserve">
+    <value>Unsupported protocol version: {0}. Supported versions: {1}</value>
+    <comment>Error message for unsupported protocol version. {0} is received version, {1} is supported versions.</comment>
+  </data>
+  <data name="Protocol_Sequence_Error" xml:space="preserve">
+    <value>Protocol sequence error. Expected sequence: {0}, Received: {1}</value>
+    <comment>Error message for protocol sequence errors. {0} is expected sequence, {1} is received sequence.</comment>
+  </data>
+  
+  <!-- Memory Access Errors -->
+  <data name="Memory_Access_Denied" xml:space="preserve">
+    <value>Access denied to memory address {0:X8}. Insufficient privileges</value>
+    <comment>Error message when memory access is denied. {0} is the memory address.</comment>
+  </data>
+  <data name="Memory_Invalid_Address" xml:space="preserve">
+    <value>Invalid memory address: {0:X8}. Address is outside valid range</value>
+    <comment>Error message for invalid memory address. {0} is the invalid address.</comment>
+  </data>
+  <data name="Memory_Read_Failed" xml:space="preserve">
+    <value>Failed to read {0} bytes from memory address {1:X8}: {2}</value>
+    <comment>Error message for memory read failure. {0} is byte count, {1} is address, {2} is error details.</comment>
+  </data>
+  <data name="Memory_Write_Failed" xml:space="preserve">
+    <value>Failed to write {0} bytes to memory address {1:X8}: {2}</value>
+    <comment>Error message for memory write failure. {0} is byte count, {1} is address, {2} is error details.</comment>
+  </data>
+  <data name="Memory_Alignment_Error" xml:space="preserve">
+    <value>Memory alignment error at address {0:X8}. Address must be aligned to {1} bytes</value>
+    <comment>Error message for memory alignment issues. {0} is address, {1} is required alignment.</comment>
+  </data>
+  <data name="Memory_Protection_Violation" xml:space="preserve">
+    <value>Memory protection violation at address {0:X8}. Cannot write to read-only memory</value>
+    <comment>Error message for memory protection violations. {0} is the protected address.</comment>
+  </data>
+  
+  <!-- Payload Errors -->
+  <data name="Payload_Load_Failed" xml:space="preserve">
+    <value>Failed to load payload from '{0}': {1}</value>
+    <comment>Error message when payload loading fails. {0} is file path, {1} is error details.</comment>
+  </data>
+  <data name="Payload_Invalid_Format" xml:space="preserve">
+    <value>Invalid payload format in file '{0}'. Expected format: {1}</value>
+    <comment>Error message for invalid payload format. {0} is file path, {1} is expected format.</comment>
+  </data>
+  <data name="Payload_Size_Exceeded" xml:space="preserve">
+    <value>Payload size ({0} bytes) exceeds maximum allowed size ({1} bytes)</value>
+    <comment>Error message when payload is too large. {0} is actual size, {1} is maximum size.</comment>
+  </data>
+  <data name="Payload_Execution_Failed" xml:space="preserve">
+    <value>Payload execution failed at address {0:X8}: {1}</value>
+    <comment>Error message when payload execution fails. {0} is execution address, {1} is error details.</comment>
+  </data>
+  <data name="Payload_Verification_Failed" xml:space="preserve">
+    <value>Payload verification failed: {0}</value>
+    <comment>Error message when payload verification fails. {0} is the verification error details.</comment>
+  </data>
+  
+  <!-- Stager Errors -->
+  <data name="Stager_Installation_Failed" xml:space="preserve">
+    <value>Stager installation failed: {0}</value>
+    <comment>Error message when stager installation fails. {0} is the error details.</comment>
+  </data>
+  <data name="Stager_Not_Found" xml:space="preserve">
+    <value>Stager file not found at '{0}'</value>
+    <comment>Error message when stager file is not found. {0} is the expected file path.</comment>
+  </data>
+  <data name="Stager_Verification_Failed" xml:space="preserve">
+    <value>Stager verification failed: {0}</value>
+    <comment>Error message when stager verification fails. {0} is the verification error details.</comment>
+  </data>
+  <data name="Stager_Already_Installed" xml:space="preserve">
+    <value>Stager is already installed. Use force option to reinstall</value>
+    <comment>Error message when trying to install stager that's already installed.</comment>
+  </data>
+  
+  <!-- File System Errors -->
+  <data name="File_Access_Denied" xml:space="preserve">
+    <value>Access denied to file '{0}'. Check file permissions</value>
+    <comment>Error message when file access is denied. {0} is the file path.</comment>
+  </data>
+  <data name="File_In_Use" xml:space="preserve">
+    <value>File '{0}' is currently in use by another process</value>
+    <comment>Error message when file is locked by another process. {0} is the file path.</comment>
+  </data>
+  <data name="File_Corrupted" xml:space="preserve">
+    <value>File '{0}' appears to be corrupted or invalid</value>
+    <comment>Error message when file is corrupted. {0} is the file path.</comment>
+  </data>
+  <data name="File_Too_Large" xml:space="preserve">
+    <value>File '{0}' is too large ({1} bytes). Maximum allowed size is {2} bytes</value>
+    <comment>Error message when file is too large. {0} is file path, {1} is actual size, {2} is max size.</comment>
+  </data>
+  <data name="Disk_Space_Insufficient" xml:space="preserve">
+    <value>Insufficient disk space to save file '{0}'. Required: {1} bytes, Available: {2} bytes</value>
+    <comment>Error message for insufficient disk space. {0} is file path, {1} is required space, {2} is available space.</comment>
+  </data>
+  
+  <!-- Configuration Errors -->
+  <data name="Configuration_Invalid" xml:space="preserve">
+    <value>Invalid configuration: {0}</value>
+    <comment>Error message for invalid configuration. {0} is the specific configuration error.</comment>
+  </data>
+  <data name="Configuration_Missing_Section" xml:space="preserve">
+    <value>Missing required configuration section: '{0}'</value>
+    <comment>Error message for missing configuration section. {0} is the section name.</comment>
+  </data>
+  <data name="Configuration_Invalid_Value" xml:space="preserve">
+    <value>Invalid value '{0}' for configuration key '{1}'. Expected: {2}</value>
+    <comment>Error message for invalid configuration value. {0} is the value, {1} is the key, {2} is expected format.</comment>
+  </data>
+  <data name="Configuration_Load_Failed" xml:space="preserve">
+    <value>Failed to load configuration from '{0}': {1}</value>
+    <comment>Error message when configuration loading fails. {0} is file path, {1} is error details.</comment>
+  </data>
+  <data name="Configuration_Save_Failed" xml:space="preserve">
+    <value>Failed to save configuration to '{0}': {1}</value>
+    <comment>Error message when configuration saving fails. {0} is file path, {1} is error details.</comment>
+  </data>
+  
+  <!-- Security Errors -->
+  <data name="Security_Unauthorized_Access" xml:space="preserve">
+    <value>Unauthorized access attempt detected for operation: {0}</value>
+    <comment>Error message for unauthorized access attempts. {0} is the operation being attempted.</comment>
+  </data>
+  <data name="Security_Invalid_Credentials" xml:space="preserve">
+    <value>Invalid credentials provided for user '{0}'</value>
+    <comment>Error message for invalid credentials. {0} is the username.</comment>
+  </data>
+  <data name="Security_Session_Expired" xml:space="preserve">
+    <value>Security session has expired. Please re-authenticate</value>
+    <comment>Error message when security session expires.</comment>
+  </data>
+  <data name="Security_Permission_Denied" xml:space="preserve">
+    <value>Permission denied for operation '{0}'. Required permission: {1}</value>
+    <comment>Error message for permission denied. {0} is the operation, {1} is the required permission.</comment>
+  </data>
+  
+  <!-- System Errors -->
+  <data name="System_Out_Of_Memory" xml:space="preserve">
+    <value>System is out of memory. Cannot complete operation</value>
+    <comment>Error message when system runs out of memory.</comment>
+  </data>
+  <data name="System_Resource_Exhausted" xml:space="preserve">
+    <value>System resource '{0}' is exhausted. Cannot complete operation</value>
+    <comment>Error message when system resource is exhausted. {0} is the resource name.</comment>
+  </data>
+  <data name="System_Service_Unavailable" xml:space="preserve">
+    <value>System service '{0}' is currently unavailable</value>
+    <comment>Error message when system service is unavailable. {0} is the service name.</comment>
+  </data>
+  <data name="System_Unexpected_Error" xml:space="preserve">
+    <value>An unexpected system error occurred: {0}</value>
+    <comment>Error message for unexpected system errors. {0} is the error details.</comment>
+  </data>
+  
+  <!-- Operation Errors -->
+  <data name="Operation_Cancelled" xml:space="preserve">
+    <value>Operation '{0}' was cancelled by user request</value>
+    <comment>Error message when operation is cancelled. {0} is the operation name.</comment>
+  </data>
+  <data name="Operation_Timeout" xml:space="preserve">
+    <value>Operation '{0}' timed out after {1} seconds</value>
+    <comment>Error message when operation times out. {0} is operation name, {1} is timeout duration.</comment>
+  </data>
+  <data name="Operation_Not_Supported" xml:space="preserve">
+    <value>Operation '{0}' is not supported in the current context</value>
+    <comment>Error message when operation is not supported. {0} is the operation name.</comment>
+  </data>
+  <data name="Operation_Failed" xml:space="preserve">
+    <value>Operation '{0}' failed: {1}</value>
+    <comment>General operation failure message. {0} is operation name, {1} is error details.</comment>
+  </data>
+</root>

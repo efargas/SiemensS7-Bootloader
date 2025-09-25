@@ -33,6 +33,7 @@
     </Content>
   </ItemGroup>
 
+  
   <!-- Ensure all required directories exist in output -->
   <Target Name="CreateResourceDirectories" AfterTargets="Build">
     <MakeDir Directories="$(OutputPath)Resources\payloads" />

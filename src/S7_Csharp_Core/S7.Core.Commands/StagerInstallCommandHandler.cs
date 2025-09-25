@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using S7.Net;
 using S7.Net.Channels;
 using S7.Net.Interfaces;
@@ -31,6 +33,52 @@ namespace S7.Core.Commands
         {
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
             _powerController = powerController ?? throw new ArgumentNullException(nameof(powerController));
+        }
+
+        /// <summary>
+        /// Sets up the stager install command handler and its dependencies in the service container.
+        /// </summary>
+        /// <param name="host">The host containing the service provider</param>
+        /// <exception cref="ArgumentNullException">Thrown when host is null</exception>
+        /// <exception cref="InvalidOperationException">Thrown when required services cannot be resolved</exception>
+        public static void SetupCommand(IHost host)
+        {
+            ArgumentNullException.ThrowIfNull(host);
+
+            var services = host.Services;
+            var logger = services.GetService<ILogger<StagerInstallCommandHandler>>();
+            
+            if (logger == null)
+            {
+                throw new InvalidOperationException("ILogger<StagerInstallCommandHandler> service is not registered. " +
+                    "Ensure logging services are configured in the service container.");
+            }
+
+            // Verify PayloadManager is available
+            var payloadManager = services.GetService<PayloadManager>();
+            if (payloadManager == null)
+            {
+                throw new InvalidOperationException("PayloadManager service is not registered. " +
+                    "Ensure PayloadManager is configured in the service container.");
+            }
+
+            // Verify IPowerController is available
+            var powerController = services.GetService<IPowerController>();
+            if (powerController == null)
+            {
+                throw new InvalidOperationException("IPowerController service is not registered. " +
+                    "Ensure IPowerController is configured in the service container.");
+            }
+
+            // Verify the command handler itself can be resolved
+            var handler = services.GetService<ICommandHandler<StagerInstallOptions>>();
+            if (handler == null)
+            {
+                throw new InvalidOperationException("ICommandHandler<StagerInstallOptions> service is not registered. " +
+                    "Ensure the command handler is configured in the service container.");
+            }
+
+            logger.LogInformation("StagerInstallCommandHandler setup completed successfully");
         }
 
         /// <summary>
