@@ -1,0 +1,12 @@
+{
+  "modelName": "CPU1212DC/DC/DC",
+  "firmwareVersion": "V.4.2.1",
+  "regions": [
+    {
+      "name": ".bss",
+      "address": "0x01E01040",
+      "size": 8519448,
+      "endAddress": "0x2620F58"
+    }
+  ]
+}

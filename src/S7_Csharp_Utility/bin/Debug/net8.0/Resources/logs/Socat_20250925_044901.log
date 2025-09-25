@@ -1,0 +1,2 @@
+[2025-09-25 05:00:55] Starting socat: TCP-LISTEN:1238 <-> 
+[2025-09-25 05:00:55] ERROR: No serial port selected. Please select a serial device before starting socat.

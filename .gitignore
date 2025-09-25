@@ -1,61 +1,333 @@
+# =============================================================================
+# .NET Build Artifacts and IDE Files
+# =============================================================================
+
 # Visual Studio
 .vs/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
 
-# VSCode
+# Visual Studio Code
 .vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# Build Output
-src/**/bin/
-**/obj/
-
-# Avalonia Designer/Preview
-**/.designer/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs/Temp
-!*.log
-*.tmp
-
-# Python legacy artifacts
-Legacy/tools/__pycache__/
-Legacy/tools/*.pyc
-
-# Legacy scripts output
-Legacy/*.log
-Legacy/*.tmp
-
-# Payloads/project generated outputs
-src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.exe
-src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.tmp
-src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.d
-src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.ihex
-src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.o
-src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.sym
-src/bootloader-payloads/docker-scripts/compiled_payloads/**/build/*
-!src/bootloader-payloads/docker-scripts/compiled_payloads/**/build/*.bin
-!src/bootloader-payloads/docker-scripts/compiled_payloads/**/*.bin
-
-# Rider
+# JetBrains Rider
 .idea/
 *.sln.iml
 
-# Other
+# =============================================================================
+# .NET Build Output - IGNORE ALL
+# =============================================================================
+
+# Build directories - ignore obj/ completely, bin/ selectively
+**/obj/
+
+# Build artifacts in bin/ directories (but allow exceptions below)
+**/bin/**/*.dll
+**/bin/**/*.exe
+**/bin/**/*.pdb
+**/bin/**/*.cache
+**/bin/**/*.deps.json
+**/bin/**/*.runtimeconfig.json
+**/bin/**/*.runtimeconfig.dev.json
+**/bin/**/*.xml
+**/bin/**/*.config
+**/bin/**/*.manifest
+**/bin/**/*.application
+**/bin/**/*.deploy
+**/bin/**/*.mdb
+**/bin/**/*.vshost.*
+**/bin/**/*.lastcodeanalysissucceeded
+
+# NuGet packages
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+!packages/repositories.config
+
+# =============================================================================
+# Test Results and Coverage
+# =============================================================================
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+*.testlog
+
+# Coverage reports
+coverage/
+*.lcov
+opencover.xml
+
+# =============================================================================
+# EXCEPTIONS - Keep These Specific Artifacts
+# =============================================================================
+
+# Keep compiled payload .bin files in source Resources (not build output)
+!src/Resources/payloads/**/*.bin
+!src/S7_Csharp_Utility/Resources/**/*.bin
+!bootloader-payloads/**/*.bin
+
+# Keep C# Utility logs and settings from build output
+!src/S7_Csharp_Utility/bin/
+!src/S7_Csharp_Utility/bin/**/
+!src/S7_Csharp_Utility/bin/**/logs/
+!src/S7_Csharp_Utility/bin/**/logs/**
+!src/S7_Csharp_Utility/bin/**/Resources/
+!src/S7_Csharp_Utility/bin/**/Resources/logs/
+!src/S7_Csharp_Utility/bin/**/Resources/logs/**
+!src/S7_Csharp_Utility/bin/**/Resources/Settings/
+!src/S7_Csharp_Utility/bin/**/Resources/Settings/**
+!src/S7_Csharp_Utility/bin/**/Resources/dumps/
+!src/S7_Csharp_Utility/bin/**/Resources/dumps/**
+!src/S7_Csharp_Utility/bin/**/Resources/extracted/
+!src/S7_Csharp_Utility/bin/**/Resources/extracted/**
+
+# Keep payload .bin files in build output (these are copied resources)
+!src/S7_Csharp_Utility/bin/**/Resources/payloads/
+!src/S7_Csharp_Utility/bin/**/Resources/payloads/**/*.bin
+!tests/S7_Csharp_Utility.Tests/bin/**/Resources/payloads/
+!tests/S7_Csharp_Utility.Tests/bin/**/Resources/payloads/**/*.bin
+
+# =============================================================================
+# Operating System Files
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# Development and Temporary Files
+# =============================================================================
+
+# Logs (except those explicitly kept above)
+*.log
+# Override for specific log locations
+!src/S7_Csharp_Utility/bin/**/logs/*.log
+!src/S7_Csharp_Utility/bin/**/Resources/logs/*.log
+
+# Temporary files
+*.tmp
+*.temp
 *.swp
+*.swo
 *.bak
 *.old
+*.orig
 
-# Ignore test results
-TestResults/
+# Backup files
+*~
+*.backup
 
+# =============================================================================
+# Legacy Python Artifacts
+# =============================================================================
 
-# Agent ephemeral workspace and tracking artifacts
+# Python cache and compiled files
+Legacy/tools/__pycache__/
+Legacy/tools/*.pyc
+Legacy/tools/*.pyo
+Legacy/tools/*.pyd
+Legacy/tools/.Python
+Legacy/tools/env/
+Legacy/tools/venv/
+Legacy/tools/ENV/
+Legacy/tools/env.bak/
+Legacy/tools/venv.bak/
+
+# Legacy script outputs (except logs which are handled above)
+Legacy/*.tmp
+Legacy/*.temp
+
+# =============================================================================
+# Bootloader Payload Build Artifacts
+# =============================================================================
+
+# Compiled intermediate files from payload builds
+bootloader-payloads/**/*.o
+bootloader-payloads/**/*.d
+bootloader-payloads/**/*.exe
+bootloader-payloads/**/*.elf
+bootloader-payloads/**/*.map
+bootloader-payloads/**/*.sym
+bootloader-payloads/**/*.ihex
+bootloader-payloads/**/*.hex
+bootloader-payloads/**/build/
+!bootloader-payloads/**/build/*.bin  # Keep final .bin files
+
+# Docker build artifacts
+bootloader-payloads/docker-scripts/compiled_payloads/**/*.exe
+bootloader-payloads/docker-scripts/compiled_payloads/**/*.tmp
+bootloader-payloads/docker-scripts/compiled_payloads/**/*.d
+bootloader-payloads/docker-scripts/compiled_payloads/**/*.ihex
+bootloader-payloads/docker-scripts/compiled_payloads/**/*.o
+bootloader-payloads/docker-scripts/compiled_payloads/**/*.sym
+bootloader-payloads/docker-scripts/compiled_payloads/**/build/*
+!bootloader-payloads/docker-scripts/compiled_payloads/**/build/*.bin
+!bootloader-payloads/docker-scripts/compiled_payloads/**/*.bin
+
+# =============================================================================
+# Avalonia Designer/Preview
+# =============================================================================
+
+**/.designer/
+**/DesignTimeResolveAssemblyReferencesInput.cache
+
+# =============================================================================
+# Agent and Tracking Artifacts
+# =============================================================================
+
+# Agent ephemeral workspace
 agents/workspace/
+
+# Tracking changes (keep plans and reports, ignore daily changes)
 .copilot-tracking/changes/*.md
+!.copilot-tracking/changes/*-completion-report.md
+!.copilot-tracking/changes/*-phase*-complete.md
+
+# Generated reports
 reports/*.csv
 reports/*.txt
+reports/*.html
+!reports/*.md
+
+# Generated documentation
 docs/REPO_LAYOUT_CURRENT.md
+
+# =============================================================================
+# Package Manager Files
+# =============================================================================
+
+# NuGet
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# npm (if any JavaScript tools are used)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =============================================================================
+# Security and Sensitive Files
+# =============================================================================
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Secrets
+secrets.json
+appsettings.Development.json
+appsettings.Local.json
+
+# =============================================================================
+# Performance and Profiling
+# =============================================================================
+
+# Profiling results
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Performance counters
+PerfLogs/
+
+# =============================================================================
+# Documentation Build Artifacts
+# =============================================================================
+
+# DocFX
+_site/
+api/
+articles/obj/
+
+# Sphinx
+docs/_build/
+
+# =============================================================================
+# Miscellaneous
+# =============================================================================
+
+# Fody - auto-generated files
+FodyWeavers.xsd
+
+# StyleCop
+StyleCopReport.xml
+
+# Files built by Visual Studio
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.iobj
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp_proj
+*_wpftmp.csproj
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# =============================================================================
+# END OF .GITIGNORE
+# =============================================================================
