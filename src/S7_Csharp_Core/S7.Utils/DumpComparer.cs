@@ -36,7 +36,7 @@ namespace S7.Utils
             foreach (var file in files)
             {
                 _progressReporter?.Invoke($"Hashing {Path.GetFileName(file)}...");
-                string hashString = await ComputeFileHashAsync(file);
+                string hashString = await ComputeFileHashAsync(file).ConfigureAwait(false);
                 if (!hashes.ContainsKey(hashString))
                 {
                     hashes[hashString] = new List<string>();
@@ -207,7 +207,7 @@ namespace S7.Utils
             using (var md5 = MD5.Create())
             using (var stream = File.OpenRead(path))
             {
-                var hashBytes = await md5.ComputeHashAsync(stream);
+                var hashBytes = await md5.ComputeHashAsync(stream).ConfigureAwait(false);
                 return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
             }
         }

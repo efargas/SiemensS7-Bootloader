@@ -44,7 +44,7 @@ namespace S7.Services
 
             _fs.Seek(offset, SeekOrigin.Begin);
 
-            int bytesRead = await _fs.ReadAsync(buffer, 0, (int)bytesToRead, ct);
+            int bytesRead = await _fs.ReadAsync(buffer, 0, (int)bytesToRead, ct).ConfigureAwait(false);
 
             var memory = new ReadOnlyMemory<byte>(buffer, 0, bytesRead);
 

@@ -72,7 +72,7 @@ namespace S7.Core.Commands.Handlers
                     var handshakeStart = Stopwatch.StartNew();
                     _logger.LogInformation("Performing handshake. CorrelationId: {CorrelationId}", command.CorrelationId);
                     
-                    await plcClient.PerformHandshakeAsync(cancellationToken);
+                    await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
                     handshakeStart.Stop();
                     performanceMetrics = performanceMetrics with { HandshakeTime = handshakeStart.Elapsed };
                     
@@ -84,11 +84,11 @@ namespace S7.Core.Commands.Handlers
                 _logger.LogInformation("Loading payload from {PayloadPath}. CorrelationId: {CorrelationId}",
                     command.PayloadPath, command.CorrelationId);
                 
-                var payload = await _payloadManager.LoadPayloadAsync(command.PayloadPath, cancellationToken);
+                var payload = await _payloadManager.LoadPayloadAsync(command.PayloadPath, cancellationToken).ConfigureAwait(false);
 
                 // Perform the memory dump
                 var transferStart = Stopwatch.StartNew();
-                var dumpData = await PerformMemoryDumpAsync(plcClient, command, payload, cancellationToken);
+                var dumpData = await PerformMemoryDumpAsync(plcClient, command, payload, cancellationToken).ConfigureAwait(false);
                 transferStart.Stop();
 
                 // Calculate performance metrics
@@ -110,7 +110,7 @@ namespace S7.Core.Commands.Handlers
                 Directory.CreateDirectory(command.OutputPath);
 
                 // Save the dump data
-                await File.WriteAllBytesAsync(outputPath, dumpData, cancellationToken);
+                await File.WriteAllBytesAsync(outputPath, dumpData, cancellationToken).ConfigureAwait(false);
                 _logger.LogInformation("Memory dump saved to {OutputPath}. CorrelationId: {CorrelationId}",
                     outputPath, command.CorrelationId);
 
@@ -121,7 +121,7 @@ namespace S7.Core.Commands.Handlers
                 {
                     var verificationStart = Stopwatch.StartNew();
                     checksum = CalculateChecksum(dumpData);
-                    isVerified = await VerifyDumpAsync(plcClient, command, dumpData, cancellationToken);
+                    isVerified = await VerifyDumpAsync(plcClient, command, dumpData, cancellationToken).ConfigureAwait(false);
                     verificationStart.Stop();
                     
                     performanceMetrics = performanceMetrics with { VerificationTime = verificationStart.Elapsed };
@@ -277,7 +277,7 @@ namespace S7.Core.Commands.Handlers
             try
             {
                 // Simplified verification - in reality, you'd re-read a portion of memory and compare
-                await Task.Delay(100, cancellationToken); // Simulate verification time
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false); // Simulate verification time
                 return true; // Assume verification passes for now
             }
             catch (Exception ex)

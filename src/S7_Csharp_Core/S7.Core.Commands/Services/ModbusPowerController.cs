@@ -50,17 +50,17 @@ namespace S7.Core.Commands.Services
             try
             {
                 // Turn power OFF
-                await SetPowerAsync(config, false, cancellationToken);
+                await SetPowerAsync(config, false, cancellationToken).ConfigureAwait(false);
 
                 // Wait for the specified delay
                 if (config.DelaySeconds > 0)
                 {
                     _logger.LogInformation("Waiting {DelaySeconds} seconds before turning power back on", config.DelaySeconds);
-                    await Task.Delay(TimeSpan.FromSeconds(config.DelaySeconds), cancellationToken);
+                    await Task.Delay(TimeSpan.FromSeconds(config.DelaySeconds), cancellationToken).ConfigureAwait(false);
                 }
 
                 // Turn power ON
-                await SetPowerAsync(config, true, cancellationToken);
+                await SetPowerAsync(config, true, cancellationToken).ConfigureAwait(false);
 
                 stopwatch.Stop();
                 _logger.LogInformation("Power cycle completed successfully in {Duration}ms", stopwatch.ElapsedMilliseconds);
@@ -98,10 +98,10 @@ namespace S7.Core.Commands.Services
                     using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     timeoutCts.CancelAfter(config.Timeout);
 
-                    var connection = await _connectionManager.GetConnectionAsync(config.Host, config.Port, timeoutCts.Token);
+                    var connection = await _connectionManager.GetConnectionAsync(config.Host, config.Port, timeoutCts.Token).ConfigureAwait(false);
                     
                     // Write to the coil
-                    await connection.WriteSingleCoilAsync(1, (ushort)config.Coil, powerOn);
+                    await connection.WriteSingleCoilAsync(1, (ushort)config.Coil, powerOn).ConfigureAwait(false);
 
                     stopwatch.Stop();
                     _logger.LogInformation("Power state set to {PowerState} successfully in {Duration}ms (attempt {Attempt})",
@@ -114,7 +114,7 @@ namespace S7.Core.Commands.Services
                     _logger.LogWarning(ex, "Power control attempt {Attempt} failed, retrying in {Delay}ms",
                         attempt, config.RetryDelay.TotalMilliseconds);
                     
-                    await Task.Delay(config.RetryDelay, cancellationToken);
+                    await Task.Delay(config.RetryDelay, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -147,10 +147,10 @@ namespace S7.Core.Commands.Services
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeoutCts.CancelAfter(config.Timeout);
 
-                var connection = await _connectionManager.GetConnectionAsync(config.Host, config.Port, timeoutCts.Token);
+                var connection = await _connectionManager.GetConnectionAsync(config.Host, config.Port, timeoutCts.Token).ConfigureAwait(false);
                 
                 // Read the coil status
-                var coilStatus = await connection.ReadCoilsAsync(1, (ushort)config.Coil, 1);
+                var coilStatus = await connection.ReadCoilsAsync(1, (ushort)config.Coil, 1).ConfigureAwait(false);
                 var powerState = coilStatus[0];
 
                 stopwatch.Stop();
@@ -188,10 +188,10 @@ namespace S7.Core.Commands.Services
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeoutCts.CancelAfter(config.Timeout);
 
-                var connection = await _connectionManager.GetConnectionAsync(config.Host, config.Port, timeoutCts.Token);
+                var connection = await _connectionManager.GetConnectionAsync(config.Host, config.Port, timeoutCts.Token).ConfigureAwait(false);
                 
                 // Try to read a single coil to test the connection
-                await connection.ReadCoilsAsync(1, (ushort)config.Coil, 1);
+                await connection.ReadCoilsAsync(1, (ushort)config.Coil, 1).ConfigureAwait(false);
 
                 stopwatch.Stop();
                 _logger.LogInformation("Connection test successful in {Duration}ms", stopwatch.ElapsedMilliseconds);
@@ -276,7 +276,7 @@ namespace S7.Core.Commands.Services
                 var factory = new ModbusFactory();
                 var tcpClient = new System.Net.Sockets.TcpClient();
                 
-                await tcpClient.ConnectAsync(host, port, cancellationToken);
+                await tcpClient.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
                 var connection = factory.CreateMaster(tcpClient);
 
                 lock (_lock)

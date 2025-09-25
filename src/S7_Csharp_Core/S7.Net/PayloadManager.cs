@@ -117,8 +117,8 @@ namespace S7.Net
         /// <returns>The stager payload as a byte array.</returns>
         public async Task<byte[]> GetStagerPayloadAsync(string payloadsBase)
         {
-            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "stager.bin", "stager" });
-            return await File.ReadAllBytesAsync(filePath);
+            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "stager.bin", "stager" }).ConfigureAwait(false);
+            return await File.ReadAllBytesAsync(filePath).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -127,8 +127,8 @@ namespace S7.Net
         /// <returns>The memory dumper payload as a byte array.</returns>
         public async Task<byte[]> GetMemoryDumperPayloadAsync(string payloadsBase)
         {
-            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "dump_mem.bin", "dump_mem" });
-            return await File.ReadAllBytesAsync(filePath);
+            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "dump_mem.bin", "dump_mem" }).ConfigureAwait(false);
+            return await File.ReadAllBytesAsync(filePath).ConfigureAwait(false);
         }
 
         /// <summary>

@@ -74,12 +74,12 @@ namespace S7.Core.Commands.Handlers
                 _logger.LogInformation("Loading stager payload from {PayloadPath}. CorrelationId: {CorrelationId}",
                     command.PayloadPath, command.CorrelationId);
                 
-                var payload = await _payloadManager.LoadPayloadAsync(command.PayloadPath, cancellationToken);
+                var payload = await _payloadManager.LoadPayloadAsync(command.PayloadPath, cancellationToken).ConfigureAwait(false);
 
                 // Perform power cycling before installation if requested
                 if (command.PowerCycleBeforeInstall && command.PowerConfig != null)
                 {
-                    var powerCycleTime = await PerformPowerCycleAsync(command.PowerConfig, "before installation", command.CorrelationId, cancellationToken);
+                    var powerCycleTime = await PerformPowerCycleAsync(command.PowerConfig, "before installation", command.CorrelationId, cancellationToken).ConfigureAwait(false);
                     performanceMetrics = performanceMetrics with { PowerCycleTime = performanceMetrics.PowerCycleTime.Add(powerCycleTime) };
                 }
 
@@ -92,7 +92,7 @@ namespace S7.Core.Commands.Handlers
                     var handshakeStart = Stopwatch.StartNew();
                     _logger.LogInformation("Performing handshake. CorrelationId: {CorrelationId}", command.CorrelationId);
                     
-                    await plcClient.PerformHandshakeAsync(cancellationToken);
+                    await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
                     handshakeStart.Stop();
                     performanceMetrics = performanceMetrics with { HandshakeTime = handshakeStart.Elapsed };
                     
@@ -101,7 +101,7 @@ namespace S7.Core.Commands.Handlers
                 }
 
                 // Install the stager with retry logic
-                var installationResult = await InstallStagerWithRetryAsync(plcClient, command, payload, cancellationToken);
+                var installationResult = await InstallStagerWithRetryAsync(plcClient, command, payload, cancellationToken).ConfigureAwait(false);
                 performanceMetrics = performanceMetrics with 
                 { 
                     PayloadTransferTime = installationResult.TransferTime,
@@ -122,7 +122,7 @@ namespace S7.Core.Commands.Handlers
                 if (command.VerifyInstallation)
                 {
                     var verificationStart = Stopwatch.StartNew();
-                    isVerified = await VerifyStagerInstallationAsync(plcClient, installationResult.InstallationAddress, payload, command.CorrelationId, cancellationToken);
+                    isVerified = await VerifyStagerInstallationAsync(plcClient, installationResult.InstallationAddress, payload, command.CorrelationId, cancellationToken).ConfigureAwait(false);
                     verificationStart.Stop();
                     performanceMetrics = performanceMetrics with { VerificationTime = verificationStart.Elapsed };
                     
@@ -138,7 +138,7 @@ namespace S7.Core.Commands.Handlers
                 {
                     try
                     {
-                        stagerVersion = await GetStagerVersionAsync(plcClient, installationResult.InstallationAddress, cancellationToken);
+                        stagerVersion = await GetStagerVersionAsync(plcClient, installationResult.InstallationAddress, cancellationToken).ConfigureAwait(false);
                         _logger.LogInformation("Stager version: {Version}. CorrelationId: {CorrelationId}",
                             stagerVersion, command.CorrelationId);
                     }
@@ -152,7 +152,7 @@ namespace S7.Core.Commands.Handlers
                 // Perform power cycling after installation if requested
                 if (command.PowerCycleAfterInstall && command.PowerConfig != null)
                 {
-                    var powerCycleTime = await PerformPowerCycleAsync(command.PowerConfig, "after installation", command.CorrelationId, cancellationToken);
+                    var powerCycleTime = await PerformPowerCycleAsync(command.PowerConfig, "after installation", command.CorrelationId, cancellationToken).ConfigureAwait(false);
                     performanceMetrics = performanceMetrics with { PowerCycleTime = performanceMetrics.PowerCycleTime.Add(powerCycleTime) };
                 }
 
@@ -241,7 +241,7 @@ namespace S7.Core.Commands.Handlers
             var stopwatch = Stopwatch.StartNew();
             _logger.LogInformation("Performing power cycle {Phase}. CorrelationId: {CorrelationId}", phase, correlationId);
             
-            await _powerController.PowerCycleAsync(powerConfig, cancellationToken);
+            await _powerController.PowerCycleAsync(powerConfig, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
             
             _logger.LogInformation("Power cycle {Phase} completed in {Duration}ms. CorrelationId: {CorrelationId}",
@@ -270,7 +270,7 @@ namespace S7.Core.Commands.Handlers
                     var installationAddress = 0x1000u; // Default installation address
                     
                     // Simulate payload transfer
-                    await Task.Delay(100, cancellationToken); // Simulate transfer time
+                    await Task.Delay(100, cancellationToken).ConfigureAwait(false); // Simulate transfer time
                     
                     transferStart.Stop();
                     var transferSpeed = payload.Length / transferStart.Elapsed.TotalSeconds;
@@ -291,7 +291,7 @@ namespace S7.Core.Commands.Handlers
                         attempt + 1, command.RetryDelay.TotalMilliseconds, command.CorrelationId);
                     
                     attempt++;
-                    await Task.Delay(command.RetryDelay, cancellationToken);
+                    await Task.Delay(command.RetryDelay, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -332,7 +332,7 @@ namespace S7.Core.Commands.Handlers
                     installationAddress, correlationId);
 
                 // Simplified verification - in reality, you'd read back the installed data and compare
-                await Task.Delay(50, cancellationToken); // Simulate verification time
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false); // Simulate verification time
                 
                 return true; // Assume verification passes for now
             }
@@ -349,7 +349,7 @@ namespace S7.Core.Commands.Handlers
             CancellationToken cancellationToken)
         {
             // Simplified version retrieval - in reality, you'd read version info from the installed stager
-            await Task.Delay(25, cancellationToken); // Simulate version retrieval time
+            await Task.Delay(25, cancellationToken).ConfigureAwait(false); // Simulate version retrieval time
             return "1.0.0"; // Example version
         }
 
