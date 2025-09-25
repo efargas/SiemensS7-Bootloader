@@ -28,6 +28,23 @@ namespace S7_Csharp_Utility
             {
                 concreteViewService.SetMainWindow(this);
             }
+
+            // Connect ListBox references to logging services for scroll control
+            Loaded += (sender, e) =>
+            {
+                var logListBox = this.FindControl<ListBox>("LogListBox");
+                var socatLogListBox = this.FindControl<ListBox>("SocatLogListBox");
+
+                if (logListBox != null && viewModel.Logging != null)
+                {
+                    viewModel.Logging.LogListBox = logListBox;
+                }
+
+                if (socatLogListBox != null && viewModel.SocatLogging != null)
+                {
+                    viewModel.SocatLogging.LogListBox = socatLogListBox;
+                }
+            };
         }
     }
 }

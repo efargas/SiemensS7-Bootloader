@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 
 namespace S7_Csharp_Utility.Services
@@ -115,6 +116,10 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         public event Action? ScrollToEnd;
         /// <summary>
+        /// Reference to the ListBox for scroll control.
+        /// </summary>
+        public Avalonia.Controls.ListBox? LogListBox { get; set; }
+        /// <summary>
         /// Event triggered when a property value changes.
         /// </summary>
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -132,7 +137,7 @@ namespace S7_Csharp_Utility.Services
             _mainLogFile = Path.Combine(_logsPath, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
             ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
-            ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
+            ScrollToEndCommand = new Commands.RelayCommand(_ => ForceScrollToEnd(), _ => true);
         }
 
         /// <summary>
@@ -172,6 +177,16 @@ namespace S7_Csharp_Utility.Services
                 Message = message
             };
 
+            // Handle file logging on background thread
+            Task.Run(() =>
+            {
+                lock (_sync)
+                {
+                    HandleLogFile(entry);
+                }
+            });
+
+            // Update UI on UI thread with lower priority to avoid blocking
             _dispatcher.Post(() =>
             {
                 lock (_sync)
@@ -190,13 +205,7 @@ namespace S7_Csharp_Utility.Services
                         LogMessages.Remove(toRemove); // This will do nothing if the item is not in the list
                     }
                 }
-                ScrollToEnd?.Invoke();
-            });
-
-            lock (_sync)
-            {
-                HandleLogFile(entry);
-            }
+            }, Avalonia.Threading.DispatcherPriority.Background);
         }
 
         /// <summary>
@@ -323,6 +332,18 @@ namespace S7_Csharp_Utility.Services
                 LogCategory.Debug => FilterDebug,
                 _ => true
             };
+        }
+
+        /// <summary>
+        /// Forces scroll to end and re-enables auto-scroll.
+        /// </summary>
+        private void ForceScrollToEnd()
+        {
+            if (LogListBox != null)
+            {
+                Behaviors.AutoScrollBehavior.ForceScrollToEnd(LogListBox);
+            }
+            ScrollToEnd?.Invoke();
         }
 
         /// <summary>

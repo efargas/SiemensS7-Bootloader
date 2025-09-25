@@ -40,6 +40,10 @@ namespace S7_Csharp_Utility.Services
         public System.Windows.Input.ICommand ExportLogCommand { get; }
         public System.Windows.Input.ICommand ScrollToEndCommand { get; }
         public event Action? ScrollToEnd;
+        /// <summary>
+        /// Reference to the ListBox for scroll control.
+        /// </summary>
+        public Avalonia.Controls.ListBox? LogListBox { get; set; }
 
         /// <summary>
         /// Event triggered when a property value changes.
@@ -59,7 +63,7 @@ namespace S7_Csharp_Utility.Services
             _socatLogFile = System.IO.Path.Combine(_logsPath, $"Socat_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
             ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
-            ScrollToEndCommand = new Commands.RelayCommand(_ => ScrollToEnd?.Invoke(), _ => true);
+            ScrollToEndCommand = new Commands.RelayCommand(_ => ForceScrollToEnd(), _ => true);
         }
 
         /// <summary>
@@ -71,6 +75,17 @@ namespace S7_Csharp_Utility.Services
             if (data == null) return;
             var entry = new SocatLogEntry { Timestamp = DateTime.Now, Message = data };
 
+            // Handle file logging on background thread
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                lock (_sync)
+                {
+                    RotateIfNeeded();
+                    System.IO.File.AppendAllText(_socatLogFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}{Environment.NewLine}");
+                }
+            });
+
+            // Update UI on UI thread with lower priority to avoid blocking
             _dispatcher.Post(() =>
             {
                 lock (_sync)
@@ -81,14 +96,7 @@ namespace S7_Csharp_Utility.Services
                         LogEntries.RemoveAt(0);
                     }
                 }
-                ScrollToEnd?.Invoke();
-            });
-
-            lock (_sync)
-            {
-                RotateIfNeeded();
-                System.IO.File.AppendAllText(_socatLogFile, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss}] {entry.Message}{Environment.NewLine}");
-            }
+            }, Avalonia.Threading.DispatcherPriority.Background);
         }
 
         /// <summary>
@@ -174,6 +182,18 @@ namespace S7_Csharp_Utility.Services
                 }
                 return sb.ToString();
             }
+        }
+
+        /// <summary>
+        /// Forces scroll to end and re-enables auto-scroll.
+        /// </summary>
+        private void ForceScrollToEnd()
+        {
+            if (LogListBox != null)
+            {
+                Behaviors.AutoScrollBehavior.ForceScrollToEnd(LogListBox);
+            }
+            ScrollToEnd?.Invoke();
         }
 
         /// <summary>

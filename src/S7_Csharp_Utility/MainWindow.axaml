@@ -31,8 +31,8 @@
             <MenuItem Header="{DynamicResource HelpMenuHeader}" />
         </Menu>
         
-        <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,Auto,*" ColumnDefinitions="*">
-            <Expander x:Name="ConfigExpander" Header="{DynamicResource ConfigurationHeader}" IsExpanded="True" HorizontalAlignment="Stretch" VerticalAlignment="Top" Grid.Row="0" Classes="ContentPanel">
+        <Grid Margin="0,8,0,0" RowDefinitions="Auto,Auto,Auto,*" ColumnDefinitions="*">
+            <Expander x:Name="ConfigExpander" Header="{DynamicResource ConfigurationHeader}" IsExpanded="False" HorizontalAlignment="Stretch" VerticalAlignment="Top" Grid.Row="0" Classes="ContentPanel">
                 <TabControl HorizontalAlignment="Stretch">
                     <TabItem Header="{DynamicResource ConnectionParametersHeader}">
                         <Grid ColumnDefinitions="2*,2*" HorizontalAlignment="Stretch">
@@ -129,6 +129,9 @@
                                     <TextBlock Name="DumpTimeLabel" 
                                                Text="{Binding DumpProgressTime}" 
                                                HorizontalAlignment="Center" />
+                                    <TextBlock Name="DumpSpeedLabel" 
+                                               Text="{Binding DumpProgressSpeed}" 
+                                               HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Border>
                             
@@ -208,7 +211,12 @@
                     </StackPanel>
                     <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <TextBlock Grid.Row="0" Text="{DynamicResource MainLoggerHeader}" Classes="HeaderText" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="LogListBox" Grid.Row="1" ItemsSource="{Binding Logging.LogMessages}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" MinHeight="120"
+                        <ListBox Name="LogListBox" Grid.Row="1" ItemsSource="{Binding Logging.LogMessages}" 
+                                 VerticalAlignment="Stretch" HorizontalAlignment="Stretch" 
+                                 Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" 
+                                 MinHeight="120"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                  behaviors:AutoScrollBehavior.IsEnabled="True">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
@@ -223,7 +231,12 @@
                     </Grid>
                     <Grid Grid.Row="2" Grid.Column="1" RowDefinitions="Auto,*" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <TextBlock Grid.Row="0" Text="{DynamicResource SocatLoggerHeader}" Classes="HeaderText" FontSize="12" Margin="0,0,0,4" />
-                        <ListBox Name="SocatLogListBox" Grid.Row="1" ItemsSource="{Binding SocatLogging.LogEntries}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" MinHeight="120"
+                        <ListBox Name="SocatLogListBox" Grid.Row="1" ItemsSource="{Binding SocatLogging.LogEntries}" 
+                                 VerticalAlignment="Stretch" HorizontalAlignment="Stretch" 
+                                 Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" 
+                                 MinHeight="120"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                  behaviors:AutoScrollBehavior.IsEnabled="True">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
