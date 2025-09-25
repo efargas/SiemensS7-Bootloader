@@ -775,6 +775,7 @@
           }
         }
       },
+      "System.ComponentModel.Annotations/5.0.0": {},
       "System.IO.Pipelines/8.0.0": {
         "runtime": {
           "lib/net8.0/System.IO.Pipelines.dll": {
@@ -825,8 +826,18 @@
           }
         }
       },
+      "S7.Core.Abstractions/1.0.0": {
+        "dependencies": {
+          "S7.Utils": "1.0.0",
+          "System.ComponentModel.Annotations": "5.0.0"
+        },
+        "runtime": {
+          "S7.Core.Abstractions.dll": {}
+        }
+      },
       "S7.Infrastructure/1.0.0": {
         "dependencies": {
+          "S7.Core.Abstractions": "1.0.0",
           "S7.Utils": "1.0.0"
         },
         "runtime": {
@@ -1277,6 +1288,13 @@
       "path": "skiasharp.nativeassets.win32/2.88.9",
       "hashPath": "skiasharp.nativeassets.win32.2.88.9.nupkg.sha512"
     },
+    "System.ComponentModel.Annotations/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-dMkqfy2el8A8/I76n2Hi1oBFEbG1SfxD2l5nhwXV3XjlnOmwxJlQbYpJH4W51odnU9sARCSAgv7S3CyAFMkpYg==",
+      "path": "system.componentmodel.annotations/5.0.0",
+      "hashPath": "system.componentmodel.annotations.5.0.0.nupkg.sha512"
+    },
     "System.IO.Pipelines/8.0.0": {
       "type": "package",
       "serviceable": true,
@@ -1311,6 +1329,11 @@
       "sha512": "sha512-ScSMrUrrw8px4kK1Glh0fZv/HQUlg1078bNXNPfRPKQ3WbRzV9HpsydYEOgSoMK5LWICMf2bMwIFH0pGjxjcMA==",
       "path": "tmds.dbus.protocol/0.21.2",
       "hashPath": "tmds.dbus.protocol.0.21.2.nupkg.sha512"
+    },
+    "S7.Core.Abstractions/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
     },
     "S7.Infrastructure/1.0.0": {
       "type": "project",
