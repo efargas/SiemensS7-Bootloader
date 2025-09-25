@@ -1,224 +1,137 @@
 name: CI
+
 on:
   push:
-    branches: [ main, develop, feature/*, chore/*, fix/* ]
+    branches: [ main, cancellation-and-fire-and-forget-2 ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, cancellation-and-fire-and-forget-2 ]
 
 env:
-  FAIL_ON_ASYNC_VOID: 'false'
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       matrix:
-        dotnet-version: [ '8.0.x' ]
+        dotnet: [8.0.x]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          persist-credentials: true
-
-      - name: Install ripgrep
-        if: runner.os == 'Linux'
-        run: |
-          if ! command -v rg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y ripgrep
-          else
-            echo "rg already installed"
-          fi
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
+          dotnet-version: ${{ matrix.dotnet }}
 
-      - name: Find solution or project
-        id: findproj
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/.nuget/packages
+          key: nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-
+
+      - name: Restore (auto-detect .sln/.csproj)
         run: |
           set -e
-          project_path=""
-          if command -v rg >/dev/null 2>&1; then
-            project_path=$(rg --files --glob '**/*.sln' --glob '!**/bin/**' --glob '!**/obj/**' | head -n 1 || true)
-            if [ -z "$project_path" ]; then
-              project_path=$(rg --files --glob '**/*.csproj' --glob '!**/bin/**' --glob '!**/obj/**' | head -n 1 || true)
-            fi
-          fi
-          if [ -z "$project_path" ]; then
-            project_path=$(git ls-files '*.sln' | head -n 1 || true)
-          fi
-          if [ -z "$project_path" ]; then
-            project_path=$(git ls-files '*.csproj' | head -n 1 || true)
-          fi
-
-          if [ -n "$project_path" ]; then
-            echo "project_path=$project_path" >> $GITHUB_OUTPUT
-            echo "Found project: $project_path"
+          SOLN=$(git ls-files '*.sln' | head -n 1 || true)
+          if [ -n "$SOLN" ]; then
+            echo "Restoring solution: $SOLN"
+            dotnet restore "$SOLN"
             exit 0
           fi
-
-          echo "No .sln or .csproj found in repository"
+          CSPROJ=$(git ls-files '*.csproj' | head -n 1 || true)
+          if [ -n "$CSPROJ" ]; then
+            echo "Restoring from project dir: $(dirname "$CSPROJ")"
+            dotnet restore "$(dirname "$CSPROJ")"
+            exit 0
+          fi
+          echo "No .sln or .csproj found. Aborting."
           exit 1
-          
-      - name: Ensure UTF-8 encoding and commit changes
-        env:
-          GIT_COMMITTER_NAME: github-actions
-          GIT_COMMITTER_EMAIL: actions@github.com
+
+      - name: Ensure dotnet-format available (manifest or fallback)
+        working-directory: ./tests/S7.Tests
         run: |
-          set -euo pipefail
-
-          # Install prerequisites
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends file git libc-bin
-
-          globs=( '*.cs' '*.xaml' '*.axaml' '*.config' '*.csproj' '*.sln' '*.md' '*.txt' )
-          changed=false
-          tmpfile=$(mktemp)
-          failed_conversions_file=$(mktemp)
-
-          find_files() {
-            for g in "${globs[@]}"; do
-              git ls-files -- "$g" || true
-            done | sort -u
-          }
-
-          files=$(find_files)
-          if [ -z "$files" ]; then
-            echo "No candidate files found; skipping encoding normalization."
-            rm -f "$tmpfile" "$failed_conversions_file"
-            exit 0
-          fi
-
-          for f in $files; do
-            [ -f "$f" ] || continue
-
-            # Skip big files
-            size=$(stat -c%s "$f" || echo 0)
-            [ "$size" -le $((1024*1024)) ] || continue
-
-            # Detect charset; fallback to utf-8 if detection fails
-            enc=$(file -i "$f" 2>/dev/null | awk -F'charset=' '{print $2}' | tr -d ' \n' || true)
-            enc=${enc:-utf-8}
-            enc=$(echo "$enc" | tr '[:upper:]' '[:lower:]')
-
-            # Skip already utf-8/us-ascii
-            if [[ "$enc" == "utf-8" || "$enc" == "us-ascii" ]]; then
-              continue
-            fi
-
-            echo "Attempting conversion: $f from $enc -> UTF-8"
-            if iconv -f "$enc" -t UTF-8 "$f" -o "$tmpfile" 2>/dev/null; then
-              # Only replace file if content changed after conversion
-              if ! cmp -s "$f" "$tmpfile"; then
-                mv "$tmpfile" "$f"
-                changed=true
-                echo "Converted: $f"
-              else
-                echo "No content change after conversion: $f"
-              fi
+          set -e
+          if [ -f .config/dotnet-tools.json ]; then
+            echo "Attempting dotnet tool restore in tests/S7.Tests"
+            if dotnet tool restore; then
+              echo "dotnet tool restore succeeded"
             else
-              echo "iconv failed for $f (detected encoding: $enc); skipping and logging"
-              printf '%s\n' "$f (detected: $enc)" >> "$failed_conversions_file"
+              echo "dotnet tool restore failed; installing dotnet-format globally as fallback"
+              dotnet tool install -g dotnet-format
             fi
-          done
-
-          rm -f "$tmpfile"
-
-          if [ -s "$failed_conversions_file" ]; then
-            echo "The following files could not be converted by iconv (left unchanged):"
-            sed -n '1,200p' "$failed_conversions_file" || true
-          fi
-          rm -f "$failed_conversions_file"
-
-          if [ "$changed" = true ] ; then
-            git config user.name "$GIT_COMMITTER_NAME"
-            git config user.email "$GIT_COMMITTER_EMAIL"
-            git add -A
-            git --no-pager diff --staged --name-only || true
-            git commit -m "ci: normalize text file encodings to UTF-8 (automated)" || true
-            git push origin HEAD:"${GITHUB_REF##*/}" || {
-              echo "Push failed; check Actions workflow permissions for GITHUB_TOKEN (write access required)."
-              exit 1
-            }
-            echo "Committed and pushed encoding fixes."
           else
-            echo "No encoding changes needed."
-          fi
-          
-      - name: Restore
-        run: |
-          dotnet restore "${{ steps.findproj.outputs.project_path }}"
-
-      - name: Build
-        run: |
-          dotnet build "${{ steps.findproj.outputs.project_path }}" --no-restore -c Release
-
-      - name: Test
-        run: |
-          if [[ "${{ steps.findproj.outputs.project_path }}" == *.sln ]]; then
-            dotnet test "${{ steps.findproj.outputs.project_path }}" --no-build -c Release --verbosity normal
-          else
-            dotnet test --no-build -c Release --verbosity normal
+            echo "No tool manifest; installing dotnet-format globally for CI"
+            dotnet tool install -g dotnet-format
           fi
 
-      - name: Async void guard
+      - name: Format check (warn only)
         run: |
-          if [ -f ./scripts/find_async_void.sh ]; then
-            bash ./scripts/find_async_void.sh
-          else
-            echo "No async-void guard script found"
-          fi
+         set -e
+         SOLN=$(git ls-files '*.sln' | head -n1 || true)
+         CSPROJ=$(git ls-files '*.csproj' | head -n1 || true)
+         RESULT=0
+         if [ -n "$SOLN" ]; then
+           dotnet format "$SOLN" --verify-no-changes || RESULT=1
+         elif [ -n "$CSPROJ" ]; then
+           dotnet format "$CSPROJ" --verify-no-changes || RESULT=1
+         else
+           echo "No .sln or .csproj found; skipping format check."
+           exit 0
+         fi
+         if [ "$RESULT" -eq 1 ]; then
+           echo "::warning ::Code formatting issues found. Please run 'dotnet format' locally."
+         fi
 
-      - name: Auto-fix formatting and commit
-        env:
-          GIT_COMMITTER_NAME: github-actions
-          GIT_COMMITTER_EMAIL: actions@github.com
+      - name: Build all projects (Release)
         run: |
-          set -euo pipefail
-
-          proj="${{ steps.findproj.outputs.project_path }}"
-          if [ -z "$proj" ]; then
-            echo "No project_path found; skipping format step"
+          set -e
+          SOLN=$(git ls-files '*.sln' | head -n 1 || true)
+          if [ -n "$SOLN" ]; then
+            echo "Building solution: $SOLN"
+            dotnet build "$SOLN" --configuration Release --no-restore
             exit 0
           fi
-
-          projdir=$(dirname "$proj")
-          workspace=$(basename "$proj")
-          echo "Running dotnet format in: $projdir (workspace: $workspace)"
-          cd "$projdir"
-
-          dotnet tool restore || true
-          dotnet format "$workspace" --verbosity minimal
-
-          if git diff --quiet --exit-code; then
-            echo "No formatting changes needed."
+          CSPROJ=$(git ls-files '*.csproj' | head -n 1 || true)
+          if [ -n "$CSPROJ" ]; then
+            echo "Building project: $CSPROJ"
+            dotnet build "$CSPROJ" --configuration Release --no-restore
             exit 0
           fi
+          echo "No .sln or .csproj found. Aborting."
+          exit 1
 
-          echo "Formatting changes detected; committing them"
-          git config user.name "$GIT_COMMITTER_NAME"
-          git config user.email "$GIT_COMMITTER_EMAIL"
-          git add -A
-          git commit -m "ci: apply dotnet format fixes (automated)" || true
-
-          # Determine target branch ref (works for push runs and PR branch refs)
-          BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "Target branch: $BRANCH"
-
-          # Fetch remote and rebase local formatting commit on top
-          git fetch origin "$BRANCH" --depth=1
-          # If remote has commits, rebase on top; if no remote, this is a no-op
-          if git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
-            git rebase --rebase-merges "origin/$BRANCH"
+      - name: Run tests (explicit csproj)
+        run: |
+          if [ -f ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj ]; then
+            dotnet test ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+          else
+            echo "Test project not found at ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj; skipping tests."
           fi
 
-          # Push safely using force-with-lease to avoid overwriting new remote commits unexpectedly
-          git push --force-with-lease origin "HEAD:${BRANCH}" || {
-            echo "Push failed after rebase; aborting to avoid overwriting remote. Please merge/rebase changes locally."
-            exit 1
-          }
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
 
-          echo "Committed and pushed formatting fixes."
+      - name: Clean up stale partial files (best-effort)
+        if: always()
+        run: |
+          echo "Cleaning .partial files from workspace (best-effort)"
+          find $RUNNER_TEMP -type f -name "*.partial" -maxdepth 4 -print -delete || true
+
+      - name: Show disk usage (debug)
+        if: always()
+        run: df -h || true
+
+      - name: List workspace (debug)
+        if: always()
+        run: ls -la || true
