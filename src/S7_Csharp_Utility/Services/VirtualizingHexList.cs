@@ -48,7 +48,7 @@ namespace S7_Csharp_Utility.Services
             var pageIndex = offset / _reader.PageSize;
             var offsetInPage = (int)(offset % _reader.PageSize);
 
-            var page = await _reader.ReadPageAsync(pageIndex, _reader.PageSize, CancellationToken.None);
+            var page = await _reader.ReadPageAsync(pageIndex, _reader.PageSize, CancellationToken.None).ConfigureAwait(false);
 
             var rowLength = (int)Math.Min(HexBytesPerLine, page.Data.Length - offsetInPage);
             if (rowLength < 0) rowLength = 0;
@@ -128,7 +128,7 @@ namespace S7_Csharp_Utility.Services
             {
                 var pageIndex = offset / _reader.PageSize;
                 var offsetInPage = (int)(offset % _reader.PageSize);
-                var page = await _reader.ReadPageAsync(pageIndex, _reader.PageSize, CancellationToken.None);
+                var page = await _reader.ReadPageAsync(pageIndex, _reader.PageSize, CancellationToken.None).ConfigureAwait(false);
 
                 var bytesToCopy = Math.Min(page.Data.Length - offsetInPage, length - read_total);
                 if (bytesToCopy <= 0) break;

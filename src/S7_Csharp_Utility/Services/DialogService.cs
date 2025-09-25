@@ -46,7 +46,7 @@ namespace S7_Csharp_Utility.Services
                 }
             };
 
-            var result = await storageProvider.OpenFilePickerAsync(options);
+            var result = await storageProvider.OpenFilePickerAsync(options).ConfigureAwait(false);
             return result?.FirstOrDefault()?.Path.LocalPath;
         }
 
@@ -61,7 +61,7 @@ namespace S7_Csharp_Utility.Services
                 AllowMultiple = false
             };
 
-            var result = await storageProvider.OpenFolderPickerAsync(options);
+            var result = await storageProvider.OpenFolderPickerAsync(options).ConfigureAwait(false);
             return result?.FirstOrDefault()?.Path.LocalPath;
         }
 
@@ -89,7 +89,7 @@ namespace S7_Csharp_Utility.Services
                 FileTypeFilter = fileTypes
             };
 
-            var result = await storageProvider.OpenFilePickerAsync(options);
+            var result = await storageProvider.OpenFilePickerAsync(options).ConfigureAwait(false);
             return result?.FirstOrDefault()?.Path.LocalPath;
         }
 
@@ -116,7 +116,7 @@ namespace S7_Csharp_Utility.Services
                 FileTypeChoices = fileTypes
             };
 
-            var result = await storageProvider.SaveFilePickerAsync(options);
+            var result = await storageProvider.SaveFilePickerAsync(options).ConfigureAwait(false);
             return result?.Path.LocalPath;
         }
 
@@ -159,7 +159,7 @@ namespace S7_Csharp_Utility.Services
             stackPanel.Children.Add(button);
             messageBox.Content = stackPanel;
 
-            await messageBox.ShowDialog(mainWindow);
+            await messageBox.ShowDialog(mainWindow).ConfigureAwait(false);
         }
 
         public void ShowSocatLogWindow()

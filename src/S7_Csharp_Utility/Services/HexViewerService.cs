@@ -202,7 +202,7 @@ namespace S7_Csharp_Utility.Services
             IProgress<long> progress,
             CancellationToken cancellationToken)
         {
-            await Task.Run(() =>
+            await Task.Run(() => // ConfigureAwait(false) applied at end of method call
             {
                 if (string.IsNullOrEmpty(searchText) || hexList == null)
                 {
@@ -235,7 +235,7 @@ namespace S7_Csharp_Utility.Services
                     cancellationToken.ThrowIfCancellationRequested();
                     progress.Report(offset);
                 }
-            }, cancellationToken);
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 }

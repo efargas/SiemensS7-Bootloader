@@ -33,7 +33,7 @@ namespace S7_Csharp_Utility.Services
             {
                 _log($"Connecting to Modbus host {host}:{port}...", false);
                 _client = new TcpClient();
-                await _client.ConnectAsync(host, port, cancellationToken);
+                await _client.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
 
                 if (_client.Connected)
                 {
@@ -81,7 +81,7 @@ namespace S7_Csharp_Utility.Services
             try
             {
                 ushort zeroBasedCoilAddress = (ushort)(coilAddress - 1);
-                await _master.WriteSingleCoilAsync(slaveId, zeroBasedCoilAddress, on);
+                await _master.WriteSingleCoilAsync(slaveId, zeroBasedCoilAddress, on).ConfigureAwait(false);
                 _log($"Successfully turned power {state}.", false);
             }
             catch (Exception ex)

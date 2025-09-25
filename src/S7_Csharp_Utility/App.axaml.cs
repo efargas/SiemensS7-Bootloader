@@ -50,8 +50,8 @@ namespace S7_Csharp_Utility
                 desktop.MainWindow = Services.GetRequiredService<MainWindow>();
                 var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();
 
-                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartup();
-                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExit();
+                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartup().ConfigureAwait(false);
+                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExit().ConfigureAwait(false);
                 desktop.Exit += OnApplicationExit;
             }
 
