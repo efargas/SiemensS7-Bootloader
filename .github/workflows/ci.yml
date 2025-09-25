@@ -107,12 +107,23 @@ jobs:
           echo "No .sln or .csproj found. Aborting."
           exit 1
 
-      - name: Run tests (explicit csproj)
+      - name: Run tests (unified tests folder)
         run: |
-          if [ -f ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj ]; then
-            dotnet test ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+          echo "Running tests from unified tests folder..."
+          if [ -f ./tests/S7.Core.Tests/S7.Core.Tests.csproj ]; then
+            dotnet test ./tests/S7.Core.Tests/S7.Core.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
           else
-            echo "Test project not found at ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj; skipping tests."
+            echo "Test project not found at ./tests/S7.Core.Tests/S7.Core.Tests.csproj; skipping S7.Core.Tests."
+          fi
+          if [ -f ./tests/S7_Csharp_Utility.Tests/S7_Csharp_Utility.Tests.csproj ]; then
+            dotnet test ./tests/S7_Csharp_Utility.Tests/S7_Csharp_Utility.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+          else
+            echo "Test project not found at ./tests/S7_Csharp_Utility.Tests/S7_Csharp_Utility.Tests.csproj; skipping S7_Csharp_Utility.Tests."
+          fi
+          if [ -f ./tests/S7.Tests/S7.Tests.csproj ]; then
+            dotnet test ./tests/S7.Tests/S7.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+          else
+            echo "Test project not found at ./tests/S7.Tests/S7.Tests.csproj; skipping S7.Tests."
           fi
 
       - name: Upload test results

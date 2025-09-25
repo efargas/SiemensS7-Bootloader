@@ -107,7 +107,7 @@ namespace S7.Core.Commands
         /// <param name="options">The command options</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>A command result with the output file path</returns>
-        public override async Task<CommandResult> ExecuteAsync(MemoryDumpOptions options, CancellationToken cancellationToken)
+        protected override async Task<CommandResult> ExecuteAsync(MemoryDumpOptions options, CancellationToken cancellationToken)
         {
             ICommunicationChannel? channel = null;
             try
