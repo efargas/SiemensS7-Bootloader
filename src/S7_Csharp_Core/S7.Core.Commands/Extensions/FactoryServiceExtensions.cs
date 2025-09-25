@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using S7.Core.Abstractions.Configuration;
 using S7.Core.Abstractions.Factories;
 using S7.Core.Abstractions.Repositories;
@@ -40,13 +41,12 @@ namespace S7.Core.Commands.Extensions
             // Register configuration options
             if (configuration != null)
             {
-                var virtualFileReaderSection = configuration.GetSection(VirtualFileReaderConfiguration.SectionName);
-                var repositoryFactorySection = configuration.GetSection(RepositoryFactoryConfiguration.SectionName);
-                var abstractFactorySection = configuration.GetSection(AbstractFactoryConfiguration.SectionName);
-
-                services.Configure<VirtualFileReaderConfiguration>(virtualFileReaderSection);
-                services.Configure<RepositoryFactoryConfiguration>(repositoryFactorySection);
-                services.Configure<AbstractFactoryConfiguration>(abstractFactorySection);
+                services.Configure<VirtualFileReaderConfiguration>(options =>
+                    configuration.GetSection(VirtualFileReaderConfiguration.SectionName).Bind(options));
+                services.Configure<RepositoryFactoryConfiguration>(options =>
+                    configuration.GetSection(RepositoryFactoryConfiguration.SectionName).Bind(options));
+                services.Configure<AbstractFactoryConfiguration>(options =>
+                    configuration.GetSection(AbstractFactoryConfiguration.SectionName).Bind(options));
             }
             else
             {
@@ -180,13 +180,12 @@ namespace S7.Core.Commands.Extensions
             // Register configuration options
             if (configuration != null)
             {
-                var virtualFileReaderSection = configuration.GetSection(VirtualFileReaderConfiguration.SectionName);
-                var repositoryFactorySection = configuration.GetSection(RepositoryFactoryConfiguration.SectionName);
-                var abstractFactorySection = configuration.GetSection(AbstractFactoryConfiguration.SectionName);
-
-                services.Configure<VirtualFileReaderConfiguration>(virtualFileReaderSection);
-                services.Configure<RepositoryFactoryConfiguration>(repositoryFactorySection);
-                services.Configure<AbstractFactoryConfiguration>(abstractFactorySection);
+                services.Configure<VirtualFileReaderConfiguration>(options =>
+                    configuration.GetSection(VirtualFileReaderConfiguration.SectionName).Bind(options));
+                services.Configure<RepositoryFactoryConfiguration>(options =>
+                    configuration.GetSection(RepositoryFactoryConfiguration.SectionName).Bind(options));
+                services.Configure<AbstractFactoryConfiguration>(options =>
+                    configuration.GetSection(AbstractFactoryConfiguration.SectionName).Bind(options));
             }
 
             // Register factories with specified lifetime
