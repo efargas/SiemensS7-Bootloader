@@ -56,7 +56,7 @@ namespace S7.Utils
         {
             _value = default;
             _error = error ?? throw new ArgumentNullException(nameof(error));
-            IsSuccess = false;IsSuccess ? _value : throw new InvalidOperationException("Cannot access Value when Result is in failure state. Check IsSuccess first.")
+            IsSuccess = false;
         }
 
         /// <summary>
