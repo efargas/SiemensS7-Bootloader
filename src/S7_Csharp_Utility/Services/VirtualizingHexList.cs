@@ -22,8 +22,18 @@ namespace S7_Csharp_Utility.Services
 
         public HexViewerService.HexRow this[int index]
         {
-            get => GetRowAsync(index).GetAwaiter().GetResult();
+            get => GetRowSync(index);
             set => throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// Synchronous version of GetRowAsync for IList compatibility.
+        /// Note: This may block the calling thread. Use GetRowAsync when possible.
+        /// </summary>
+        private HexViewerService.HexRow GetRowSync(int index)
+        {
+            // Use Task.Run to avoid potential deadlocks in UI contexts
+            return Task.Run(async () => await GetRowAsync(index).ConfigureAwait(false)).GetAwaiter().GetResult();
         }
 
         private async Task<HexViewerService.HexRow> GetRowAsync(int index)
@@ -100,10 +110,14 @@ namespace S7_Csharp_Utility.Services
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+        /// <summary>
+        /// Reads a range of bytes from the file.
+        /// Note: This may block the calling thread. Use ReadRangeAsync when possible.
+        /// </summary>
         public byte[] ReadRange(long offset, int length)
         {
-            // This method needs to be async now, or block. Let's make it block.
-            return ReadRangeAsync(offset, length).GetAwaiter().GetResult();
+            // Use Task.Run to avoid potential deadlocks in UI contexts
+            return Task.Run(async () => await ReadRangeAsync(offset, length).ConfigureAwait(false)).GetAwaiter().GetResult();
         }
 
         private async Task<byte[]> ReadRangeAsync(long offset, int length)

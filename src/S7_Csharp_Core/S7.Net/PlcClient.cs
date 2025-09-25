@@ -7,6 +7,8 @@ using System.IO;
 using System.Text;
 using System.Diagnostics;
 using System.Threading;
+using System.Buffers;
+using S7.Utils;
 
 namespace S7.Net
 {
@@ -45,17 +47,26 @@ namespace S7.Net
         /// <param name="awaitResponse">Whether to wait for a response.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The response from the PLC, or null if no response was awaited.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when args is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when args is too large for protocol.</exception>
         public async Task<byte[]?> InvokePrimaryHandler(byte handlerIndex, byte[] args, bool awaitResponse = true, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
+            if (args is null) throw new ArgumentNullException(nameof(args));
+            
+            // Validate payload size doesn't exceed protocol limits
+            if (args.Length > Constants.Protocol.MaxPayloadSize - 1)
+                throw new ArgumentException($"Arguments too large. Maximum size is {Constants.Protocol.MaxPayloadSize - 1} bytes, got {args.Length} bytes.", nameof(args));
+
             var payload = new byte[1 + args.Length];
             payload[0] = handlerIndex;
             Array.Copy(args, 0, payload, 1, args.Length);
-            await _protocol.SendPacketAsync(payload, cancellationToken: cancellationToken);
+            await _protocol.SendPacketAsync(payload, cancellationToken: cancellationToken).ConfigureAwait(false);
             if (!awaitResponse) return null;
             try
             {
-                return await _protocol.ReceivePacketAsync(cancellationToken);
+                return await _protocol.ReceivePacketAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (ChecksumMismatchException ex)
             {
@@ -81,7 +92,7 @@ namespace S7.Net
             for (int attempt = 0; attempt < 100; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await _protocol.RawWriteAsync(handshakePayload, 0, handshakePayload.Length, cancellationToken);
+                await _protocol.RawWriteAsync(handshakePayload, 0, handshakePayload.Length, cancellationToken).ConfigureAwait(false);
                 var sw = Stopwatch.StartNew();
                 var responseBuffer = new System.Collections.Generic.List<byte>();
                 while (sw.ElapsedMilliseconds < 300)
@@ -89,21 +100,29 @@ namespace S7.Net
                     cancellationToken.ThrowIfCancellationRequested();
                     if (_protocol.DataAvailable)
                     {
-                        var tmpBuf = new byte[256];
-                        int bytesRead = await _protocol.RawReadAsync(tmpBuf, 0, tmpBuf.Length, cancellationToken);
-                        if (bytesRead > 0)
+                        // Use ArrayPool for temporary buffer to reduce allocations
+                        var tmpBuf = ArrayPool<byte>.Shared.Rent(Constants.BufferSizes.TempBuffer);
+                        try
                         {
-                            responseBuffer.AddRange(tmpBuf.Take(bytesRead));
-                            var ascii = Encoding.ASCII.GetString(responseBuffer.ToArray());
-                            _log($"Handshake attempt {attempt + 1}: buf={BitConverter.ToString(responseBuffer.ToArray())} ASCII={ascii}");
-                            if (ascii.Contains("-CPU"))
+                            int bytesRead = await _protocol.RawReadAsync(tmpBuf, 0, Constants.BufferSizes.TempBuffer, cancellationToken).ConfigureAwait(false);
+                            if (bytesRead > 0)
                             {
-                                _log("Handshake successful: Found -CPU signature!");
-                                return true;
+                                responseBuffer.AddRange(tmpBuf.Take(bytesRead));
+                                var ascii = Encoding.ASCII.GetString(responseBuffer.ToArray());
+                                _log($"Handshake attempt {attempt + 1}: buf={BitConverter.ToString(responseBuffer.ToArray())} ASCII={ascii}");
+                                if (ascii.Contains("-CPU"))
+                                {
+                                    _log("Handshake successful: Found -CPU signature!");
+                                    return true;
+                                }
                             }
                         }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(tmpBuf);
+                        }
                     }
-                    await Task.Delay(50, cancellationToken);
+                    await Task.Delay(50, cancellationToken).ConfigureAwait(false);
                 }
                 // Final buffer check after silence
                 if (responseBuffer.Count > 0)
@@ -116,7 +135,7 @@ namespace S7.Net
                         return true;
                     }
                 }
-                await Task.Delay(10, cancellationToken); // brief pause before retry
+                await Task.Delay(10, cancellationToken).ConfigureAwait(false); // brief pause before retry
             }
             _log("Handshake failed.");
             return false;
@@ -479,9 +498,28 @@ namespace S7.Net
             }
         }
 
-        public async Task<byte[]> DumpMemoryAsync(uint address, uint length, byte[] dumpMemPayload, IProgress<long> progress, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Dumps memory from the PLC at the specified address and length.
+        /// </summary>
+        /// <param name="address">The memory address to start dumping from.</param>
+        /// <param name="length">The number of bytes to dump.</param>
+        /// <param name="dumpMemPayload">The memory dumper payload binary.</param>
+        /// <param name="progress">Progress reporter for the dump operation.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The dumped memory data.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when dumpMemPayload is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when parameters are invalid.</exception>
+        public async Task<byte[]> DumpMemoryAsync(uint address, uint length, byte[] dumpMemPayload, IProgress<long>? progress = null, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
+            if (dumpMemPayload is null) throw new ArgumentNullException(nameof(dumpMemPayload));
+            if (length == 0) throw new ArgumentException("Length must be greater than zero.", nameof(length));
+            if (dumpMemPayload.Length == 0) throw new ArgumentException("Dump memory payload cannot be empty.", nameof(dumpMemPayload));
+            
+            // Validate reasonable memory dump size (prevent excessive memory usage)
+            if (length > Constants.BufferSizes.MaxMemoryDumpSize)
+                throw new ArgumentException($"Dump size too large. Maximum allowed is {Constants.BufferSizes.MaxMemoryDumpSize:N0} bytes, requested {length:N0} bytes.", nameof(length));
 
             cancellationToken.ThrowIfCancellationRequested();
 
