@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, cancellation-and-fire-and-forget-2 ]
+    branches: [ main, Phase-3, master ]
   pull_request:
-    branches: [ main, cancellation-and-fire-and-forget-2 ]
+    branches: [ main, Phase-3, master ]
 
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
