@@ -17,23 +17,13 @@ namespace S7.Infrastructure.Providers
     /// This registry supports automatic provider discovery, manual registration,
     /// and provider lifecycle management with thread-safe operations.
     /// </remarks>
-    public class ProviderRegistry : IProviderRegistry
+    public class ProviderRegistry(ILogger<ProviderRegistry> logger) : IProviderRegistry
     {
         private readonly ConcurrentDictionary<string, object> _providers = new();
         private readonly ConcurrentDictionary<string, ProviderMetadata> _metadata = new();
         private readonly ConcurrentDictionary<Type, List<string>> _typeProviders = new();
-        private readonly ILogger<ProviderRegistry> _logger;
+        private readonly ILogger<ProviderRegistry> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly object _lock = new();
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ProviderRegistry"/> class.
-        /// </summary>
-        /// <param name="logger">The logger instance.</param>
-        /// <exception cref="ArgumentNullException">Thrown when logger is null.</exception>
-        public ProviderRegistry(ILogger<ProviderRegistry> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
 
         /// <summary>
         /// Gets the total number of registered providers.

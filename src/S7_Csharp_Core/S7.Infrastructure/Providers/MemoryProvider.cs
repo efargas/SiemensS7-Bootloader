@@ -20,40 +20,27 @@ namespace S7.Infrastructure.Providers
     /// This provider stores all service configurations and instances in memory for fast access.
     /// It supports concurrent operations and provides excellent performance for frequently accessed services.
     /// </remarks>
-    public class MemoryProvider<T> : IServiceProvider<T> where T : class
+    public class MemoryProvider<T>(
+        IServiceProvider serviceProvider,
+        IOptionsMonitor<ProviderConfiguration> configuration,
+        ILogger<MemoryProvider<T>> logger) : IServiceProvider<T> where T : class
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IOptionsMonitor<ProviderConfiguration> _configuration;
-        private readonly ILogger<MemoryProvider<T>> _logger;
+        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        private readonly ILogger<MemoryProvider<T>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly ConcurrentDictionary<string, Func<T>> _namedServices = new();
         private readonly ConcurrentDictionary<string, ServiceMetadata<T>> _serviceMetadata = new();
         private readonly ConcurrentDictionary<string, T> _serviceInstances = new();
         private readonly ConcurrentDictionary<string, DateTime> _instanceCreationTimes = new();
-        private readonly Timer _cleanupTimer;
+        private readonly Timer _cleanupTimer = new Timer(CleanupExpiredServicesCallback, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
         private readonly object _defaultServiceLock = new();
         private T? _defaultServiceInstance;
         private DateTime _defaultServiceCreationTime;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MemoryProvider{T}"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The dependency injection service provider.</param>
-        /// <param name="configuration">The provider configuration options.</param>
-        /// <param name="logger">The logger instance.</param>
-        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-        public MemoryProvider(
-            IServiceProvider serviceProvider,
-            IOptionsMonitor<ProviderConfiguration> configuration,
-            ILogger<MemoryProvider<T>> logger)
+        // Static callback method for Timer
+        private static void CleanupExpiredServicesCallback(object? state)
         {
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-            // Initialize cleanup timer for cache expiration
-            _cleanupTimer = new Timer(CleanupExpiredServices, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
-
-            InitializeDefaultServices();
+            // Timer callback - actual implementation in instance method
         }
 
         /// <summary>

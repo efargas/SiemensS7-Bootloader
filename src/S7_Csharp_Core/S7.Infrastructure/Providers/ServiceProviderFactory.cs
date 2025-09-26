@@ -18,32 +18,16 @@ namespace S7.Infrastructure.Providers
     /// This factory supports configuration-driven provider selection and integrates with
     /// the Microsoft.Extensions.DependencyInjection container.
     /// </remarks>
-    public class ServiceProviderFactory : IProviderFactory
+    public class ServiceProviderFactory(
+        IServiceProvider serviceProvider,
+        IProviderRegistry providerRegistry,
+        IOptionsMonitor<ProviderConfiguration> configuration,
+        ILogger<ServiceProviderFactory> logger) : IProviderFactory
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IProviderRegistry _providerRegistry;
-        private readonly IOptionsMonitor<ProviderConfiguration> _configuration;
-        private readonly ILogger<ServiceProviderFactory> _logger;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ServiceProviderFactory"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The dependency injection service provider.</param>
-        /// <param name="providerRegistry">The provider registry for discovering providers.</param>
-        /// <param name="configuration">The provider configuration options.</param>
-        /// <param name="logger">The logger instance.</param>
-        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-        public ServiceProviderFactory(
-            IServiceProvider serviceProvider,
-            IProviderRegistry providerRegistry,
-            IOptionsMonitor<ProviderConfiguration> configuration,
-            ILogger<ServiceProviderFactory> logger)
-        {
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _providerRegistry = providerRegistry ?? throw new ArgumentNullException(nameof(providerRegistry));
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        private readonly IProviderRegistry _providerRegistry = providerRegistry ?? throw new ArgumentNullException(nameof(providerRegistry));
+        private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        private readonly ILogger<ServiceProviderFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <summary>
         /// Creates a service provider for the specified type using the default configuration.

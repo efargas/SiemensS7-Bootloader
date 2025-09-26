@@ -19,33 +19,17 @@ namespace S7.Infrastructure.Providers
     /// This provider integrates with the Microsoft.Extensions.DependencyInjection container
     /// and supports configuration-driven service selection and lifetime management.
     /// </remarks>
-    public class DefaultServiceProvider<T> : IServiceProvider<T> where T : class
+    public class DefaultServiceProvider<T>(
+        IServiceProvider serviceProvider,
+        IOptionsMonitor<ProviderConfiguration> configuration,
+        ILogger<DefaultServiceProvider<T>> logger) : IServiceProvider<T> where T : class
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IOptionsMonitor<ProviderConfiguration> _configuration;
-        private readonly ILogger<DefaultServiceProvider<T>> _logger;
+        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        private readonly ILogger<DefaultServiceProvider<T>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly Dictionary<string, Func<T>> _namedServices = new();
         private readonly Dictionary<string, ServiceMetadata<T>> _serviceMetadata = new();
         private readonly object _lock = new();
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DefaultServiceProvider{T}"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The dependency injection service provider.</param>
-        /// <param name="configuration">The provider configuration options.</param>
-        /// <param name="logger">The logger instance.</param>
-        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-        public DefaultServiceProvider(
-            IServiceProvider serviceProvider,
-            IOptionsMonitor<ProviderConfiguration> configuration,
-            ILogger<DefaultServiceProvider<T>> logger)
-        {
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-            InitializeDefaultServices();
-        }
 
         /// <summary>
         /// Gets a service instance using the default configuration.

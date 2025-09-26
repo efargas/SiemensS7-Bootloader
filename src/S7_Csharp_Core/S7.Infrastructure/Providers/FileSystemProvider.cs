@@ -20,41 +20,21 @@ namespace S7.Infrastructure.Providers
     /// This provider stores service configurations and metadata in the file system
     /// and supports persistent service registration and discovery.
     /// </remarks>
-    public class FileSystemProvider<T> : IServiceProvider<T> where T : class
+    public class FileSystemProvider<T>(
+        IServiceProvider serviceProvider,
+        IOptionsMonitor<ProviderConfiguration> configuration,
+        ILogger<FileSystemProvider<T>> logger) : IServiceProvider<T> where T : class
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IOptionsMonitor<ProviderConfiguration> _configuration;
-        private readonly ILogger<FileSystemProvider<T>> _logger;
+        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        private readonly ILogger<FileSystemProvider<T>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         private readonly Dictionary<string, Func<T>> _namedServices = new();
         private readonly Dictionary<string, ServiceMetadata<T>> _serviceMetadata = new();
         private readonly object _lock = new();
-        private readonly string _basePath;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="FileSystemProvider{T}"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The dependency injection service provider.</param>
-        /// <param name="configuration">The provider configuration options.</param>
-        /// <param name="logger">The logger instance.</param>
-        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-        public FileSystemProvider(
-            IServiceProvider serviceProvider,
-            IOptionsMonitor<ProviderConfiguration> configuration,
-            ILogger<FileSystemProvider<T>> logger)
-        {
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-            // Set up base path for file system storage
-            _basePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "S7Provider",
-                typeof(T).Name);
-
-            EnsureDirectoryExists();
-            InitializeFromFileSystem();
-        }
+        private readonly string _basePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "S7Provider",
+            typeof(T).Name);
 
         /// <summary>
         /// Gets a service instance using the default configuration.

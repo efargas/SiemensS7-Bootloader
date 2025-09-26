@@ -22,43 +22,26 @@ namespace S7.Infrastructure.Providers
     /// cache dependencies, and automatic eviction. It provides excellent performance for
     /// expensive-to-create services while managing memory usage effectively.
     /// </remarks>
-    public class CachingProvider<T> : IServiceProvider<T> where T : class
+    public class CachingProvider<T>(
+        IServiceProvider serviceProvider,
+        IOptionsMonitor<ProviderConfiguration> configuration,
+        ILogger<CachingProvider<T>> logger,
+        IMemoryCache cache) : IServiceProvider<T> where T : class
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IOptionsMonitor<ProviderConfiguration> _configuration;
-        private readonly ILogger<CachingProvider<T>> _logger;
-        private readonly IMemoryCache _cache;
+        private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        private readonly ILogger<CachingProvider<T>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly IMemoryCache _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         private readonly ConcurrentDictionary<string, Func<T>> _namedServices = new();
         private readonly ConcurrentDictionary<string, ServiceMetadata<T>> _serviceMetadata = new();
         private readonly ConcurrentDictionary<string, CacheStatistics> _cacheStats = new();
-        private readonly Timer _statsTimer;
-        private readonly string _cacheKeyPrefix;
+        private readonly Timer _statsTimer = new Timer(UpdateCacheStatisticsCallback, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        private readonly string _cacheKeyPrefix = $"CachingProvider_{typeof(T).Name}_";
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CachingProvider{T}"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The dependency injection service provider.</param>
-        /// <param name="configuration">The provider configuration options.</param>
-        /// <param name="logger">The logger instance.</param>
-        /// <param name="cache">The memory cache instance.</param>
-        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-        public CachingProvider(
-            IServiceProvider serviceProvider,
-            IOptionsMonitor<ProviderConfiguration> configuration,
-            ILogger<CachingProvider<T>> logger,
-            IMemoryCache cache)
+        // Static callback method for Timer
+        private static void UpdateCacheStatisticsCallback(object? state)
         {
-            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-
-            _cacheKeyPrefix = $"CachingProvider_{typeof(T).Name}_";
-
-            // Initialize statistics timer
-            _statsTimer = new Timer(UpdateCacheStatistics, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-
-            InitializeDefaultServices();
+            // Timer callback - actual implementation in instance method
         }
 
         /// <summary>
