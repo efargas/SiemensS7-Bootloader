@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\S7.Utils\S7.Utils.csproj" />
     <ProjectReference Include="..\S7.Infrastructure\S7.Infrastructure.csproj" />
+    <ProjectReference Include="..\S7.Net\S7.Net.csproj" />
+    <ProjectReference Include="..\S7.Core.Abstractions\S7.Core.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

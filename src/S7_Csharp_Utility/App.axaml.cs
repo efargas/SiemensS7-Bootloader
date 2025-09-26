@@ -2,10 +2,13 @@
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.ViewModels;
 using S7.Net;
+using S7.Core.Abstractions.Services;
+using S7.Services;
 using System;
 using System.Linq;
 using Avalonia.Threading;
@@ -64,10 +67,18 @@ namespace S7_Csharp_Utility
         /// <param name="services">The service collection to configure.</param>
         private void ConfigureServices(IServiceCollection services)
         {
+            // Register Logging
+            services.AddLogging(builder =>
+            {
+                builder.AddConsole();
+                builder.AddDebug();
+                builder.SetMinimumLevel(LogLevel.Information);
+            });
+
             // Register Resource Management Services
             services.AddSingleton<ResourceManagerService>();
 
-            // Register Services
+            // Register Legacy Services
             services.AddSingleton<LoggingService>(sp => 
             {
                 var resourceManager = sp.GetRequiredService<ResourceManagerService>();
@@ -84,6 +95,13 @@ namespace S7_Csharp_Utility
                     loggingService.Log(message, isError ? LogCategory.Error : LogCategory.Info));
             });
 
+            // Register New Service Layer (Enterprise Architecture)
+            services.AddScoped<IPlcOperationService, PlcOperationService>();
+            services.AddScoped<IMemoryDumpService, MemoryDumpService>();
+            services.AddScoped<IStagerService, StagerService>();
+            services.AddScoped<IPayloadService, PayloadService>();
+            services.AddScoped<ICommunicationChannelService, CommunicationChannelService>();
+
             // Register ViewModels
             services.AddSingleton<MainWindowViewModel>();
             services.AddTransient<PlcConnectionViewModel>();
@@ -94,7 +112,7 @@ namespace S7_Csharp_Utility
             // Register the MainWindow itself. It will act as the root view.
             services.AddSingleton<MainWindow>();
 
-            // Register services
+            // Register UI Services
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<IViewService, ViewService>();
         }

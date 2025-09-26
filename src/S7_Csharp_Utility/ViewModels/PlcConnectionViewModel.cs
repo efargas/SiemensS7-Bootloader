@@ -3,6 +3,8 @@ using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Extensions;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
+using S7.Core.Abstractions.Services;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
@@ -19,9 +21,10 @@ namespace S7_Csharp_Utility.ViewModels
     /// </summary>
     public class PlcConnectionViewModel : ViewModelBase
     {
-        private readonly SocatService _socatService;
+        private readonly ICommunicationChannelService _communicationChannelService;
         private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
+        private readonly ILogger<PlcConnectionViewModel> _logger;
 
         /// <summary>
         /// Occurs when the socat status changes.
@@ -262,65 +265,199 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Initializes a new instance of the <see cref="PlcConnectionViewModel"/> class.
         /// </summary>
-        public PlcConnectionViewModel(SocatService socatService, IDialogService dialogService, LoggingService loggingService)
+        public PlcConnectionViewModel(
+            ICommunicationChannelService communicationChannelService,
+            IDialogService dialogService,
+            LoggingService loggingService,
+            ILogger<PlcConnectionViewModel> logger)
         {
-            _socatService = socatService;
-            _dialogService = dialogService;
-            _loggingService = loggingService;
+            _communicationChannelService = communicationChannelService ?? throw new ArgumentNullException(nameof(communicationChannelService));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+            _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            StartSocatCommand = new AsyncRelayCommand(_ => StartSocatAsync(), _ => SocatStatus != "Running");
-            StopSocatCommand = new AsyncRelayCommand(_ => StopSocatAsync(), _ => SocatStatus == "Running");
-            RefreshSerialPortsCommand = new RelayCommand(_ => RefreshSerialPorts());
+            // Subscribe to service events
+            _communicationChannelService.SocatStatusChanged += OnSocatStatusChanged;
+            _communicationChannelService.SerialPortsChanged += OnSerialPortsChanged;
+
+            // Initialize commands
+            StartSocatCommand = new AsyncRelayCommand(_ => StartSocatAsync(), _ => CanStartSocat());
+            StopSocatCommand = new AsyncRelayCommand(_ => StopSocatAsync(), _ => CanStopSocat());
+            RefreshSerialPortsCommand = new AsyncRelayCommand(_ => RefreshSerialPortsAsync());
             ShowSocatLogCommand = new RelayCommand(_ => _dialogService.ShowSocatLogWindow());
-            CheckSocatProcessesCommand = new RelayCommand(_ => CheckSocatProcesses(), _ => true);
-            KillSocatProcessesCommand = new RelayCommand(_ => KillSocatProcesses(), _ => true);
+            CheckSocatProcessesCommand = new AsyncRelayCommand(_ => CheckSocatProcessesAsync());
+            KillSocatProcessesCommand = new AsyncRelayCommand(_ => KillSocatProcessesAsync());
 
-            RefreshSerialPorts();
+            // Initialize serial ports
+            RefreshSerialPortsAsync().FireAndForget(ex => 
+                _logger.LogError(ex, "Error during initial serial port refresh"));
         }
 
-        private void CheckSocatProcesses()
+        /// <summary>
+        /// Determines if socat can be started based on current state.
+        /// </summary>
+        private bool CanStartSocat()
         {
-            Task.Run(() =>
-            {
-                var pids = SocatService.GetSocatProcessIds();
-                if (pids.Length == 0)
-                    _loggingService.Log("No running socat instances detected.", LogCategory.Info);
-                else
-                    _loggingService.Log($"Socat running instances: {string.Join(", ", pids)}", LogCategory.Info);
-            }).FireAndForget(ex => _loggingService.Log($"Error checking socat processes: {ex.Message}", LogCategory.Error));
+            return SocatStatus != "Running" && !string.IsNullOrWhiteSpace(SelectedSerialPort);
         }
 
-        private void KillSocatProcesses()
+        /// <summary>
+        /// Determines if socat can be stopped based on current state.
+        /// </summary>
+        private bool CanStopSocat()
         {
-            Task.Run(() =>
-            {
-                SocatService.KillAllSocatProcesses(s => _loggingService.Log(s, LogCategory.Info));
-            }).FireAndForget(ex => _loggingService.Log($"Error killing socat processes: {ex.Message}", LogCategory.Error));
+            return SocatStatus == "Running";
         }
 
-        private void RefreshSerialPorts()
+        /// <summary>
+        /// Event handler for socat status changes from the service layer.
+        /// </summary>
+        private void OnSocatStatusChanged(object? sender, SocatStatusChangedEventArgs e)
         {
-            Task.Run(() =>
+            _logger.LogInformation("Socat status changed from {PreviousStatus} to {CurrentStatus}", 
+                e.PreviousStatus, e.CurrentStatus);
+
+            // Update UI on UI thread
+            Dispatcher.UIThread.InvokeAsync(() =>
             {
-                var ports = System.IO.Ports.SerialPort.GetPortNames();
-                Dispatcher.UIThread.Post(() =>
+                SocatStatus = e.CurrentStatus.ToString();
+            });
+        }
+
+        /// <summary>
+        /// Event handler for serial port changes from the service layer.
+        /// </summary>
+        private void OnSerialPortsChanged(object? sender, SerialPortsChangedEventArgs e)
+        {
+            _logger.LogInformation("Serial ports changed. Available ports: {PortCount}", e.AvailablePorts.Count);
+
+            // Update UI on UI thread with thread-safe collection updates
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                AvailableSerialPorts.Clear();
+                foreach (var portInfo in e.AvailablePorts)
                 {
-                    AvailableSerialPorts.Clear();
-                    foreach (var port in ports)
-                    {
-                        AvailableSerialPorts.Add(port);
-                    }
-                    if (AvailableSerialPorts.Any())
-                    {
-                        SelectedSerialPort = AvailableSerialPorts[0];
-                    }
-                });
-            }).FireAndForget(ex => _loggingService.Log($"Error refreshing serial ports: {ex.Message}", LogCategory.Error));
+                    AvailableSerialPorts.Add(portInfo.PortName);
+                }
+
+                // Select first available port if none selected
+                if (string.IsNullOrWhiteSpace(SelectedSerialPort) && AvailableSerialPorts.Any())
+                {
+                    SelectedSerialPort = AvailableSerialPorts[0];
+                }
+            });
         }
 
+        /// <summary>
+        /// Checks socat processes using the service layer.
+        /// </summary>
+        private async Task CheckSocatProcessesAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Checking socat processes");
+
+                var processInfo = _communicationChannelService.GetSocatProcessInfo();
+                
+                if (processInfo.TotalProcesses == 0)
+                {
+                    _loggingService.Log("No running socat instances detected.", LogCategory.Info);
+                }
+                else
+                {
+                    _loggingService.Log($"Socat running instances: {string.Join(", ", processInfo.ProcessIds)}", LogCategory.Info);
+                }
+
+                _logger.LogInformation("Found {ProcessCount} socat processes", processInfo.TotalProcesses);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking socat processes");
+                _loggingService.Log($"Error checking socat processes: {ex.Message}", LogCategory.Error);
+            }
+        }
+
+        /// <summary>
+        /// Kills all socat processes using the service layer.
+        /// </summary>
+        private async Task KillSocatProcessesAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Killing all socat processes");
+
+                var result = await _communicationChannelService.KillAllSocatProcessesAsync().ConfigureAwait(false);
+                
+                if (result.IsSuccess)
+                {
+                    _loggingService.Log($"Successfully killed {result.Value} socat processes.", LogCategory.Info);
+                    _logger.LogInformation("Killed {ProcessCount} socat processes", result.Value);
+                }
+                else
+                {
+                    _loggingService.Log($"Failed to kill socat processes: {result.ErrorMessage}", LogCategory.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error killing socat processes");
+                _loggingService.Log($"Error killing socat processes: {ex.Message}", LogCategory.Error);
+            }
+        }
+
+        /// <summary>
+        /// Refreshes serial ports using the service layer with thread-safe UI updates.
+        /// </summary>
+        private async Task RefreshSerialPortsAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Refreshing serial ports");
+
+                var result = await _communicationChannelService.DiscoverSerialPortsAsync().ConfigureAwait(false);
+                
+                if (result.IsSuccess && result.Value != null)
+                {
+                    var discoveryResult = result.Value;
+                    
+                    // Update UI on UI thread with thread-safe collection updates
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        AvailableSerialPorts.Clear();
+                        foreach (var portInfo in discoveryResult.AvailablePorts)
+                        {
+                            AvailableSerialPorts.Add(portInfo.PortName);
+                        }
+
+                        // Select first available port if none selected
+                        if (string.IsNullOrWhiteSpace(SelectedSerialPort) && AvailableSerialPorts.Any())
+                        {
+                            SelectedSerialPort = AvailableSerialPorts[0];
+                        }
+                    });
+
+                    _loggingService.Log($"Discovered {discoveryResult.AvailablePorts.Count} serial ports.", LogCategory.Info);
+                    _logger.LogInformation("Discovered {PortCount} serial ports in {Duration}ms", 
+                        discoveryResult.AvailablePorts.Count, discoveryResult.DiscoveryDuration.TotalMilliseconds);
+                }
+                else
+                {
+                    _loggingService.Log($"Failed to discover serial ports: {result.ErrorMessage}", LogCategory.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error refreshing serial ports");
+                _loggingService.Log($"Error refreshing serial ports: {ex.Message}", LogCategory.Error);
+            }
+        }
+
+        /// <summary>
+        /// Starts socat using the service layer.
+        /// </summary>
         private async Task StartSocatAsync()
         {
-            if (SelectedSerialPort == null)
+            if (string.IsNullOrWhiteSpace(SelectedSerialPort))
             {
                 await _dialogService.ShowMessageAsync("Error", "Please select a serial port.");
                 return;
@@ -328,35 +465,70 @@ namespace S7_Csharp_Utility.ViewModels
 
             try
             {
-                await Task.Run(() => _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize));
-                SocatStatus = "Running";
+                _logger.LogInformation("Starting socat bridge. Port: {SerialPort}, TCP: {TcpPort}", 
+                    SelectedSerialPort, SocatTcpPort);
+
+                var socatOptions = new SocatOptions(
+                    SerialPort: SelectedSerialPort,
+                    TcpPort: SocatTcpPort,
+                    BaudRate: SelectedBaudRate,
+                    Parity: SelectedParity.ToString(),
+                    StopBits: SelectedStopBits.ToString(),
+                    FlowControl: SelectedFlowControl.ToString(),
+                    Verbose: SocatVerbose,
+                    HexDump: SocatHexDump,
+                    BlockSize: SocatBlockSize);
+
+                var result = await _communicationChannelService.StartSocatAsync(socatOptions).ConfigureAwait(false);
+                
+                if (result.IsSuccess && result.Value != null)
+                {
+                    _loggingService.Log($"✅ Socat bridge started successfully. {SelectedSerialPort} -> TCP:{SocatTcpPort}", LogCategory.Info);
+                    _logger.LogInformation("Socat started successfully. PID: {ProcessId}, Port: {SerialPort} -> TCP:{TcpPort}", 
+                        result.Value.ProcessId, result.Value.SerialPort, result.Value.TcpPort);
+                }
+                else
+                {
+                    _loggingService.Log($"❌ Failed to start socat: {result.ErrorMessage}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", $"Failed to start socat: {result.ErrorMessage}");
+                }
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Unexpected error starting socat");
                 _loggingService.Log($"Error starting socat: {ex.ToString()}", LogCategory.Error);
                 await _dialogService.ShowMessageAsync("Error", $"Error starting socat: {ex.Message}");
-                SocatStatus = "Error";
             }
         }
 
-        private Task StopSocatAsync()
+        /// <summary>
+        /// Stops socat using the service layer.
+        /// </summary>
+        private async Task StopSocatAsync()
         {
-            return Task.Run(async () =>
+            try
             {
-                try
+                _logger.LogInformation("Stopping socat bridge");
+
+                var result = await _communicationChannelService.StopSocatAsync().ConfigureAwait(false);
+                
+                if (result.IsSuccess)
                 {
-                    _socatService.Stop();
-                    Dispatcher.UIThread.Post(() => SocatStatus = "Stopped");
+                    _loggingService.Log("✅ Socat bridge stopped successfully.", LogCategory.Info);
+                    _logger.LogInformation("Socat stopped successfully");
                 }
-                catch (Exception ex)
+                else
                 {
-                    _loggingService.Log($"Error stopping socat: {ex.ToString()}", LogCategory.Error);
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
-                    });
+                    _loggingService.Log($"❌ Failed to stop socat: {result.ErrorMessage}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", $"Failed to stop socat: {result.ErrorMessage}");
                 }
-            });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error stopping socat");
+                _loggingService.Log($"Error stopping socat: {ex.ToString()}", LogCategory.Error);
+                await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
+            }
         }
     }
 }

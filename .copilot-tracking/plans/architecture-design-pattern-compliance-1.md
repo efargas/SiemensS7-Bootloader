@@ -87,10 +87,10 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-013 | Create IStagerService interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Services/IStagerService.cs` with InstallStagerAsync and verification methods | [x] | 2024-12-19 |
 | TASK-014 | Create IPayloadService interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Services/IPayloadService.cs` with ScanPayloadsAsync and loading methods | [x] | 2024-12-19 |
 | TASK-015 | Implement PlcOperationService in `src/S7_Csharp_Core/S7.Services/PlcOperationService.cs` with comprehensive error handling and logging | [x] | 2024-12-19 |
-| TASK-016 | Implement MemoryDumpService in `src/S7_Csharp_Core/S7.Services/MemoryDumpService.cs` with progress reporting and cancellation support | | |
-| TASK-017 | Implement StagerService in `src/S7_Csharp_Core/S7.Services/StagerService.cs` with installation validation and retry logic | | |
-| TASK-018 | Implement PayloadService in `src/S7_Csharp_Core/S7.Services/PayloadService.cs` with async scanning and caching capabilities | | |
-| TASK-019 | Register all new services in dependency injection container in `src/S7_Csharp_Utility/App.axaml.cs` | | |
+| TASK-016 | Implement MemoryDumpService in `src/S7_Csharp_Core/S7.Services/MemoryDumpService.cs` with progress reporting and cancellation support | [x] | 2024-12-26 |
+| TASK-017 | Implement StagerService in `src/S7_Csharp_Core/S7.Services/StagerService.cs` with installation validation and retry logic | [x] | 2024-12-26 |
+| TASK-018 | Implement PayloadService in `src/S7_Csharp_Core/S7.Services/PayloadService.cs` with async scanning and caching capabilities | [x] | 2024-12-26 |
+| TASK-019 | Register all new services in dependency injection container in `src/S7_Csharp_Utility/App.axaml.cs` | [x] | 2024-12-26 |
 | TASK-020 | Create comprehensive unit tests for all service implementations in `tests/S7_Csharp_Utility.Tests/Services/` directory | | |
 
 ### Implementation Phase 3: ViewModel Refactoring and Thread Safety
@@ -99,9 +99,9 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-021 | Refactor MainWindowViewModel in `src/S7_Csharp_Utility/ViewModels/MainWindowViewModel.cs` to use service layer and remove PLC business logic | | |
+| TASK-021 | Refactor MainWindowViewModel in `src/S7_Csharp_Utility/ViewModels/MainWindowViewModel.cs` to use service layer and remove PLC business logic | [x] | 2024-12-26 |
 | TASK-022 | Implement thread-safe collection updates in MainWindowViewModel using Dispatcher.UIThread.InvokeAsync for DiscoveredPayloads | | |
-| TASK-023 | Refactor PlcConnectionViewModel in `src/S7_Csharp_Utility/ViewModels/PlcConnectionViewModel.cs` to delegate connection logic to service layer | | |
+| TASK-023 | Refactor PlcConnectionViewModel in `src/S7_Csharp_Utility/ViewModels/PlcConnectionViewModel.cs` to delegate connection logic to service layer | [x] | 2024-12-26 |
 | TASK-024 | Refactor ModbusPowerSupplyViewModel in `src/S7_Csharp_Utility/ViewModels/ModbusPowerSupplyViewModel.cs` to use service abstractions | | |
 | TASK-025 | Implement proper async/await patterns in all ViewModels with CancellationToken support | | |
 | TASK-026 | Add progress reporting interfaces and implementations for long-running operations | | |

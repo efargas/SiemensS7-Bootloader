@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using S7.Core.Abstractions.Services;
+using S7.Core.Abstractions.Configuration;
+using S7.Core.Abstractions.Validation;
 using S7.Net;
 using S7.Net.Interfaces;
 using S7.Net.Channels;
@@ -19,362 +21,506 @@ namespace S7.Services
     {
         private readonly ILogger<PlcOperationService> _logger;
         private readonly PayloadManager _payloadManager;
-        private readonly IPowerController? _powerController;
+        private PlcClient? _currentClient;
+        private PlcConnectionStatus _connectionStatus = PlcConnectionStatus.Disconnected;
 
         /// <summary>
         /// Initializes a new instance of the PlcOperationService class.
         /// </summary>
         /// <param name="logger">The logger instance</param>
         /// <param name="payloadManager">The payload manager for handling payloads</param>
-        /// <param name="powerController">The optional power controller</param>
         public PlcOperationService(
             ILogger<PlcOperationService> logger,
-            PayloadManager payloadManager,
-            IPowerController? powerController = null)
+            PayloadManager payloadManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
-            _powerController = powerController;
         }
+
+        /// <inheritdoc />
+        public event EventHandler<PlcConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
+
+        /// <inheritdoc />
+        public event EventHandler<PlcOperationCompletedEventArgs>? OperationCompleted;
 
         /// <inheritdoc />
         public async Task<Result<ExploitSequenceResult>> ExecuteExploitSequenceAsync(
             ExploitSequenceOptions options,
-            IProgress<ExploitSequenceProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(options);
 
             var stopwatch = Stopwatch.StartNew();
-            var correlationId = options.CorrelationId ?? Guid.NewGuid().ToString();
+            var operationName = "ExecuteExploitSequence";
             
-            _logger.LogInformation("Starting exploit sequence execution. CorrelationId: {CorrelationId}", correlationId);
+            _logger.LogInformation("Starting exploit sequence execution with {PayloadCount} payloads", options.PayloadPaths.Count);
 
             try
             {
                 var result = new ExploitSequenceResult
                 {
-                    CorrelationId = correlationId,
-                    StartTime = DateTime.UtcNow,
-                    Steps = new List<ExploitStepResult>()
+                    TotalSteps = options.PayloadPaths.Count,
+                    StepResults = new List<ExploitStepResult>()
                 };
 
-                // Execute each step in the sequence
-                for (int i = 0; i < options.Steps.Count; i++)
+                // Connect to PLC first
+                var connectionResult = await ConnectAsync(options.ChannelConfig, cancellationToken).ConfigureAwait(false);
+                if (!connectionResult.IsSuccess)
                 {
-                    var step = options.Steps[i];
-                    var stepProgress = new ExploitSequenceProgress(
-                        CurrentStep = i + 1,
-                        TotalSteps = options.Steps.Count,
-                        CurrentStepName = step.Name,
-                        PercentComplete = (double)i / options.Steps.Count * 100,
-                        Elapsed = stopwatch.Elapsed,
-                        EstimatedRemaining = EstimateRemainingTime(stopwatch.Elapsed, i, options.Steps.Count)
-                    );
+                    result.ErrorMessage = $"Failed to connect to PLC: {connectionResult.ErrorMessage}";
+                    return Result<ExploitSequenceResult>.Failure(result.ErrorMessage);
+                }
 
-                    progress?.Report(stepProgress);
-
-                    var stepResult = await ExecuteExploitStepAsync(step, correlationId, cancellationToken).ConfigureAwait(false);
-                    result.Steps.Add(stepResult);
-
-                    if (!stepResult.IsSuccess && !step.ContinueOnFailure)
+                // Perform handshake if requested
+                if (options.PerformHandshake)
+                {
+                    var handshakeResult = await PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
+                    if (!handshakeResult.IsSuccess)
                     {
-                        _logger.LogError("Exploit step '{StepName}' failed and ContinueOnFailure is false. Stopping sequence. CorrelationId: {CorrelationId}",
-                            step.Name, correlationId);
+                        result.Warnings.Add($"Handshake failed: {handshakeResult.ErrorMessage}");
+                    }
+                }
+
+                // Execute each payload
+                for (int i = 0; i < options.PayloadPaths.Count; i++)
+                {
+                    var payloadPath = options.PayloadPaths[i];
+                    var stepResult = await ExecutePayloadStepAsync(payloadPath, i + 1, cancellationToken).ConfigureAwait(false);
+                    result.StepResults.Add(stepResult);
+                    result.StepsExecuted++;
+
+                    if (!stepResult.IsSuccess && !options.ContinueOnFailure)
+                    {
+                        _logger.LogError("Payload execution failed and ContinueOnFailure is false. Stopping sequence");
                         break;
                     }
                 }
 
                 stopwatch.Stop();
-                result.EndTime = DateTime.UtcNow;
                 result.Duration = stopwatch.Elapsed;
-                result.IsSuccess = result.Steps.TrueForAll(s => s.IsSuccess);
+                result.IsSuccess = result.StepResults.TrueForAll(s => s.IsSuccess);
 
-                _logger.LogInformation("Exploit sequence execution completed. Success: {IsSuccess}, Duration: {Duration}ms. CorrelationId: {CorrelationId}",
-                    result.IsSuccess, stopwatch.ElapsedMilliseconds, correlationId);
+                _logger.LogInformation("Exploit sequence execution completed. Success: {IsSuccess}, Duration: {Duration}ms",
+                    result.IsSuccess, stopwatch.ElapsedMilliseconds);
 
+                OnOperationCompleted(operationName, result.IsSuccess, stopwatch.Elapsed, result.ErrorMessage);
                 return Result<ExploitSequenceResult>.Success(result);
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("Exploit sequence execution was cancelled. CorrelationId: {CorrelationId}", correlationId);
+                _logger.LogWarning("Exploit sequence execution was cancelled");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, "Operation was cancelled");
                 return Result<ExploitSequenceResult>.Failure("Operation was cancelled");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exploit sequence execution failed with exception. CorrelationId: {CorrelationId}", correlationId);
+                _logger.LogError(ex, "Exploit sequence execution failed with exception");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
                 return Result<ExploitSequenceResult>.Failure($"Exploit sequence failed: {ex.Message}");
             }
         }
 
         /// <inheritdoc />
-        public async Task<Result<ConnectionResult>> EstablishConnectionAsync(
-            ConnectionOptions options,
+        public async Task<Result<PlcConnectionInfo>> ConnectAsync(
+            CommunicationChannelConfig channelConfig,
             CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(channelConfig);
 
             var stopwatch = Stopwatch.StartNew();
-            var correlationId = options.CorrelationId ?? Guid.NewGuid().ToString();
+            var operationName = "Connect";
 
-            _logger.LogInformation("Establishing PLC connection. Host: {Host}, Port: {Port}, CorrelationId: {CorrelationId}",
-                options.Host, options.Port, correlationId);
+            _logger.LogInformation("Establishing PLC connection. Mode: {Mode}, Host: {Host}, Port: {Port}",
+                channelConfig.Mode, channelConfig.Host, channelConfig.Port);
 
             try
             {
-                using var plcClient = CreatePlcClient(options);
+                SetConnectionStatus(PlcConnectionStatus.Connecting);
+
+                // Dispose existing client if any
+                _currentClient?.Dispose();
+
+                // Create new client
+                _currentClient = CreatePlcClient(channelConfig);
                 
                 // Perform connection with timeout
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeoutCts.CancelAfter(options.ConnectionTimeout);
+                timeoutCts.CancelAfter(channelConfig.Timeout);
 
-                await plcClient.ConnectAsync(timeoutCts.Token).ConfigureAwait(false);
-
-                // Perform handshake if requested
-                if (options.PerformHandshake)
-                {
-                    await plcClient.PerformHandshakeAsync(timeoutCts.Token).ConfigureAwait(false);
-                }
+                await _currentClient.ConnectAsync(timeoutCts.Token).ConfigureAwait(false);
 
                 stopwatch.Stop();
+                SetConnectionStatus(PlcConnectionStatus.Connected);
 
-                var result = new ConnectionResult
+                var connectionInfo = new PlcConnectionInfo
                 {
-                    IsConnected = true,
-                    ConnectionTime = stopwatch.Elapsed,
-                    DeviceInfo = await GetDeviceInfoAsync(plcClient, cancellationToken).ConfigureAwait(false),
-                    CorrelationId = correlationId
+                    ConnectionId = Guid.NewGuid().ToString(),
+                    Address = channelConfig.Host ?? channelConfig.SerialPort ?? "Unknown",
+                    ConnectionType = channelConfig.Mode,
+                    ConnectedAt = DateTime.UtcNow,
+                    IsActive = true,
+                    Properties = new Dictionary<string, object>
+                    {
+                        ["Port"] = channelConfig.Port,
+                        ["Timeout"] = channelConfig.Timeout.TotalMilliseconds
+                    }
                 };
 
-                _logger.LogInformation("PLC connection established successfully in {Duration}ms. CorrelationId: {CorrelationId}",
-                    stopwatch.ElapsedMilliseconds, correlationId);
+                _logger.LogInformation("PLC connection established successfully in {Duration}ms",
+                    stopwatch.ElapsedMilliseconds);
 
-                return Result<ConnectionResult>.Success(result);
+                OnOperationCompleted(operationName, true, stopwatch.Elapsed);
+                return Result<PlcConnectionInfo>.Success(connectionInfo);
             }
             catch (OperationCanceledException)
             {
-                _logger.LogWarning("PLC connection attempt was cancelled. CorrelationId: {CorrelationId}", correlationId);
-                return Result<ConnectionResult>.Failure("Connection attempt was cancelled");
+                SetConnectionStatus(PlcConnectionStatus.Error);
+                _logger.LogWarning("PLC connection attempt was cancelled");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, "Connection attempt was cancelled");
+                return Result<PlcConnectionInfo>.Failure("Connection attempt was cancelled");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to establish PLC connection. CorrelationId: {CorrelationId}", correlationId);
-                return Result<ConnectionResult>.Failure($"Connection failed: {ex.Message}");
+                SetConnectionStatus(PlcConnectionStatus.Error);
+                _logger.LogError(ex, "Failed to establish PLC connection");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
+                return Result<PlcConnectionInfo>.Failure($"Connection failed: {ex.Message}");
             }
         }
 
         /// <inheritdoc />
-        public async Task<Result<bool>> ValidateConnectionAsync(
-            ConnectionOptions options,
-            CancellationToken cancellationToken = default)
+        public async Task<Result> DisconnectAsync(CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(options);
-
-            try
-            {
-                var connectionResult = await EstablishConnectionAsync(options, cancellationToken).ConfigureAwait(false);
-                return Result<bool>.Success(connectionResult.IsSuccess);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Connection validation failed");
-                return Result<bool>.Failure($"Connection validation failed: {ex.Message}");
-            }
-        }
-
-        /// <inheritdoc />
-        public async Task<Result<DeviceInfo>> GetDeviceInfoAsync(
-            ConnectionOptions options,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(options);
-
-            try
-            {
-                using var plcClient = CreatePlcClient(options);
-                await plcClient.ConnectAsync(cancellationToken).ConfigureAwait(false);
-
-                var deviceInfo = await GetDeviceInfoAsync(plcClient, cancellationToken).ConfigureAwait(false);
-                return Result<DeviceInfo>.Success(deviceInfo);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to retrieve device information");
-                return Result<DeviceInfo>.Failure($"Failed to get device info: {ex.Message}");
-            }
-        }
-
-        /// <inheritdoc />
-        public async Task<Result<PowerCycleResult>> PowerCycleDeviceAsync(
-            PowerCycleOptions options,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(options);
-
-            if (_powerController == null)
-            {
-                return Result<PowerCycleResult>.Failure("Power controller is not available");
-            }
-
             var stopwatch = Stopwatch.StartNew();
-            var correlationId = options.CorrelationId ?? Guid.NewGuid().ToString();
+            var operationName = "Disconnect";
 
-            _logger.LogInformation("Starting power cycle operation. CorrelationId: {CorrelationId}", correlationId);
+            _logger.LogInformation("Disconnecting from PLC");
 
             try
             {
-                await _powerController.PowerCycleAsync(options.PowerConfig, cancellationToken).ConfigureAwait(false);
+                if (_currentClient != null)
+                {
+                    await _currentClient.DisconnectAsync(cancellationToken).ConfigureAwait(false);
+                    _currentClient.Dispose();
+                    _currentClient = null;
+                }
+
+                stopwatch.Stop();
+                SetConnectionStatus(PlcConnectionStatus.Disconnected);
+
+                _logger.LogInformation("PLC disconnection completed in {Duration}ms", stopwatch.ElapsedMilliseconds);
+                OnOperationCompleted(operationName, true, stopwatch.Elapsed);
+                return Result.Success();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to disconnect from PLC");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
+                return Result.Failure($"Disconnection failed: {ex.Message}");
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task<Result<HandshakeResult>> PerformHandshakeAsync(CancellationToken cancellationToken = default)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var operationName = "PerformHandshake";
+
+            if (_currentClient == null)
+            {
+                return Result<HandshakeResult>.Failure("No active PLC connection");
+            }
+
+            _logger.LogInformation("Performing PLC handshake");
+
+            try
+            {
+                await _currentClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
                 stopwatch.Stop();
 
-                var result = new PowerCycleResult
+                var handshakeResult = new HandshakeResult
                 {
                     IsSuccess = true,
                     Duration = stopwatch.Elapsed,
-                    CorrelationId = correlationId
+                    ProtocolVersion = "S7-1200/1500", // This would be detected from actual handshake
+                    AdditionalInfo = new Dictionary<string, object>
+                    {
+                        ["HandshakeTime"] = DateTime.UtcNow,
+                        ["ClientVersion"] = "1.0"
+                    }
                 };
 
-                _logger.LogInformation("Power cycle completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
-                    stopwatch.ElapsedMilliseconds, correlationId);
-
-                return Result<PowerCycleResult>.Success(result);
+                _logger.LogInformation("PLC handshake completed successfully in {Duration}ms", stopwatch.ElapsedMilliseconds);
+                OnOperationCompleted(operationName, true, stopwatch.Elapsed);
+                return Result<HandshakeResult>.Success(handshakeResult);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Power cycle operation failed. CorrelationId: {CorrelationId}", correlationId);
-                return Result<PowerCycleResult>.Failure($"Power cycle failed: {ex.Message}");
+                _logger.LogError(ex, "PLC handshake failed");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
+                return Result<HandshakeResult>.Failure($"Handshake failed: {ex.Message}");
             }
         }
 
         /// <inheritdoc />
-        public TimeSpan EstimateOperationDuration(ExploitSequenceOptions options)
+        public async Task<Result<byte[]>> ReadMemoryAsync(
+            uint address,
+            uint length,
+            CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(options);
+            var stopwatch = Stopwatch.StartNew();
+            var operationName = "ReadMemory";
 
-            // Base time estimates for different operation types
-            var baseEstimates = new Dictionary<string, TimeSpan>
+            if (_currentClient == null)
             {
-                ["connect"] = TimeSpan.FromSeconds(2),
-                ["handshake"] = TimeSpan.FromSeconds(1),
-                ["upload"] = TimeSpan.FromSeconds(5),
-                ["execute"] = TimeSpan.FromSeconds(3),
-                ["download"] = TimeSpan.FromSeconds(4),
-                ["verify"] = TimeSpan.FromSeconds(2)
-            };
+                return Result<byte[]>.Failure("No active PLC connection");
+            }
 
-            var totalEstimate = TimeSpan.Zero;
+            _logger.LogInformation("Reading {Length} bytes from PLC memory at address 0x{Address:X8}", length, address);
 
-            foreach (var step in options.Steps)
+            try
             {
-                var stepType = step.Type?.ToLowerInvariant() ?? "unknown";
-                if (baseEstimates.TryGetValue(stepType, out var baseTime))
+                var data = await _currentClient.ReadMemoryAsync(address, (int)length, cancellationToken).ConfigureAwait(false);
+                stopwatch.Stop();
+
+                _logger.LogInformation("Successfully read {Length} bytes from PLC memory in {Duration}ms",
+                    data.Length, stopwatch.ElapsedMilliseconds);
+
+                OnOperationCompleted(operationName, true, stopwatch.Elapsed);
+                return Result<byte[]>.Success(data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read PLC memory at address 0x{Address:X8}", address);
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
+                return Result<byte[]>.Failure($"Memory read failed: {ex.Message}");
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task<Result> WriteMemoryAsync(
+            uint address,
+            byte[] data,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+
+            var stopwatch = Stopwatch.StartNew();
+            var operationName = "WriteMemory";
+
+            if (_currentClient == null)
+            {
+                return Result.Failure("No active PLC connection");
+            }
+
+            _logger.LogInformation("Writing {Length} bytes to PLC memory at address 0x{Address:X8}", data.Length, address);
+
+            try
+            {
+                await _currentClient.WriteMemoryAsync(address, data, cancellationToken).ConfigureAwait(false);
+                stopwatch.Stop();
+
+                _logger.LogInformation("Successfully wrote {Length} bytes to PLC memory in {Duration}ms",
+                    data.Length, stopwatch.ElapsedMilliseconds);
+
+                OnOperationCompleted(operationName, true, stopwatch.Elapsed);
+                return Result.Success();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to write PLC memory at address 0x{Address:X8}", address);
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
+                return Result.Failure($"Memory write failed: {ex.Message}");
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task<Result<PlcInfo>> GetPlcInfoAsync(CancellationToken cancellationToken = default)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var operationName = "GetPlcInfo";
+
+            if (_currentClient == null)
+            {
+                return Result<PlcInfo>.Failure("No active PLC connection");
+            }
+
+            _logger.LogInformation("Retrieving PLC information");
+
+            try
+            {
+                // Simulate PLC info retrieval - in real implementation this would query the PLC
+                await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+                stopwatch.Stop();
+
+                var plcInfo = new PlcInfo
                 {
-                    // Adjust based on payload size if available
-                    var adjustedTime = baseTime;
-                    if (step.Parameters?.ContainsKey("payloadSize") == true && 
-                        step.Parameters["payloadSize"] is int payloadSize)
+                    Model = "S7-1200",
+                    FirmwareVersion = "4.2.1",
+                    HardwareVersion = "1.0",
+                    SerialNumber = "6ES7214-1AG40-0XB0",
+                    SupportedProtocols = new List<string> { "S7", "Modbus", "Profinet" },
+                    MemoryLayout = new Dictionary<string, object>
                     {
-                        // Add time based on payload size (rough estimate: 1 second per 10KB)
-                        var sizeAdjustment = TimeSpan.FromMilliseconds(payloadSize / 10);
-                        adjustedTime = adjustedTime.Add(sizeAdjustment);
+                        ["TotalMemory"] = 1024 * 1024, // 1MB
+                        ["AvailableMemory"] = 512 * 1024, // 512KB
+                        ["ProgramMemory"] = 256 * 1024 // 256KB
+                    },
+                    Properties = new Dictionary<string, object>
+                    {
+                        ["LastQueried"] = DateTime.UtcNow,
+                        ["QueryDuration"] = stopwatch.Elapsed
                     }
+                };
 
-                    totalEstimate = totalEstimate.Add(adjustedTime);
-                }
-                else
-                {
-                    // Default estimate for unknown operations
-                    totalEstimate = totalEstimate.Add(TimeSpan.FromSeconds(3));
-                }
+                _logger.LogInformation("Successfully retrieved PLC information in {Duration}ms", stopwatch.ElapsedMilliseconds);
+                OnOperationCompleted(operationName, true, stopwatch.Elapsed);
+                return Result<PlcInfo>.Success(plcInfo);
             }
-
-            // Add buffer time (20% overhead)
-            var bufferTime = TimeSpan.FromMilliseconds(totalEstimate.TotalMilliseconds * 0.2);
-            return totalEstimate.Add(bufferTime);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve PLC information");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
+                return Result<PlcInfo>.Failure($"Failed to get PLC info: {ex.Message}");
+            }
         }
 
         /// <inheritdoc />
-        public Result<bool> ValidateExploitSequence(ExploitSequenceOptions options)
+        public async Task<Result<ValidationResult>> ValidateConnectionAsync(
+            CommunicationChannelConfig channelConfig,
+            CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(channelConfig);
 
-            var validationErrors = new List<string>();
+            var stopwatch = Stopwatch.StartNew();
+            var operationName = "ValidateConnection";
 
-            // Validate basic requirements
-            if (options.Steps == null || options.Steps.Count == 0)
+            _logger.LogInformation("Validating PLC connection configuration");
+
+            try
             {
-                validationErrors.Add("Exploit sequence must contain at least one step");
-            }
+                SetConnectionStatus(PlcConnectionStatus.Validating);
 
-            // Validate each step
-            for (int i = 0; i < options.Steps.Count; i++)
-            {
-                var step = options.Steps[i];
-                
-                if (string.IsNullOrWhiteSpace(step.Name))
+                var validationResult = new ValidationResult();
+
+                // Validate configuration
+                if (string.IsNullOrWhiteSpace(channelConfig.Mode))
                 {
-                    validationErrors.Add($"Step {i + 1}: Name is required");
+                    validationResult.AddError("Connection mode is required");
                 }
 
-                if (string.IsNullOrWhiteSpace(step.Type))
+                if (channelConfig.Mode?.ToUpperInvariant() == "TCP")
                 {
-                    validationErrors.Add($"Step {i + 1}: Type is required");
+                    if (string.IsNullOrWhiteSpace(channelConfig.Host))
+                    {
+                        validationResult.AddError("Host is required for TCP connection");
+                    }
+                    if (channelConfig.Port <= 0 || channelConfig.Port > 65535)
+                    {
+                        validationResult.AddError("Port must be between 1 and 65535");
+                    }
+                }
+                else if (channelConfig.Mode?.ToUpperInvariant() == "SERIAL")
+                {
+                    if (string.IsNullOrWhiteSpace(channelConfig.SerialPort))
+                    {
+                        validationResult.AddError("Serial port is required for serial connection");
+                    }
                 }
 
-                // Validate step-specific requirements
-                ValidateStepRequirements(step, i + 1, validationErrors);
-            }
+                // Test connection if configuration is valid
+                if (validationResult.IsValid)
+                {
+                    try
+                    {
+                        var connectionResult = await ConnectAsync(channelConfig, cancellationToken).ConfigureAwait(false);
+                        if (connectionResult.IsSuccess)
+                        {
+                            await DisconnectAsync(cancellationToken).ConfigureAwait(false);
+                            validationResult.AddInfo("Connection test successful");
+                        }
+                        else
+                        {
+                            validationResult.AddWarning($"Connection test failed: {connectionResult.ErrorMessage}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        validationResult.AddWarning($"Connection test failed: {ex.Message}");
+                    }
+                }
 
-            if (validationErrors.Count > 0)
+                stopwatch.Stop();
+                SetConnectionStatus(PlcConnectionStatus.Disconnected);
+
+                _logger.LogInformation("Connection validation completed in {Duration}ms. Valid: {IsValid}",
+                    stopwatch.ElapsedMilliseconds, validationResult.IsValid);
+
+                OnOperationCompleted(operationName, validationResult.IsValid, stopwatch.Elapsed);
+                return Result<ValidationResult>.Success(validationResult);
+            }
+            catch (Exception ex)
             {
-                var errorMessage = string.Join("; ", validationErrors);
-                _logger.LogWarning("Exploit sequence validation failed: {Errors}", errorMessage);
-                return Result<bool>.Failure(errorMessage);
+                SetConnectionStatus(PlcConnectionStatus.Error);
+                _logger.LogError(ex, "Connection validation failed");
+                OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
+                return Result<ValidationResult>.Failure($"Validation failed: {ex.Message}");
             }
-
-            return Result<bool>.Success(true);
         }
 
-        private PlcClient CreatePlcClient(ConnectionOptions options)
+        /// <inheritdoc />
+        public PlcConnectionStatus GetConnectionStatus()
         {
-            ICommunicationChannel channel = options.ConnectionType.ToUpperInvariant() switch
+            return _connectionStatus;
+        }
+
+        private PlcClient CreatePlcClient(CommunicationChannelConfig config)
+        {
+            ICommunicationChannel channel = config.Mode.ToUpperInvariant() switch
             {
-                "TCP" => new TcpChannel(options.Host ?? "localhost", options.Port),
-                "SERIAL" => new SerialChannel(options.SerialPort ?? "COM1", options.BaudRate),
-                _ => throw new ArgumentException($"Unsupported connection type: {options.ConnectionType}")
+                "TCP" => new TcpChannel(config.Host ?? "localhost", config.Port),
+                "SERIAL" => new SerialChannel(config.SerialPort ?? "COM1", config.BaudRate),
+                _ => throw new ArgumentException($"Unsupported connection type: {config.Mode}")
             };
 
             Action<string> logger = message => _logger.LogDebug("{Message}", message);
             return new PlcClient(channel, logger);
         }
 
-        private async Task<ExploitStepResult> ExecuteExploitStepAsync(
-            ExploitStep step,
-            string correlationId,
+        private async Task<ExploitStepResult> ExecutePayloadStepAsync(
+            string payloadPath,
+            int stepNumber,
             CancellationToken cancellationToken)
         {
             var stepStopwatch = Stopwatch.StartNew();
             
-            _logger.LogInformation("Executing exploit step '{StepName}' of type '{StepType}'. CorrelationId: {CorrelationId}",
-                step.Name, step.Type, correlationId);
+            _logger.LogInformation("Executing payload step {StepNumber}: {PayloadPath}", stepNumber, payloadPath);
 
             try
             {
-                // Simulate step execution based on type
-                var result = step.Type?.ToLowerInvariant() switch
-                {
-                    "connect" => await ExecuteConnectStepAsync(step, cancellationToken).ConfigureAwait(false),
-                    "upload" => await ExecuteUploadStepAsync(step, cancellationToken).ConfigureAwait(false),
-                    "execute" => await ExecuteExecuteStepAsync(step, cancellationToken).ConfigureAwait(false),
-                    "download" => await ExecuteDownloadStepAsync(step, cancellationToken).ConfigureAwait(false),
-                    "verify" => await ExecuteVerifyStepAsync(step, cancellationToken).ConfigureAwait(false),
-                    _ => await ExecuteGenericStepAsync(step, cancellationToken).ConfigureAwait(false)
-                };
+                // Load and execute payload
+                var payload = await _payloadManager.LoadPayloadAsync(payloadPath, cancellationToken).ConfigureAwait(false);
+                
+                // Simulate payload execution
+                await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
 
                 stepStopwatch.Stop();
-                result.Duration = stepStopwatch.Elapsed;
 
-                _logger.LogInformation("Exploit step '{StepName}' completed. Success: {IsSuccess}, Duration: {Duration}ms. CorrelationId: {CorrelationId}",
-                    step.Name, result.IsSuccess, stepStopwatch.ElapsedMilliseconds, correlationId);
+                var result = new ExploitStepResult
+                {
+                    StepName = $"Payload {stepNumber}: {System.IO.Path.GetFileName(payloadPath)}",
+                    IsSuccess = true,
+                    Duration = stepStopwatch.Elapsed,
+                    Data = new Dictionary<string, object>
+                    {
+                        ["PayloadPath"] = payloadPath,
+                        ["PayloadSize"] = payload?.Length ?? 0,
+                        ["ExecutionTime"] = DateTime.UtcNow
+                    }
+                };
+
+                _logger.LogInformation("Payload step {StepNumber} completed successfully in {Duration}ms",
+                    stepNumber, stepStopwatch.ElapsedMilliseconds);
 
                 return result;
             }
@@ -382,12 +528,11 @@ namespace S7.Services
             {
                 stepStopwatch.Stop();
                 
-                _logger.LogError(ex, "Exploit step '{StepName}' failed with exception. CorrelationId: {CorrelationId}",
-                    step.Name, correlationId);
+                _logger.LogError(ex, "Payload step {StepNumber} failed", stepNumber);
 
                 return new ExploitStepResult
                 {
-                    StepName = step.Name,
+                    StepName = $"Payload {stepNumber}: {System.IO.Path.GetFileName(payloadPath)}",
                     IsSuccess = false,
                     ErrorMessage = ex.Message,
                     Duration = stepStopwatch.Elapsed
@@ -395,149 +540,35 @@ namespace S7.Services
             }
         }
 
-        private async Task<ExploitStepResult> ExecuteConnectStepAsync(ExploitStep step, CancellationToken cancellationToken)
+        private void SetConnectionStatus(PlcConnectionStatus newStatus)
         {
-            // Simulate connection step
-            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
-            
-            return new ExploitStepResult
-            {
-                StepName = step.Name,
-                IsSuccess = true,
-                Output = "Connection established successfully"
-            };
-        }
+            var previousStatus = _connectionStatus;
+            _connectionStatus = newStatus;
 
-        private async Task<ExploitStepResult> ExecuteUploadStepAsync(ExploitStep step, CancellationToken cancellationToken)
-        {
-            // Simulate upload step
-            var payloadPath = step.Parameters?.GetValueOrDefault("payloadPath")?.ToString();
-            if (!string.IsNullOrEmpty(payloadPath))
+            if (previousStatus != newStatus)
             {
-                var payload = await _payloadManager.LoadPayloadAsync(payloadPath, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(2000, cancellationToken).ConfigureAwait(false); // Simulate upload time
-            }
-            else
-            {
-                await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
-            }
+                _logger.LogInformation("PLC connection status changed from {PreviousStatus} to {CurrentStatus}",
+                    previousStatus, newStatus);
 
-            return new ExploitStepResult
-            {
-                StepName = step.Name,
-                IsSuccess = true,
-                Output = "Payload uploaded successfully"
-            };
-        }
-
-        private async Task<ExploitStepResult> ExecuteExecuteStepAsync(ExploitStep step, CancellationToken cancellationToken)
-        {
-            // Simulate execution step
-            await Task.Delay(1500, cancellationToken).ConfigureAwait(false);
-            
-            return new ExploitStepResult
-            {
-                StepName = step.Name,
-                IsSuccess = true,
-                Output = "Payload executed successfully"
-            };
-        }
-
-        private async Task<ExploitStepResult> ExecuteDownloadStepAsync(ExploitStep step, CancellationToken cancellationToken)
-        {
-            // Simulate download step
-            await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
-            
-            return new ExploitStepResult
-            {
-                StepName = step.Name,
-                IsSuccess = true,
-                Output = "Data downloaded successfully"
-            };
-        }
-
-        private async Task<ExploitStepResult> ExecuteVerifyStepAsync(ExploitStep step, CancellationToken cancellationToken)
-        {
-            // Simulate verification step
-            await Task.Delay(800, cancellationToken).ConfigureAwait(false);
-            
-            return new ExploitStepResult
-            {
-                StepName = step.Name,
-                IsSuccess = true,
-                Output = "Verification completed successfully"
-            };
-        }
-
-        private async Task<ExploitStepResult> ExecuteGenericStepAsync(ExploitStep step, CancellationToken cancellationToken)
-        {
-            // Simulate generic step
-            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
-            
-            return new ExploitStepResult
-            {
-                StepName = step.Name,
-                IsSuccess = true,
-                Output = "Step completed successfully"
-            };
-        }
-
-        private async Task<DeviceInfo> GetDeviceInfoAsync(PlcClient plcClient, CancellationToken cancellationToken)
-        {
-            // Simulate device info retrieval
-            await Task.Delay(500, cancellationToken).ConfigureAwait(false);
-            
-            return new DeviceInfo
-            {
-                DeviceType = "S7-1200",
-                FirmwareVersion = "4.2.1",
-                SerialNumber = "6ES7214-1AG40-0XB0",
-                HardwareVersion = "1.0",
-                SupportedFeatures = new[] { "TCP", "Modbus", "Profinet" },
-                MemoryInfo = new Dictionary<string, object>
-                {
-                    ["TotalMemory"] = 1024 * 1024, // 1MB
-                    ["AvailableMemory"] = 512 * 1024, // 512KB
-                    ["ProgramMemory"] = 256 * 1024 // 256KB
-                }
-            };
-        }
-
-        private void ValidateStepRequirements(ExploitStep step, int stepNumber, List<string> validationErrors)
-        {
-            switch (step.Type?.ToLowerInvariant())
-            {
-                case "upload":
-                    if (step.Parameters?.ContainsKey("payloadPath") != true)
-                    {
-                        validationErrors.Add($"Step {stepNumber}: Upload step requires 'payloadPath' parameter");
-                    }
-                    break;
-
-                case "download":
-                    if (step.Parameters?.ContainsKey("outputPath") != true)
-                    {
-                        validationErrors.Add($"Step {stepNumber}: Download step requires 'outputPath' parameter");
-                    }
-                    break;
-
-                case "execute":
-                    if (step.Parameters?.ContainsKey("address") != true)
-                    {
-                        validationErrors.Add($"Step {stepNumber}: Execute step requires 'address' parameter");
-                    }
-                    break;
+                ConnectionStatusChanged?.Invoke(this, new PlcConnectionStatusChangedEventArgs(
+                    previousStatus, newStatus, $"Status changed from {previousStatus} to {newStatus}"));
             }
         }
 
-        private TimeSpan EstimateRemainingTime(TimeSpan elapsed, int currentStep, int totalSteps)
+        private void OnOperationCompleted(string operationName, bool isSuccess, TimeSpan duration, string? errorMessage = null)
         {
-            if (currentStep == 0) return TimeSpan.Zero;
-            
-            var averageStepTime = elapsed.TotalMilliseconds / currentStep;
-            var remainingSteps = totalSteps - currentStep;
-            
-            return TimeSpan.FromMilliseconds(averageStepTime * remainingSteps);
+            OperationCompleted?.Invoke(this, new PlcOperationCompletedEventArgs(
+                operationName, isSuccess, duration, errorMessage));
+        }
+
+        /// <summary>
+        /// Disposes the service and cleans up resources.
+        /// </summary>
+        public void Dispose()
+        {
+            _currentClient?.Dispose();
+            _currentClient = null;
+            SetConnectionStatus(PlcConnectionStatus.Disconnected);
         }
     }
 }
