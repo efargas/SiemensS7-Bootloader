@@ -17,6 +17,8 @@ namespace S7.Core.Commands.Services
         private readonly ILogger<ModbusPowerController> _logger;
         private readonly ModbusConnectionManager _connectionManager;
         private bool _disposed;
+        private string? _currentHost;
+        private int _currentPort;
 
         /// <summary>
         /// Initializes a new instance of the ModbusPowerController class.
@@ -29,6 +31,83 @@ namespace S7.Core.Commands.Services
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether the power controller is connected.
+        /// </summary>
+        public bool IsConnected => !string.IsNullOrEmpty(_currentHost) && _currentPort > 0;
+
+        /// <summary>
+        /// Connects to the Modbus power controller.
+        /// </summary>
+        /// <param name="host">The Modbus host address.</param>
+        /// <param name="port">The Modbus port.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public async Task ConnectAsync(string host, int port)
+        {
+            ArgumentNullException.ThrowIfNull(host);
+            ThrowIfDisposed();
+
+            _logger.LogInformation("Connecting to Modbus power controller at {Host}:{Port}", host, port);
+
+            try
+            {
+                // Test the connection by getting a connection from the manager
+                await _connectionManager.GetConnectionAsync(host, port).ConfigureAwait(false);
+                
+                _currentHost = host;
+                _currentPort = port;
+                
+                _logger.LogInformation("Successfully connected to Modbus power controller at {Host}:{Port}", host, port);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to connect to Modbus power controller at {Host}:{Port}", host, port);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Disconnects from the Modbus power controller.
+        /// </summary>
+        public void Disconnect()
+        {
+            _logger.LogInformation("Disconnecting from Modbus power controller");
+            _currentHost = null;
+            _currentPort = 0;
+        }
+
+        /// <summary>
+        /// Sets the power state of the specified coil.
+        /// </summary>
+        /// <param name="coil">The coil address.</param>
+        /// <param name="powerOn">True to turn on, false to turn off.</param>
+        /// <param name="slaveId">The Modbus slave ID.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public async Task SetPowerAsync(ushort coil, bool powerOn, byte slaveId)
+        {
+            ThrowIfDisposed();
+
+            if (!IsConnected)
+                throw new InvalidOperationException("Not connected to power controller");
+
+            _logger.LogInformation("Setting power state to {PowerState} for coil {Coil} on slave {SlaveId}",
+                powerOn ? "ON" : "OFF", coil, slaveId);
+
+            try
+            {
+                var connection = await _connectionManager.GetConnectionAsync(_currentHost!, _currentPort).ConfigureAwait(false);
+                await connection.WriteSingleCoilAsync(slaveId, coil, powerOn).ConfigureAwait(false);
+
+                _logger.LogInformation("Power state set to {PowerState} successfully for coil {Coil} on slave {SlaveId}",
+                    powerOn ? "ON" : "OFF", coil, slaveId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to set power state for coil {Coil} on slave {SlaveId}", coil, slaveId);
+                throw;
+            }
         }
 
         /// <summary>

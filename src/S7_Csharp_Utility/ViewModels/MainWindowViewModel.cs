@@ -16,6 +16,7 @@ using S7_Csharp_Utility.Interfaces;
 using S7.Core.Abstractions.Services;
 using S7.Core.Abstractions.Configuration;
 using Microsoft.Extensions.Logging;
+using S7.Net;
 
 namespace S7_Csharp_Utility.ViewModels
 {

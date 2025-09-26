@@ -16,6 +16,10 @@ using S7.Net;
 using S7.Net.Interfaces;
 using S7.Net.Channels;
 
+// Alias to resolve ambiguous reference between Commands and Services namespaces
+using CommandsStagerInstallResult = S7.Core.Abstractions.Commands.StagerInstallResult;
+using ServicesStagerInstallResult = S7.Core.Abstractions.Services.StagerInstallResult;
+
 namespace S7.Core.Commands.Handlers
 {
     /// <summary>
@@ -69,11 +73,11 @@ namespace S7.Core.Commands.Handlers
         /// <param name="options">The stager installation options</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
-        public async Task<CommandResult<StagerInstallResult>> HandleAsync(
+        public async Task<CommandResult<CommandsStagerInstallResult>> HandleAsync(
             StagerInstallOptions options, 
             CancellationToken cancellationToken = default)
         {
-            return await ExecuteAsync<StagerInstallResult>(options, cancellationToken).ConfigureAwait(false);
+            return await ExecuteAsync<CommandsStagerInstallResult>(options, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -181,7 +185,7 @@ namespace S7.Core.Commands.Handlers
             var checksum = CalculateChecksum(payload);
 
             // Create the result
-            var result = new StagerInstallResult
+            var result = new CommandsStagerInstallResult
             {
                 IsInstalled = true,
                 StagerVersion = stagerVersion,

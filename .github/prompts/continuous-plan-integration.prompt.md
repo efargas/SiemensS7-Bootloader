@@ -1,1 +1,1 @@
-@expert-dotnet-software-engineer.chatmode.md @task-implementation.instructions.md @AGENT_IMPLEMENTATION_INSTRUCTIONS.md read carefully the context attached files the instructions and implementation plan to continue implementation tasks.
+@expert-dotnet-software-engineer.chatmode.md @task-implementation.instructions.md @AGENT_IMPLEMENTATION_INSTRUCTIONS.md read carefully the context attached files the instructions and implementation plan agent intructions tracking to continue implementation tasks.
