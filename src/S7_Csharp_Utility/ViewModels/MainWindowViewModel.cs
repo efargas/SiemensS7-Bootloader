@@ -442,9 +442,9 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 else
                 {
-                    Logging.Log($"❌ Exploit sequence failed: {result.ErrorMessage}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Exploit Sequence Failed", 
-                        result.ErrorMessage ?? "Unknown error occurred during exploit sequence");
+                    Logging.Log($"❌ Exploit sequence failed: {result.Error.Message}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Exploit Sequence Failed",
+                    result.Error.Message ?? "Unknown error occurred during exploit sequence");
                 }
             }
             catch (InvalidOperationException ex)
@@ -542,15 +542,15 @@ namespace S7_Csharp_Utility.ViewModels
                         }
                         else
                         {
-                            Logging.Log($"❌ Failed to save memory dump: {saveResult.ErrorMessage}", LogCategory.Error);
-                            await _dialogService.ShowMessageAsync("Save Error", $"Failed to save memory dump: {saveResult.ErrorMessage}");
+                            Logging.Log($"❌ Failed to save memory dump: {saveResult.Error.Message}", LogCategory.Error);
+                            await _dialogService.ShowMessageAsync("Save Error", $"Failed to save memory dump: {saveResult.Error.Message}");
                         }
                     }
                     else
                     {
-                        Logging.Log($"❌ Memory dump failed: {result.ErrorMessage}", LogCategory.Error);
+                        Logging.Log($"❌ Memory dump failed: {result.Error.Message}", LogCategory.Error);
                         await _dialogService.ShowMessageAsync("Memory Dump Failed", 
-                            result.ErrorMessage ?? "Unknown error occurred during memory dump");
+                            result.Error.Message ?? "Unknown error occurred during memory dump");
                     }
                 }
                 catch (OperationCanceledException)
@@ -847,9 +847,9 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 else
                 {
-                    Logging.Log($"❌ Payload scan failed: {result.ErrorMessage}", LogCategory.Error);
+                    Logging.Log($"❌ Payload scan failed: {result.Error.Message}", LogCategory.Error);
                     await _dialogService.ShowMessageAsync("Payload Scan Failed", 
-                        result.ErrorMessage ?? "Unknown error occurred during payload scan");
+                        result.Error.Message ?? "Unknown error occurred during payload scan");
                 }
             }
             catch (OperationCanceledException)

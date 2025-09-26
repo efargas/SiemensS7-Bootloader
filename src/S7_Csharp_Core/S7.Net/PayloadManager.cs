@@ -17,6 +17,8 @@ namespace S7.Net
         public string RelativePath { get; set; } = string.Empty;
         public long Size { get; set; }
         public string Type { get; set; } = string.Empty;
+        public DateTime LastModified { get; set; }
+        public string Description { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -83,7 +85,9 @@ namespace S7.Net
                                     FilePath = file,
                                     RelativePath = relativePath,
                                     Size = fileInfo.Length,
-                                    Type = DeterminePayloadType(file)
+                                    Type = DeterminePayloadType(file),
+                                    LastModified = fileInfo.LastWriteTime,
+                                    Description = GenerateDescription(file, fileInfo)
                                 });
                             }
                         }
@@ -181,6 +185,25 @@ namespace S7.Net
                 return "Binary";
 
             return "Unknown";
+        }
+
+        /// <summary>
+        /// Generates a description for the payload based on its type and properties.
+        /// </summary>
+        private static string GenerateDescription(string filePath, FileInfo fileInfo)
+        {
+            var type = DeterminePayloadType(filePath);
+            var sizeKb = fileInfo.Length / 1024.0;
+
+            return type switch
+            {
+                "Stager" => $"Bootloader stager payload ({sizeKb:F1} KB)",
+                "Memory Dumper" => $"Memory dump utility ({sizeKb:F1} KB)",
+                "Hello World" => $"Hello World demo payload ({sizeKb:F1} KB)",
+                "Tic Tac Toe" => $"Tic Tac Toe game payload ({sizeKb:F1} KB)",
+                "Binary" => $"Binary payload ({sizeKb:F1} KB)",
+                _ => $"Unknown payload type ({sizeKb:F1} KB)"
+            };
         }
 
         /// <summary>

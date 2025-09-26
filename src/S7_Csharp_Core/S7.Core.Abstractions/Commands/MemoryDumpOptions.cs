@@ -19,6 +19,15 @@ namespace S7.Core.Abstractions.Commands
         public uint Address { get; set; }
 
         /// <summary>
+        /// Gets or sets the starting memory address for the dump operation (alias for Address).
+        /// </summary>
+        public uint StartAddress 
+        { 
+            get => Address; 
+            set => Address = value; 
+        }
+
+        /// <summary>
         /// Gets or sets the length of memory to dump in bytes.
         /// </summary>
         [Required(ErrorMessage = "Memory length is required")]
@@ -81,6 +90,11 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets a value indicating whether to verify the dump after completion.
         /// </summary>
         public bool VerifyDump { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to validate checksums during the dump operation.
+        /// </summary>
+        public bool ValidateChecksum { get; set; } = true;
 
         /// <summary>
         /// Gets or sets the maximum number of retry attempts for failed read operations.
