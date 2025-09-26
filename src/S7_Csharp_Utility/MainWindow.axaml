@@ -106,9 +106,29 @@
                             <TextBlock Text="{DynamicResource SelectRegionLabel}" Classes="LabelText" />
                             <ComboBox Name="RegionComboBox" ItemsSource="{Binding MemoryRegions}" SelectedItem="{Binding SelectedMemoryRegion, Mode=TwoWay}" DisplayMemberBinding="{Binding Name}" HorizontalAlignment="Stretch" />
                             <TextBlock Text="{DynamicResource AddressLabel}" Classes="LabelText" />
-                            <TextBox Name="DumpAddressTextBox" Text="{Binding DumpAddress, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                            <StackPanel>
+                                <TextBox Name="DumpAddressTextBox" 
+                                         Text="{Binding DumpAddress, Mode=TwoWay}" 
+                                         HorizontalAlignment="Stretch"
+                                         Watermark="Enter hex address (e.g., 0x691E28)" />
+                                <TextBlock Text="{Binding (Validation.Errors)[0].ErrorContent, ElementName=DumpAddressTextBox}"
+                                           Foreground="Red"
+                                           FontSize="11"
+                                           Margin="0,2,0,0"
+                                           IsVisible="{Binding (Validation.HasErrors), ElementName=DumpAddressTextBox}" />
+                            </StackPanel>
                             <TextBlock Text="{DynamicResource LengthLabel}" Classes="LabelText" />
-                            <TextBox Name="DumpLengthTextBox" Text="{Binding DumpLength, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                            <StackPanel>
+                                <TextBox Name="DumpLengthTextBox" 
+                                         Text="{Binding DumpLength, Mode=TwoWay}" 
+                                         HorizontalAlignment="Stretch"
+                                         Watermark="Enter number of bytes to dump" />
+                                <TextBlock Text="{Binding (Validation.Errors)[0].ErrorContent, ElementName=DumpLengthTextBox}"
+                                           Foreground="Red"
+                                           FontSize="11"
+                                           Margin="0,2,0,0"
+                                           IsVisible="{Binding (Validation.HasErrors), ElementName=DumpLengthTextBox}" />
+                            </StackPanel>
                             
                             <Border Classes="InfoPanel" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
                                 <StackPanel>
@@ -132,6 +152,27 @@
                                     <TextBlock Name="DumpSpeedLabel" 
                                                Text="{Binding DumpProgressSpeed}" 
                                                HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                            
+                            <!-- Validation Summary -->
+                            <Border Background="#2D1B69" 
+                                    BorderBrush="Red" 
+                                    BorderThickness="1" 
+                                    CornerRadius="4" 
+                                    Padding="8" 
+                                    Margin="0,8,0,8"
+                                    IsVisible="{Binding HasValidationErrors}">
+                                <StackPanel>
+                                    <TextBlock Text="⚠️ Validation Errors" 
+                                               Foreground="Red" 
+                                               FontWeight="Bold" 
+                                               FontSize="12" 
+                                               Margin="0,0,0,4" />
+                                    <TextBlock Text="{Binding ValidationSummary}" 
+                                               Foreground="Red" 
+                                               FontSize="11" 
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
                             

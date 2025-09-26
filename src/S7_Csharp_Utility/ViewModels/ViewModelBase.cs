@@ -133,6 +133,7 @@ namespace S7_Csharp_Utility.ViewModels
             }
 
             ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+            OnValidationChanged();
         }
 
         /// <summary>
@@ -205,6 +206,14 @@ namespace S7_Csharp_Utility.ViewModels
             field = value;
             OnPropertyChanged(propertyName);
             return true;
+        }
+
+        /// <summary>
+        /// Called when validation state changes. Override in derived classes to handle validation changes.
+        /// </summary>
+        protected virtual void OnValidationChanged()
+        {
+            // Base implementation does nothing - override in derived classes
         }
     }
 }

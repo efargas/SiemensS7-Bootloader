@@ -176,6 +176,20 @@ namespace S7_Csharp_Utility.ViewModels
             set => SetProperty(ref _isScanning, value);
         }
 
+        private string _validationSummary = string.Empty;
+        public string ValidationSummary
+        {
+            get => _validationSummary;
+            set => SetProperty(ref _validationSummary, value);
+        }
+
+        private bool _hasValidationErrors;
+        public bool HasValidationErrors
+        {
+            get => _hasValidationErrors;
+            set => SetProperty(ref _hasValidationErrors, value);
+        }
+
         public ICommand LoadProfileCommand { get; }
         public ICommand StartExploitSequenceCommand { get; }
         public ICommand DumpMemoryCommand { get; }
@@ -749,6 +763,36 @@ namespace S7_Csharp_Utility.ViewModels
         private static string FormatTime(TimeSpan timeSpan)
         {
             return $"{(int)timeSpan.TotalHours:D2}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}";
+        }
+
+        /// <summary>
+        /// Updates validation summary when validation state changes.
+        /// </summary>
+        protected override void OnValidationChanged()
+        {
+            base.OnValidationChanged();
+            
+            var allErrors = new List<string>();
+            
+            // Collect all validation errors from all properties
+            var propertyNames = new[] { nameof(DumpAddress), nameof(DumpLength) };
+            foreach (var propertyName in propertyNames)
+            {
+                var errors = GetErrors(propertyName);
+                if (errors != null)
+                {
+                    foreach (string error in errors)
+                    {
+                        allErrors.Add(error);
+                    }
+                }
+            }
+            
+            // Update validation summary properties
+            HasValidationErrors = allErrors.Any();
+            ValidationSummary = HasValidationErrors 
+                ? $"⚠️ {allErrors.Count} validation error(s): {string.Join("; ", allErrors)}"
+                : string.Empty;
         }
 
         private void StartScanPayloads()
