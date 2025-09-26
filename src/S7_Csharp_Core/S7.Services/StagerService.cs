@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using S7.Core.Abstractions.Services;
 using S7.Core.Abstractions.Commands;
 using S7.Utils;
+using CommandInstallationPerformanceMetrics = S7.Core.Abstractions.Commands.InstallationPerformanceMetrics;
 
 namespace S7.Services
 {
@@ -25,7 +26,7 @@ namespace S7.Services
         {
             ArgumentNullException.ThrowIfNull(options);
             
-            _logger.LogInformation("Starting stager installation at address 0x{Address:X8}", options.InstallAddress);
+            _logger.LogInformation("Starting stager installation at address 0x{Address:X8}", options.TargetAddress ?? 0);
             
             try
             {
@@ -73,18 +74,30 @@ namespace S7.Services
                 var duration = DateTime.UtcNow - startTime;
                 var checksum = ComputeChecksum(new byte[totalBytes]);
                 
-                var performanceMetrics = new InstallationPerformanceMetrics(
-                    HandshakeTime: TimeSpan.FromMilliseconds(100),
-                    PayloadTransferTime: TimeSpan.FromMilliseconds(2000),
-                    VerificationTime: TimeSpan.FromMilliseconds(300),
-                    PowerCycleTime: TimeSpan.FromMilliseconds(100),
-                    RetryAttempts: 0,
-                    AverageTransferSpeed: totalBytes / duration.TotalSeconds,
-                    TotalBytesTransferred: totalBytes);
+                var commandPerformanceMetrics = new CommandInstallationPerformanceMetrics
+                {
+                    HandshakeTime = TimeSpan.FromMilliseconds(100),
+                    PayloadTransferTime = TimeSpan.FromMilliseconds(2000),
+                    VerificationTime = TimeSpan.FromMilliseconds(300),
+                    PowerCycleTime = TimeSpan.FromMilliseconds(100),
+                    RetryAttempts = 0,
+                    AverageTransferSpeed = totalBytes / duration.TotalSeconds,
+                    TotalBytesTransferred = totalBytes
+                };
+                
+                // Convert to Services version
+                var performanceMetrics = new S7.Core.Abstractions.Services.InstallationPerformanceMetrics(
+                    HandshakeTime: commandPerformanceMetrics.HandshakeTime,
+                    PayloadTransferTime: commandPerformanceMetrics.PayloadTransferTime,
+                    VerificationTime: commandPerformanceMetrics.VerificationTime,
+                    PowerCycleTime: commandPerformanceMetrics.PowerCycleTime,
+                    RetryAttempts: commandPerformanceMetrics.RetryAttempts,
+                    AverageTransferSpeed: commandPerformanceMetrics.AverageTransferSpeed,
+                    TotalBytesTransferred: commandPerformanceMetrics.TotalBytesTransferred);
                 
                 var result = new S7.Core.Abstractions.Services.StagerInstallResult(
                     IsInstalled: true,
-                    InstallationAddress: options.InstallAddress,
+                    InstallationAddress: options.TargetAddress ?? 0,
                     StagerVersion: "1.0.0",
                     StagerSize: totalBytes,
                     Duration: duration,
@@ -95,7 +108,7 @@ namespace S7.Services
                     Warnings: null);
                 
                 _logger.LogInformation("Stager installation completed successfully at address 0x{Address:X8}", 
-                    options.InstallAddress);
+                    options.TargetAddress ?? 0);
                 
                 return Result<S7.Core.Abstractions.Services.StagerInstallResult>.Success(result);
             }
@@ -324,7 +337,7 @@ namespace S7.Services
             
             var errors = new List<string>();
             
-            if (options.InstallAddress == 0)
+            if (options.TargetAddress == 0)
                 errors.Add("Install address cannot be zero");
             
             if (string.IsNullOrEmpty(options.PayloadPath))

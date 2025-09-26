@@ -367,7 +367,7 @@ namespace S7.Services
             {
                 var loadResult = await LoadPayloadAsync(payloadPath, new PayloadLoadOptions { CachePayload = true }, cancellationToken);
                 if (!loadResult.IsSuccess)
-                    return Result<PayloadCacheResult>.Failure(loadResult.ErrorMessage);
+                    return Result<PayloadCacheResult>.Failure(loadResult.Error.Message);
                 
                 var cacheKey = ComputeChecksum(System.Text.Encoding.UTF8.GetBytes(payloadPath));
                 var result = new PayloadCacheResult(

@@ -118,7 +118,7 @@ namespace S7.Services
             try
             {
                 var actualChecksum = ComputeChecksum(dumpData);
-                var checksumMatch = string.IsNullOrEmpty(expectedChecksum) ? null : actualChecksum == expectedChecksum;
+                var checksumMatch = string.IsNullOrEmpty(expectedChecksum) ? (bool?)null : actualChecksum == expectedChecksum;
                 var validationErrors = new List<string>();
                 var validationMetrics = new Dictionary<string, object>
                 {

@@ -55,7 +55,7 @@ namespace S7.Services
                 if (!validationResult.IsSuccess)
                 {
                     SetSocatStatus(SocatStatus.Error);
-                    return Result<SocatStartResult>.Failure($"Invalid socat options: {validationResult.ErrorMessage}");
+                    return Result<SocatStartResult>.Failure($"Invalid socat options: {validationResult.Error.Message}");
                 }
 
                 // Simulate socat start for now - this will be implemented properly later
