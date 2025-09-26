@@ -3,13 +3,15 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using NModbus;
+using S7.Core.Abstractions.Services;
+using S7.Core.Abstractions.Configuration;
 
 namespace S7_Csharp_Utility.Services
 {
     /// <summary>
     /// Controls the power supply of the PLC via Modbus.
     /// </summary>
-    public class PowerController : IDisposable
+    public class PowerController : IPowerController, IDisposable
     {
         private readonly Action<string, bool> _log;
         private TcpClient? _client;
@@ -26,14 +28,14 @@ namespace S7_Csharp_Utility.Services
             _log = logger;
         }
 
-        public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default)
+        public async Task ConnectAsync(string host, int port)
         {
             if (IsConnected) return;
             try
             {
                 _log($"Connecting to Modbus host {host}:{port}...", false);
                 _client = new TcpClient();
-                await _client.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
+                await _client.ConnectAsync(host, port).ConfigureAwait(false);
 
                 if (_client.Connected)
                 {
@@ -88,6 +90,46 @@ namespace S7_Csharp_Utility.Services
             {
                 _log($"Error controlling power: {ex.Message}", true);
                 Disconnect(); // Disconnect on error
+            }
+        }
+
+        /// <summary>
+        /// Performs a power cycle operation using the specified configuration.
+        /// </summary>
+        /// <param name="powerConfig">The power controller configuration.</param>
+        /// <param name="cancellationToken">Cancellation token for the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public async Task PowerCycleAsync(PowerControllerConfig powerConfig, CancellationToken cancellationToken = default)
+        {
+            if (!IsConnected)
+            {
+                await ConnectAsync(powerConfig.Host ?? "localhost", powerConfig.Port).ConfigureAwait(false);
+            }
+
+            _log("Starting power cycle operation...", false);
+            
+            try
+            {
+                // Turn power OFF
+                await SetPowerAsync(powerConfig.CoilAddress, false, powerConfig.SlaveId).ConfigureAwait(false);
+                _log($"Power turned OFF, waiting {powerConfig.OffDelayMs}ms...", false);
+                
+                // Wait for off delay
+                await Task.Delay(powerConfig.OffDelayMs, cancellationToken).ConfigureAwait(false);
+                
+                // Turn power ON
+                await SetPowerAsync(powerConfig.CoilAddress, true, powerConfig.SlaveId).ConfigureAwait(false);
+                _log($"Power turned ON, waiting {powerConfig.OnDelayMs}ms...", false);
+                
+                // Wait for on delay
+                await Task.Delay(powerConfig.OnDelayMs, cancellationToken).ConfigureAwait(false);
+                
+                _log("Power cycle operation completed successfully.", false);
+            }
+            catch (Exception ex)
+            {
+                _log($"Error during power cycle operation: {ex.Message}", true);
+                throw;
             }
         }
 

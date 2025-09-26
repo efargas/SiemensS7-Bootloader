@@ -1,5 +1,7 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
+using S7.Core.Abstractions.Configuration;
 
 namespace S7.Core.Abstractions.Services
 {
@@ -34,5 +36,13 @@ namespace S7.Core.Abstractions.Services
         /// <param name="slaveId">The Modbus slave ID.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         Task SetPowerAsync(ushort coil, bool powerOn, byte slaveId);
+
+        /// <summary>
+        /// Performs a power cycle operation using the specified configuration.
+        /// </summary>
+        /// <param name="powerConfig">The power controller configuration.</param>
+        /// <param name="cancellationToken">Cancellation token for the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        Task PowerCycleAsync(PowerControllerConfig powerConfig, CancellationToken cancellationToken = default);
     }
 }

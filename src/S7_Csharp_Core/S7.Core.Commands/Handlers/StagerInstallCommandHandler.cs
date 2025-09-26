@@ -92,7 +92,7 @@ namespace S7.Core.Commands.Handlers
             CancellationToken cancellationToken = default)
         {
             var stopwatch = Stopwatch.StartNew();
-            var performanceMetrics = new InstallationPerformanceMetrics();
+            var performanceMetrics = new S7.Core.Abstractions.Commands.InstallationPerformanceMetrics();
             var warnings = new List<string>();
 
             // Load the stager payload

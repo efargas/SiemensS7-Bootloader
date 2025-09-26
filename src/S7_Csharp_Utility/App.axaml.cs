@@ -72,7 +72,7 @@ namespace S7_Csharp_Utility
             {
                 builder.AddConsole();
                 builder.AddDebug();
-                builder.SetMinimumLevel(LogLevel.Information);
+                builder.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
             });
 
             // Register Resource Management Services
