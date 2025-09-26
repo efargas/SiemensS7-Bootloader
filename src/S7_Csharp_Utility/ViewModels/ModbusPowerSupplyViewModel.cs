@@ -147,29 +147,48 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public ICommand PowerOffCommand { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ModbusPowerSupplyViewModel"/> class.
-        /// </summary>
+        // Initialize commands in constructor
         public ModbusPowerSupplyViewModel(
             IPowerSupplyService powerSupplyService,
             IDialogService dialogService,
             LoggingService loggingService,
-            ILogger<ModbusPowerSupplyViewModel> logger)
+            ILogger<ModbusPowerSupplyViewModel> logger) : base()
         {
             _powerSupplyService = powerSupplyService ?? throw new ArgumentNullException(nameof(powerSupplyService));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+            // Initialize commands
+            ConnectModbusCommand = new AsyncRelayCommand(
+                async _ => await ConnectModbusAsync(),
+                _ => !IsConnected,
+                HandleException);
+
+            DisconnectModbusCommand = new AsyncRelayCommand(
+                async _ => await DisconnectModbusAsync(),
+                _ => IsConnected,
+                HandleException);
+
+            PowerOnCommand = new AsyncRelayCommand(
+                async _ => await SetPowerAsync(true),
+                _ => IsConnected,
+                HandleException);
+
+            PowerOffCommand = new AsyncRelayCommand(
+                async _ => await SetPowerAsync(false),
+                _ => IsConnected,
+                HandleException);
+
+            InitializeViewModel();
+        }
+
+        // Primary constructor initialization
+        private void InitializeViewModel()
+        {
             // Subscribe to power supply service events
             _powerSupplyService.ConnectionStatusChanged += OnConnectionStatusChanged;
             _powerSupplyService.PowerStateChanged += OnPowerStateChanged;
-
-            // Initialize commands with service layer integration
-            ConnectModbusCommand = new AsyncRelayCommand(_ => ConnectModbusAsync(), _ => ModbusStatus != "Connected", HandleException);
-            DisconnectModbusCommand = new AsyncRelayCommand(_ => DisconnectModbusAsync(), _ => ModbusStatus == "Connected", HandleException);
-            PowerOnCommand = new AsyncRelayCommand(_ => SetPowerAsync(true), _ => ModbusStatus == "Connected", HandleException);
-            PowerOffCommand = new AsyncRelayCommand(_ => SetPowerAsync(false), _ => ModbusStatus == "Connected", HandleException);
         }
 
         /// <summary>

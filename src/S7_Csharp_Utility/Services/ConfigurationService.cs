@@ -12,21 +12,13 @@ namespace S7_Csharp_Utility.Services
     /// Service for handling application configuration and device profile management.
     /// Provides methods for saving, loading, and managing configuration files and device profiles.
     /// </summary>
-    public sealed class ConfigurationService
+    public sealed class ConfigurationService()
     {
-        private readonly JsonSerializerOptions _jsonOptions;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ConfigurationService"/> class.
-        /// </summary>
-        public ConfigurationService()
+        private readonly JsonSerializerOptions _jsonOptions = new()
         {
-            _jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-        }
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
 
         /// <summary>
         /// Saves the application configuration to the specified file path.

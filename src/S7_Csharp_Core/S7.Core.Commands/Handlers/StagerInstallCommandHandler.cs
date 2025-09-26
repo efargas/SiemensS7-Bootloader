@@ -25,28 +25,14 @@ namespace S7.Core.Commands.Handlers
     /// <summary>
     /// Command handler for stager installation operations.
     /// </summary>
-    public class StagerInstallCommandHandler : CommandHandler<StagerInstallOptions>, ICommandServiceSetup
+    public class StagerInstallCommandHandler(
+        ILogger<StagerInstallCommandHandler> logger,
+        PayloadManager payloadManager,
+        IPowerController? powerController = null,
+        IValidator<StagerInstallOptions>? validator = null) : CommandHandler<StagerInstallOptions>(logger, validator), ICommandServiceSetup
     {
-        private readonly PayloadManager _payloadManager;
-        private readonly IPowerController? _powerController;
-
-        /// <summary>
-        /// Initializes a new instance of the StagerInstallCommandHandler class.
-        /// </summary>
-        /// <param name="logger">The logger instance</param>
-        /// <param name="payloadManager">The payload manager for handling payloads</param>
-        /// <param name="powerController">The power controller (optional)</param>
-        /// <param name="validator">The optional validator for stager install options</param>
-        public StagerInstallCommandHandler(
-            ILogger<StagerInstallCommandHandler> logger,
-            PayloadManager payloadManager,
-            IPowerController? powerController = null,
-            IValidator<StagerInstallOptions>? validator = null)
-            : base(logger, validator)
-        {
-            _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
-            _powerController = powerController;
-        }
+        private readonly PayloadManager _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
+        private readonly IPowerController? _powerController = powerController;
 
         /// <summary>
         /// Sets up the stager installation command handler dependencies.

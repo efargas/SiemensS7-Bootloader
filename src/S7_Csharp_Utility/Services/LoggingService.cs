@@ -38,17 +38,27 @@ namespace S7_Csharp_Utility.Services
     /// <summary>
     /// Service for handling application logging.
     /// </summary>
-    public class LoggingService : INotifyPropertyChanged
+    public class LoggingService(
+        Dispatcher dispatcher, 
+        ResourceManagerService? resourceManager = null, 
+        string? logsPath = null) : INotifyPropertyChanged
     {
         private readonly object _sync = new object();
         private const int MaxLogLines = 2000;
-        private readonly Dispatcher _dispatcher;
-        private readonly ResourceManagerService? _resourceManager;
-        private string _mainLogFile;
-        private string _logsPath;
+        private readonly Dispatcher _dispatcher = dispatcher;
+        private readonly ResourceManagerService? _resourceManager = resourceManager;
+        private string _mainLogFile = Path.Combine(logsPath ?? Path.Combine(AppContext.BaseDirectory, "logs"), $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+        private string _logsPath = InitializeLogsPath(logsPath);
         private const long MaxLogFileSize = 5 * 1024 * 1024; // 5MB
 
         private readonly ObservableCollection<LogMessage> _allLogMessages = new();
+
+        private static string InitializeLogsPath(string? logsPath)
+        {
+            var path = logsPath ?? Path.Combine(AppContext.BaseDirectory, "logs");
+            Directory.CreateDirectory(path);
+            return path;
+        }
         private bool _filterInfo = true;
         /// <summary>
         /// Indicates whether to display informational messages.
@@ -103,15 +113,15 @@ namespace S7_Csharp_Utility.Services
         /// <summary>
         /// Command to clear the log.
         /// </summary>
-        public System.Windows.Input.ICommand ClearLogCommand { get; }
+        public System.Windows.Input.ICommand ClearLogCommand { get; } = new Commands.RelayCommand(_ => ((LoggingService)_).Clear(), _ => true);
         /// <summary>
         /// Command to export the log to a file.
         /// </summary>
-        public System.Windows.Input.ICommand ExportLogCommand { get; }
+        public System.Windows.Input.ICommand ExportLogCommand { get; } = new Commands.RelayCommand(_ => ((LoggingService)_).ExportLogs(), _ => true);
         /// <summary>
         /// Command to scroll to the end of the log.
         /// </summary>
-        public System.Windows.Input.ICommand ScrollToEndCommand { get; }
+        public System.Windows.Input.ICommand ScrollToEndCommand { get; } = new Commands.RelayCommand(_ => ((LoggingService)_).ForceScrollToEnd(), _ => true);
         /// <summary>
         /// Event triggered to scroll to the end of the log.
         /// </summary>
@@ -124,24 +134,6 @@ namespace S7_Csharp_Utility.Services
         /// Event triggered when a property value changes.
         /// </summary>
         public event PropertyChangedEventHandler? PropertyChanged;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="LoggingService"/> class.
-        /// </summary>
-        /// <param name="dispatcher">The dispatcher to use for UI updates.</param>
-        /// <param name="resourceManager">The resource manager service for localized messages. Optional for backward compatibility.</param>
-        /// <param name="logsPath">The path where log files should be saved. If null, uses default path.</param>
-        public LoggingService(Dispatcher dispatcher, ResourceManagerService? resourceManager = null, string? logsPath = null)
-        {
-            _dispatcher = dispatcher;
-            _resourceManager = resourceManager;
-            _logsPath = logsPath ?? Path.Combine(AppContext.BaseDirectory, "logs");
-            Directory.CreateDirectory(_logsPath);
-            _mainLogFile = Path.Combine(_logsPath, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
-            ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
-            ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
-            ScrollToEndCommand = new Commands.RelayCommand(_ => ForceScrollToEnd(), _ => true);
-        }
 
         /// <summary>
         /// Exports the current log to a text file.

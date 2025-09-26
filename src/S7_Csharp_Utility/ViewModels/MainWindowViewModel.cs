@@ -23,23 +23,37 @@ namespace S7_Csharp_Utility.ViewModels
     /// <summary>
     /// The main view model for the application.
     /// </summary>
-    public class MainWindowViewModel : ViewModelBase
+    public class MainWindowViewModel(
+        LoggingService loggingService,
+        SocatLoggerService socatLoggerService,
+        IDialogService dialogService,
+        ConfigurationService configService,
+        IViewService viewService,
+        PlcConnectionViewModel plcConnectionViewModel,
+        ModbusPowerSupplyViewModel modbusPowerSupplyViewModel,
+        ConfigurationViewModel configurationViewModel,
+        FileCompareViewModel fileCompareViewModel,
+        IPlcOperationService plcOperationService,
+        IMemoryDumpService memoryDumpService,
+        IStagerService stagerService,
+        IPayloadService payloadService,
+        ILogger<MainWindowViewModel> logger) : ViewModelBase
     {
         private const string ConfigFileName = "config.json";
 
-        public PlcConnectionViewModel? PlcConnectionViewModel { get; }
-        public ModbusPowerSupplyViewModel? ModbusPowerSupplyViewModel { get; }
-        public ConfigurationViewModel ConfigurationViewModel { get; }
-        public FileCompareViewModel FileCompareViewModel { get; }
-        public LoggingService Logging { get; }
-        public SocatLoggerService SocatLogging { get; }
+        public PlcConnectionViewModel? PlcConnectionViewModel { get; } = plcConnectionViewModel;
+        public ModbusPowerSupplyViewModel? ModbusPowerSupplyViewModel { get; } = modbusPowerSupplyViewModel;
+        public ConfigurationViewModel ConfigurationViewModel { get; } = configurationViewModel ?? throw new ArgumentNullException(nameof(configurationViewModel));
+        public FileCompareViewModel FileCompareViewModel { get; } = fileCompareViewModel ?? throw new ArgumentNullException(nameof(fileCompareViewModel));
+        public LoggingService Logging { get; } = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+        public SocatLoggerService SocatLogging { get; } = socatLoggerService ?? throw new ArgumentNullException(nameof(socatLoggerService));
         
         // Service layer dependencies
-        private readonly IPlcOperationService _plcOperationService;
-        private readonly IMemoryDumpService _memoryDumpService;
-        private readonly IStagerService _stagerService;
-        private readonly IPayloadService _payloadService;
-        private readonly ILogger<MainWindowViewModel> _logger;
+        private readonly IPlcOperationService _plcOperationService = plcOperationService ?? throw new ArgumentNullException(nameof(plcOperationService));
+        private readonly IMemoryDumpService _memoryDumpService = memoryDumpService ?? throw new ArgumentNullException(nameof(memoryDumpService));
+        private readonly IStagerService _stagerService = stagerService ?? throw new ArgumentNullException(nameof(stagerService));
+        private readonly IPayloadService _payloadService = payloadService ?? throw new ArgumentNullException(nameof(payloadService));
+        private readonly ILogger<MainWindowViewModel> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         private string _dumpAddress = "0x691E28";
         [Required]
@@ -161,8 +175,8 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand ExitCommand { get; }
         public ICommand CancelScanCommand { get; }
 
-        private readonly IDialogService _dialogService;
-        public ConfigurationService ConfigService { get; }
+        private readonly IDialogService _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        public ConfigurationService ConfigService { get; } = configService ?? throw new ArgumentNullException(nameof(configService));
 
         private CancellationTokenSource? _scanCancellationTokenSource;
         private DeviceProfile? _loadedProfile;
@@ -195,41 +209,17 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        public IViewService ViewService { get; }
+        public IViewService ViewService { get; } = viewService ?? throw new ArgumentNullException(nameof(viewService));
 
-        public MainWindowViewModel(
-            LoggingService loggingService,
-            SocatLoggerService socatLoggerService,
-            IDialogService dialogService,
-            ConfigurationService configService,
-            IViewService viewService,
-            PlcConnectionViewModel plcConnectionViewModel,
-            ModbusPowerSupplyViewModel modbusPowerSupplyViewModel,
-            ConfigurationViewModel configurationViewModel,
-            FileCompareViewModel fileCompareViewModel,
-            IPlcOperationService plcOperationService,
-            IMemoryDumpService memoryDumpService,
-            IStagerService stagerService,
-            IPayloadService payloadService,
-            ILogger<MainWindowViewModel> logger)
+        // Primary constructor initialization
+        static MainWindowViewModel()
         {
-            Logging = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
-            SocatLogging = socatLoggerService ?? throw new ArgumentNullException(nameof(socatLoggerService));
-            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
-            ConfigService = configService ?? throw new ArgumentNullException(nameof(configService));
-            ViewService = viewService ?? throw new ArgumentNullException(nameof(viewService));
-            PlcConnectionViewModel = plcConnectionViewModel;
-            ModbusPowerSupplyViewModel = modbusPowerSupplyViewModel;
-            ConfigurationViewModel = configurationViewModel ?? throw new ArgumentNullException(nameof(configurationViewModel));
-            FileCompareViewModel = fileCompareViewModel ?? throw new ArgumentNullException(nameof(fileCompareViewModel));
-            
-            // Service layer dependencies
-            _plcOperationService = plcOperationService ?? throw new ArgumentNullException(nameof(plcOperationService));
-            _memoryDumpService = memoryDumpService ?? throw new ArgumentNullException(nameof(memoryDumpService));
-            _stagerService = stagerService ?? throw new ArgumentNullException(nameof(stagerService));
-            _payloadService = payloadService ?? throw new ArgumentNullException(nameof(payloadService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            // Static constructor for any static initialization if needed
+        }
 
+        // Instance initialization - called automatically after primary constructor
+        private void InitializeCommands()
+        {
             // Subscribe to status change events
             if (PlcConnectionViewModel != null)
             {
@@ -243,20 +233,6 @@ namespace S7_Csharp_Utility.ViewModels
             // Subscribe to service events
             _plcOperationService.ConnectionStatusChanged += OnPlcConnectionStatusChanged;
             _plcOperationService.OperationCompleted += OnPlcOperationCompleted;
-
-            // Initialize commands
-            StartExploitSequenceCommand = new AsyncRelayCommand(_ => StartExploitSequenceAsync(), _ => CanExecuteExploitSequence(), HandleException);
-            DumpMemoryCommand = new AsyncRelayCommand(_ => DumpMemoryAsync(), _ => CanExecuteMemoryDump(), HandleException);
-            CancelDumpCommand = new RelayCommand(_ => CancelDump(), _ => IsDumpingMemory);
-            CancelScanCommand = new RelayCommand(_ => CancelScan(), _ => IsScanning);
-            LoadProfileCommand = new AsyncRelayCommand(_ => LoadProfileAsync(), _ => !IsUploadingStager && !IsDumpingMemory && !IsComparing, HandleException);
-            SaveConfigurationCommand = new AsyncRelayCommand(_ => SaveConfigurationOnExit(), _ => true, HandleException);
-            LoadConfigurationCommand = new AsyncRelayCommand(_ => LoadConfigurationAsync(), _ => true, HandleException);
-
-            ShowProfileManagementCommand = new RelayCommand(_ => ShowProfileManagement());
-            ShowFirmwareUnpackerCommand = new RelayCommand(_ => ShowFirmwareUnpacker());
-            ShowHexViewerCommand = new RelayCommand(_ => ShowHexViewer());
-            ExitCommand = new RelayCommand(_ => Exit());
 
             StartScanPayloads();
         }

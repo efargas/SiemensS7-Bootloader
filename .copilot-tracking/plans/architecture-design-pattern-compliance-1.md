@@ -119,12 +119,12 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-031 | Convert all service classes in `src/S7_Csharp_Core/S7.Services/` to primary constructor syntax | [x] | 2024-12-26 |
 | TASK-032 | Convert all repository classes in `src/S7_Csharp_Core/S7.Infrastructure/Repositories/` to primary constructor syntax | [x] | 2024-12-26 |
 | TASK-033 | Convert all provider classes in `src/S7_Csharp_Core/S7.Infrastructure/Providers/` to primary constructor syntax | [x] | 2024-12-26 |
-| TASK-034 | Convert all command handler classes in `src/S7_Csharp_Core/S7.Core.Commands/Handlers/` to primary constructor syntax | | |
-| TASK-035 | Convert all ViewModel classes in `src/S7_Csharp_Utility/ViewModels/` to primary constructor syntax | | |
-| TASK-036 | Convert utility classes in `src/S7_Csharp_Utility/Services/` to primary constructor syntax | | |
-| TASK-037 | Ensure all primary constructors maintain ArgumentNullException.ThrowIfNull validation | | |
+| TASK-034 | Convert all command handler classes in `src/S7_Csharp_Core/S7.Core.Commands/Handlers/` to primary constructor syntax | [x] | 2024-12-26 |
+| TASK-035 | Convert all ViewModel classes in `src/S7_Csharp_Utility/ViewModels/` to primary constructor syntax | [x] | 2024-12-26 |
+| TASK-036 | Convert utility classes in `src/S7_Csharp_Utility/Services/` to primary constructor syntax | [x] | 2024-12-26 |
+| TASK-037 | Ensure all primary constructors maintain ArgumentNullException.ThrowIfNull validation | [x] | 2024-12-26 |
 | TASK-038 | Update all affected unit tests to work with primary constructor syntax | | |
-| TASK-039 | Validate dependency injection continues to work correctly with primary constructors | | |
+| TASK-039 | Validate dependency injection continues to work correctly with primary constructors | [x] | 2024-12-26 |
 | TASK-040 | Create coding standard documentation for primary constructor usage in project | | |
 
 ### Implementation Phase 5: Data Validation and Configuration
@@ -133,9 +133,9 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-041 | Create custom validation attributes in `src/S7_Csharp_Core/S7.Core.Abstractions/Validation/ValidationAttributes.cs` for hex addresses, file paths, and network endpoints | | |
+| TASK-041 | Create custom validation attributes in `src/S7_Csharp_Core/S7.Core.Abstractions/Validation/ValidationAttributes.cs` for hex addresses, file paths, and network endpoints | [x] | 2024-12-26 |
 | TASK-042 | Add data validation attributes to all command option classes with appropriate error messages | | |
-| TASK-043 | Create strongly-typed configuration classes in `src/S7_Csharp_Core/S7.Core.Abstractions/Configuration/` with validation attributes | | |
+| TASK-043 | Create strongly-typed configuration classes in `src/S7_Csharp_Core/S7.Core.Abstractions/Configuration/` with validation attributes | [x] | 2024-12-26 |
 | TASK-044 | Implement configuration validation service in `src/S7_Csharp_Core/S7.Services/ConfigurationValidationService.cs` | | |
 | TASK-045 | Add input validation to all ViewModel properties that accept user input | | |
 | TASK-046 | Implement validation error handling and user feedback in UI layer | | |

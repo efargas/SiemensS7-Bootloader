@@ -19,24 +19,12 @@ namespace S7.Core.Commands.Handlers
     /// <summary>
     /// Command handler for memory dump operations.
     /// </summary>
-    public class MemoryDumpCommandHandler : CommandHandler<MemoryDumpOptions>, ICommandServiceSetup
+    public class MemoryDumpCommandHandler(
+        ILogger<MemoryDumpCommandHandler> logger,
+        PayloadManager payloadManager,
+        IValidator<MemoryDumpOptions>? validator = null) : CommandHandler<MemoryDumpOptions>(logger, validator), ICommandServiceSetup
     {
-        private readonly PayloadManager _payloadManager;
-
-        /// <summary>
-        /// Initializes a new instance of the MemoryDumpCommandHandler class.
-        /// </summary>
-        /// <param name="logger">The logger instance</param>
-        /// <param name="payloadManager">The payload manager for handling payloads</param>
-        /// <param name="validator">The optional validator for memory dump options</param>
-        public MemoryDumpCommandHandler(
-            ILogger<MemoryDumpCommandHandler> logger,
-            PayloadManager payloadManager,
-            IValidator<MemoryDumpOptions>? validator = null)
-            : base(logger, validator)
-        {
-            _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
-        }
+        private readonly PayloadManager _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
 
         /// <summary>
         /// Sets up the memory dump command handler dependencies.
