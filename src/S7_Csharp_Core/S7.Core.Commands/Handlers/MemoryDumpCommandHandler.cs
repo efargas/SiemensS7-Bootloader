@@ -5,8 +5,11 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S7.Core.Abstractions.Commands;
+using S7.Core.Abstractions.Validation;
 using S7.Net;
 using S7.Net.Interfaces;
 using S7.Net.Channels;
@@ -16,9 +19,8 @@ namespace S7.Core.Commands.Handlers
     /// <summary>
     /// Command handler for memory dump operations.
     /// </summary>
-    public class MemoryDumpCommandHandler : ICommandHandler<MemoryDumpCommand, MemoryDumpResult>
+    public class MemoryDumpCommandHandler : CommandHandler<MemoryDumpOptions>, ICommandServiceSetup
     {
-        private readonly ILogger<MemoryDumpCommandHandler> _logger;
         private readonly PayloadManager _payloadManager;
 
         /// <summary>
@@ -26,179 +28,149 @@ namespace S7.Core.Commands.Handlers
         /// </summary>
         /// <param name="logger">The logger instance</param>
         /// <param name="payloadManager">The payload manager for handling payloads</param>
+        /// <param name="validator">The optional validator for memory dump options</param>
         public MemoryDumpCommandHandler(
             ILogger<MemoryDumpCommandHandler> logger,
-            PayloadManager payloadManager)
+            PayloadManager payloadManager,
+            IValidator<MemoryDumpOptions>? validator = null)
+            : base(logger, validator)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
         }
 
         /// <summary>
-        /// Handles the memory dump command execution.
+        /// Sets up the memory dump command handler dependencies.
         /// </summary>
-        /// <param name="command">The memory dump command to execute</param>
+        /// <param name="services">The service collection</param>
+        public static void SetupServices(IServiceCollection services)
+        {
+            // Register any specific dependencies for memory dump operations
+            services.AddTransient<MemoryDumpCommandHandler>();
+            
+            // Register payload manager if not already registered
+            services.AddSingleton<PayloadManager>();
+            
+            // Register memory dump specific validator if needed
+            // services.AddTransient<IValidator<MemoryDumpOptions>, MemoryDumpOptionsValidator>();
+        }
+
+        /// <summary>
+        /// Handles the memory dump command execution using the new options-based approach.
+        /// </summary>
+        /// <param name="options">The memory dump options</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
         public async Task<CommandResult<MemoryDumpResult>> HandleAsync(
-            MemoryDumpCommand command, 
+            MemoryDumpOptions options, 
             CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(command);
+            return await ExecuteAsync<MemoryDumpResult>(options, cancellationToken).ConfigureAwait(false);
+        }
 
-            _logger.LogInformation("Starting memory dump operation. CorrelationId: {CorrelationId}, Address: 0x{Address:X8}, Length: {Length} bytes",
-                command.CorrelationId, command.Address, command.Length);
-
+        /// <summary>
+        /// Executes the memory dump operation internally.
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="options">The memory dump options</param>
+        /// <param name="cancellationToken">Cancellation token for the operation</param>
+        /// <returns>A task representing the command execution result</returns>
+        protected override async Task<TResult> ExecuteInternalAsync<TResult>(
+            MemoryDumpOptions options, 
+            CancellationToken cancellationToken = default)
+        {
             var stopwatch = Stopwatch.StartNew();
             var performanceMetrics = new DumpPerformanceMetrics();
 
-            try
+            // Create PLC client with the specified configuration
+            using var plcClient = CreatePlcClient(options.ChannelConfig);
+
+            // Perform handshake if requested
+            if (options.PerformHandshake)
             {
-                // Validate command parameters
-                var validationResult = ValidateCommand(command);
-                if (!validationResult.IsValid)
-                {
-                    _logger.LogWarning("Memory dump command validation failed. CorrelationId: {CorrelationId}, Errors: {Errors}",
-                        command.CorrelationId, string.Join(", ", validationResult.Errors));
-                    return CommandResult<MemoryDumpResult>.ValidationFailure(validationResult.Errors, command.CorrelationId);
-                }
-
-                // Create PLC client with the specified configuration
-                using var plcClient = CreatePlcClient(command.ChannelConfig);
-
-                // Perform handshake if requested
-                if (command.PerformHandshake)
-                {
-                    var handshakeStart = Stopwatch.StartNew();
-                    _logger.LogInformation("Performing handshake. CorrelationId: {CorrelationId}", command.CorrelationId);
-                    
-                    await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
-                    handshakeStart.Stop();
-                    performanceMetrics = performanceMetrics with { HandshakeTime = handshakeStart.Elapsed };
-                    
-                    _logger.LogInformation("Handshake completed in {Duration}ms. CorrelationId: {CorrelationId}",
-                        handshakeStart.ElapsedMilliseconds, command.CorrelationId);
-                }
-
-                // Load the payload
-                _logger.LogInformation("Loading payload from {PayloadPath}. CorrelationId: {CorrelationId}",
-                    command.PayloadPath, command.CorrelationId);
+                var handshakeStart = Stopwatch.StartNew();
+                Logger.LogInformation("Performing handshake. CorrelationId: {CorrelationId}", options.CorrelationId);
                 
-                var payload = await _payloadManager.LoadPayloadAsync(command.PayloadPath, cancellationToken).ConfigureAwait(false);
-
-                // Perform the memory dump
-                var transferStart = Stopwatch.StartNew();
-                var dumpData = await PerformMemoryDumpAsync(plcClient, command, payload, cancellationToken).ConfigureAwait(false);
-                transferStart.Stop();
-
-                // Calculate performance metrics
-                var readOperations = (int)Math.Ceiling((double)command.Length / command.ChunkSize);
-                var averageSpeed = command.Length / transferStart.Elapsed.TotalSeconds;
+                await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
+                handshakeStart.Stop();
+                performanceMetrics = performanceMetrics with { HandshakeTime = handshakeStart.Elapsed };
                 
-                performanceMetrics = performanceMetrics with 
-                { 
-                    DataTransferTime = transferStart.Elapsed,
-                    ReadOperations = readOperations,
-                    AverageReadSpeed = averageSpeed
-                };
-
-                // Generate output filename
-                var outputFilename = GenerateOutputFilename(command);
-                var outputPath = Path.Combine(command.OutputPath, outputFilename);
-
-                // Ensure output directory exists
-                Directory.CreateDirectory(command.OutputPath);
-
-                // Save the dump data
-                await File.WriteAllBytesAsync(outputPath, dumpData, cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("Memory dump saved to {OutputPath}. CorrelationId: {CorrelationId}",
-                    outputPath, command.CorrelationId);
-
-                // Verify the dump if requested
-                string? checksum = null;
-                bool isVerified = false;
-                if (command.VerifyDump)
-                {
-                    var verificationStart = Stopwatch.StartNew();
-                    checksum = CalculateChecksum(dumpData);
-                    isVerified = await VerifyDumpAsync(plcClient, command, dumpData, cancellationToken).ConfigureAwait(false);
-                    verificationStart.Stop();
-                    
-                    performanceMetrics = performanceMetrics with { VerificationTime = verificationStart.Elapsed };
-                    
-                    _logger.LogInformation("Dump verification completed. Verified: {IsVerified}, Checksum: {Checksum}. CorrelationId: {CorrelationId}",
-                        isVerified, checksum, command.CorrelationId);
-                }
-
-                stopwatch.Stop();
-
-                // Create the result
-                var result = new MemoryDumpResult
-                {
-                    DumpFilePath = outputPath,
-                    BytesDumped = (uint)dumpData.Length,
-                    StartAddress = command.Address,
-                    EndAddress = command.Address + command.Length - 1,
-                    Duration = stopwatch.Elapsed,
-                    Checksum = checksum,
-                    IsVerified = isVerified,
-                    Metadata = command.Metadata,
-                    PerformanceMetrics = performanceMetrics
-                };
-
-                _logger.LogInformation("Memory dump completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
-                    stopwatch.ElapsedMilliseconds, command.CorrelationId);
-
-                return CommandResult<MemoryDumpResult>.Success(result, command.CorrelationId);
+                Logger.LogInformation("Handshake completed in {Duration}ms. CorrelationId: {CorrelationId}",
+                    handshakeStart.ElapsedMilliseconds, options.CorrelationId);
             }
-            catch (OperationCanceledException)
+
+            // Load the payload
+            Logger.LogInformation("Loading payload from {PayloadPath}. CorrelationId: {CorrelationId}",
+                options.PayloadPath, options.CorrelationId);
+            
+            var payload = await _payloadManager.LoadPayloadAsync(options.PayloadPath, cancellationToken).ConfigureAwait(false);
+
+            // Perform the memory dump
+            var transferStart = Stopwatch.StartNew();
+            var dumpData = await PerformMemoryDumpAsync(plcClient, options, payload, cancellationToken).ConfigureAwait(false);
+            transferStart.Stop();
+
+            // Calculate performance metrics
+            var readOperations = (int)Math.Ceiling((double)options.Length / options.ChunkSize);
+            var averageSpeed = options.Length / transferStart.Elapsed.TotalSeconds;
+            
+            performanceMetrics = performanceMetrics with 
+            { 
+                DataTransferTime = transferStart.Elapsed,
+                ReadOperations = readOperations,
+                AverageReadSpeed = averageSpeed
+            };
+
+            // Generate output filename
+            var outputFilename = GenerateOutputFilename(options);
+            var outputPath = Path.Combine(options.OutputPath, outputFilename);
+
+            // Ensure output directory exists
+            Directory.CreateDirectory(options.OutputPath);
+
+            // Save the dump data
+            await File.WriteAllBytesAsync(outputPath, dumpData, cancellationToken).ConfigureAwait(false);
+            Logger.LogInformation("Memory dump saved to {OutputPath}. CorrelationId: {CorrelationId}",
+                outputPath, options.CorrelationId);
+
+            // Verify the dump if requested
+            string? checksum = null;
+            bool isVerified = false;
+            if (options.VerifyDump)
             {
-                _logger.LogInformation("Memory dump operation was cancelled. CorrelationId: {CorrelationId}", command.CorrelationId);
-                return CommandResult<MemoryDumpResult>.Failure("Operation was cancelled", command.CorrelationId);
+                var verificationStart = Stopwatch.StartNew();
+                checksum = CalculateChecksum(dumpData);
+                isVerified = await VerifyDumpAsync(plcClient, options, dumpData, cancellationToken).ConfigureAwait(false);
+                verificationStart.Stop();
+                
+                performanceMetrics = performanceMetrics with { VerificationTime = verificationStart.Elapsed };
+                
+                Logger.LogInformation("Dump verification completed. Verified: {IsVerified}, Checksum: {Checksum}. CorrelationId: {CorrelationId}",
+                    isVerified, checksum, options.CorrelationId);
             }
-            catch (Exception ex)
+
+            stopwatch.Stop();
+
+            // Create the result
+            var result = new MemoryDumpResult
             {
-                stopwatch.Stop();
-                _logger.LogError(ex, "Memory dump operation failed after {Duration}ms. CorrelationId: {CorrelationId}",
-                    stopwatch.ElapsedMilliseconds, command.CorrelationId);
-                return CommandResult<MemoryDumpResult>.FromException(ex, command.CorrelationId);
-            }
+                DumpFilePath = outputPath,
+                BytesDumped = (uint)dumpData.Length,
+                StartAddress = options.Address,
+                EndAddress = options.Address + options.Length - 1,
+                Duration = stopwatch.Elapsed,
+                Checksum = checksum,
+                IsVerified = isVerified,
+                Metadata = options.Metadata.ContainsKey("metadata") ? options.Metadata["metadata"]?.ToString() : null,
+                PerformanceMetrics = performanceMetrics
+            };
+
+            Logger.LogInformation("Memory dump completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
+                stopwatch.ElapsedMilliseconds, options.CorrelationId);
+
+            return (TResult)(object)result;
         }
 
-        private Abstractions.Validation.ValidationResult ValidateCommand(MemoryDumpCommand command)
-        {
-            var errors = new List<string>();
-
-            if (command.Address > uint.MaxValue - command.Length)
-                errors.Add("Address + Length would overflow");
-
-            if (!File.Exists(command.PayloadPath))
-                errors.Add($"Payload file not found: {command.PayloadPath}");
-
-            if (!Directory.Exists(command.OutputPath))
-            {
-                try
-                {
-                    Directory.CreateDirectory(command.OutputPath);
-                }
-                catch (Exception ex)
-                {
-                    errors.Add($"Cannot create output directory: {ex.Message}");
-                }
-            }
-
-            if (!command.OverwriteExisting && !string.IsNullOrEmpty(command.CustomFilename))
-            {
-                var outputPath = Path.Combine(command.OutputPath, command.CustomFilename);
-                if (File.Exists(outputPath))
-                    errors.Add($"Output file already exists and overwrite is disabled: {outputPath}");
-            }
-
-            return errors.Count > 0 
-                ? Abstractions.Validation.ValidationResult.Failure(errors)
-                : Abstractions.Validation.ValidationResult.Success();
-        }
-
+        
         private PlcClient CreatePlcClient(Abstractions.Configuration.CommunicationChannelConfig config)
         {
             // Create communication channel based on configuration
@@ -210,26 +182,26 @@ namespace S7.Core.Commands.Handlers
             };
 
             // Create logger action for PlcClient
-            Action<string> logger = message => _logger.LogDebug("{Message}", message);
+            Action<string> logger = message => Logger.LogDebug("{Message}", message);
 
             return new PlcClient(channel, logger);
         }
 
         private async Task<byte[]> PerformMemoryDumpAsync(
             PlcClient plcClient, 
-            MemoryDumpCommand command, 
+            MemoryDumpOptions options, 
             byte[] payload, 
             CancellationToken cancellationToken)
         {
-            var dumpData = new byte[command.Length];
+            var dumpData = new byte[options.Length];
             var bytesRead = 0u;
-            var currentAddress = command.Address;
+            var currentAddress = options.Address;
 
-            while (bytesRead < command.Length)
+            while (bytesRead < options.Length)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var chunkSize = Math.Min(command.ChunkSize, command.Length - bytesRead);
+                var chunkSize = Math.Min(options.ChunkSize, options.Length - bytesRead);
                 
                 // Read memory chunk (simplified - actual implementation would use PLC client methods)
                 var chunk = new byte[chunkSize];
@@ -241,24 +213,24 @@ namespace S7.Core.Commands.Handlers
                 currentAddress += chunkSize;
 
                 // Log progress periodically
-                if (bytesRead % (command.ChunkSize * 10) == 0 || bytesRead == command.Length)
+                if (bytesRead % options.ProgressReportingInterval == 0 || bytesRead == options.Length)
                 {
-                    var progress = (double)bytesRead / command.Length * 100;
-                    _logger.LogDebug("Memory dump progress: {Progress:F1}% ({BytesRead}/{TotalBytes} bytes). CorrelationId: {CorrelationId}",
-                        progress, bytesRead, command.Length, command.CorrelationId);
+                    var progress = (double)bytesRead / options.Length * 100;
+                    Logger.LogDebug("Memory dump progress: {Progress:F1}% ({BytesRead}/{TotalBytes} bytes). CorrelationId: {CorrelationId}",
+                        progress, bytesRead, options.Length, options.CorrelationId);
                 }
             }
 
             return dumpData;
         }
 
-        private string GenerateOutputFilename(MemoryDumpCommand command)
+        private string GenerateOutputFilename(MemoryDumpOptions options)
         {
-            if (!string.IsNullOrEmpty(command.CustomFilename))
-                return command.CustomFilename;
+            if (!string.IsNullOrEmpty(options.CustomFilename))
+                return options.CustomFilename;
 
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            return $"memdump_0x{command.Address:X8}_{command.Length}bytes_{timestamp}.bin";
+            return $"memdump_0x{options.Address:X8}_{options.Length}bytes_{timestamp}.bin";
         }
 
         private string CalculateChecksum(byte[] data)
@@ -270,7 +242,7 @@ namespace S7.Core.Commands.Handlers
 
         private async Task<bool> VerifyDumpAsync(
             PlcClient plcClient, 
-            MemoryDumpCommand command, 
+            MemoryDumpOptions options, 
             byte[] dumpData, 
             CancellationToken cancellationToken)
         {
@@ -282,7 +254,7 @@ namespace S7.Core.Commands.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Dump verification failed. CorrelationId: {CorrelationId}", command.CorrelationId);
+                Logger.LogWarning(ex, "Dump verification failed. CorrelationId: {CorrelationId}", options.CorrelationId);
                 return false;
             }
         }

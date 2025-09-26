@@ -65,14 +65,14 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Create CommandHandlerOptions base class in `src/S7_Csharp_Core/S7.Core.Abstractions/Commands/CommandHandlerOptions.cs` with CorrelationId, CancellationToken, and Metadata properties | | |
-| TASK-002 | Implement generic CommandHandler<TOptions> base class in `src/S7_Csharp_Core/S7.Core.Abstractions/Commands/CommandHandlerBase.cs` with validation, logging, and exception handling | | |
-| TASK-003 | Create ICommandSetup interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Commands/ICommandSetup.cs` defining static SetupCommand(IHost host) method contract | | |
-| TASK-004 | Refactor MemoryDumpCommandHandler in `src/S7_Csharp_Core/S7.Core.Commands/Handlers/MemoryDumpCommandHandler.cs` to inherit from CommandHandler<MemoryDumpOptions> | | |
-| TASK-005 | Refactor StagerInstallCommandHandler in `src/S7_Csharp_Core/S7.Core.Commands/Handlers/StagerInstallCommandHandler.cs` to inherit from CommandHandler<StagerInstallOptions> | | |
-| TASK-006 | Create MemoryDumpOptions class inheriting from CommandHandlerOptions with data validation attributes | | |
-| TASK-007 | Create StagerInstallOptions class inheriting from CommandHandlerOptions with data validation attributes | | |
-| TASK-008 | Implement static SetupCommand methods in all command handlers for dependency registration | | |
+| TASK-001 | Create CommandHandlerOptions base class in `src/S7_Csharp_Core/S7.Core.Abstractions/Commands/CommandHandlerOptions.cs` with CorrelationId, CancellationToken, and Metadata properties | [x] | 2024-12-19 |
+| TASK-002 | Implement generic CommandHandler<TOptions> base class in `src/S7_Csharp_Core/S7.Core.Abstractions/Commands/CommandHandlerBase.cs` with validation, logging, and exception handling | [x] | 2024-12-19 |
+| TASK-003 | Create ICommandSetup interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Commands/ICommandSetup.cs` defining static SetupCommand(IHost host) method contract | [x] | 2024-12-19 |
+| TASK-004 | Refactor MemoryDumpCommandHandler in `src/S7_Csharp_Core/S7.Core.Commands/Handlers/MemoryDumpCommandHandler.cs` to inherit from CommandHandler<MemoryDumpOptions> | [x] | 2024-12-19 |
+| TASK-005 | Refactor StagerInstallCommandHandler in `src/S7_Csharp_Core/S7.Core.Commands/Handlers/StagerInstallCommandHandler.cs` to inherit from CommandHandler<StagerInstallOptions> | [x] | 2024-12-19 |
+| TASK-006 | Create MemoryDumpOptions class inheriting from CommandHandlerOptions with data validation attributes | [x] | 2024-12-19 |
+| TASK-007 | Create StagerInstallOptions class inheriting from CommandHandlerOptions with data validation attributes | [x] | 2024-12-19 |
+| TASK-008 | Implement static SetupCommand methods in all command handlers for dependency registration | [x] | 2024-12-19 |
 | TASK-009 | Add comprehensive unit tests for CommandHandlerBase in `tests/S7.Core.Tests/Commands/CommandHandlerBaseTests.cs` | | |
 | TASK-010 | Validate all existing command handler tests pass with new base class implementation | | |
 
@@ -82,7 +82,7 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-011 | Create IPlcOperationService interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Services/IPlcOperationService.cs` with ExecuteExploitSequenceAsync and related methods | | |
+| TASK-011 | Create IPlcOperationService interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Services/IPlcOperationService.cs` with ExecuteExploitSequenceAsync and related methods | [x] | 2024-12-19 |
 | TASK-012 | Create IMemoryDumpService interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Services/IMemoryDumpService.cs` with DumpMemoryAsync and validation methods | | |
 | TASK-013 | Create IStagerService interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Services/IStagerService.cs` with InstallStagerAsync and verification methods | | |
 | TASK-014 | Create IPayloadService interface in `src/S7_Csharp_Core/S7.Core.Abstractions/Services/IPayloadService.cs` with ScanPayloadsAsync and loading methods | | |

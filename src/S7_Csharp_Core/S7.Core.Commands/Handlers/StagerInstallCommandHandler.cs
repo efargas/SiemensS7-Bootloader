@@ -6,9 +6,12 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using S7.Core.Abstractions.Commands;
 using S7.Core.Abstractions.Services;
+using S7.Core.Abstractions.Validation;
 using S7.Net;
 using S7.Net.Interfaces;
 using S7.Net.Channels;
@@ -18,9 +21,8 @@ namespace S7.Core.Commands.Handlers
     /// <summary>
     /// Command handler for stager installation operations.
     /// </summary>
-    public class StagerInstallCommandHandler : ICommandHandler<StagerInstallCommand, StagerInstallResult>
+    public class StagerInstallCommandHandler : CommandHandler<StagerInstallOptions>, ICommandServiceSetup
     {
-        private readonly ILogger<StagerInstallCommandHandler> _logger;
         private readonly PayloadManager _payloadManager;
         private readonly IPowerController? _powerController;
 
@@ -30,187 +32,173 @@ namespace S7.Core.Commands.Handlers
         /// <param name="logger">The logger instance</param>
         /// <param name="payloadManager">The payload manager for handling payloads</param>
         /// <param name="powerController">The power controller (optional)</param>
+        /// <param name="validator">The optional validator for stager install options</param>
         public StagerInstallCommandHandler(
             ILogger<StagerInstallCommandHandler> logger,
             PayloadManager payloadManager,
-            IPowerController? powerController = null)
+            IPowerController? powerController = null,
+            IValidator<StagerInstallOptions>? validator = null)
+            : base(logger, validator)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
             _powerController = powerController;
         }
 
         /// <summary>
-        /// Handles the stager installation command execution.
+        /// Sets up the stager installation command handler dependencies.
         /// </summary>
-        /// <param name="command">The stager installation command to execute</param>
+        /// <param name="services">The service collection</param>
+        public static void SetupServices(IServiceCollection services)
+        {
+            // Register any specific dependencies for stager installation operations
+            services.AddTransient<StagerInstallCommandHandler>();
+            
+            // Register payload manager if not already registered
+            services.AddSingleton<PayloadManager>();
+            
+            // Register power controller if available
+            // services.AddTransient<IPowerController, PowerController>();
+            
+            // Register stager install specific validator if needed
+            // services.AddTransient<IValidator<StagerInstallOptions>, StagerInstallOptionsValidator>();
+        }
+
+        /// <summary>
+        /// Handles the stager installation command execution using the new options-based approach.
+        /// </summary>
+        /// <param name="options">The stager installation options</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
         public async Task<CommandResult<StagerInstallResult>> HandleAsync(
-            StagerInstallCommand command, 
+            StagerInstallOptions options, 
             CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(command);
+            return await ExecuteAsync<StagerInstallResult>(options, cancellationToken).ConfigureAwait(false);
+        }
 
-            _logger.LogInformation("Starting stager installation operation. CorrelationId: {CorrelationId}, PayloadPath: {PayloadPath}",
-                command.CorrelationId, command.PayloadPath);
-
+        /// <summary>
+        /// Executes the stager installation operation internally.
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="options">The stager installation options</param>
+        /// <param name="cancellationToken">Cancellation token for the operation</param>
+        /// <returns>A task representing the command execution result</returns>
+        protected override async Task<TResult> ExecuteInternalAsync<TResult>(
+            StagerInstallOptions options, 
+            CancellationToken cancellationToken = default)
+        {
             var stopwatch = Stopwatch.StartNew();
             var performanceMetrics = new InstallationPerformanceMetrics();
             var warnings = new List<string>();
 
-            try
-            {
-                // Validate command parameters
-                var validationResult = ValidateCommand(command);
-                if (!validationResult.IsValid)
-                {
-                    _logger.LogWarning("Stager installation command validation failed. CorrelationId: {CorrelationId}, Errors: {Errors}",
-                        command.CorrelationId, string.Join(", ", validationResult.Errors));
-                    return CommandResult<StagerInstallResult>.ValidationFailure(validationResult.Errors, command.CorrelationId);
-                }
+            // Load the stager payload
+            Logger.LogInformation("Loading stager payload from {PayloadPath}. CorrelationId: {CorrelationId}",
+                options.PayloadPath, options.CorrelationId);
+            
+            var payload = await _payloadManager.LoadPayloadAsync(options.PayloadPath, cancellationToken).ConfigureAwait(false);
 
-                // Load the stager payload
-                _logger.LogInformation("Loading stager payload from {PayloadPath}. CorrelationId: {CorrelationId}",
-                    command.PayloadPath, command.CorrelationId);
+            // Perform power cycling before installation if requested
+            if (options.PowerCycleBeforeInstall && options.PowerConfig != null)
+            {
+                var powerCycleTime = await PerformPowerCycleAsync(options.PowerConfig, "before installation", options.CorrelationId, cancellationToken).ConfigureAwait(false);
+                performanceMetrics = performanceMetrics with { PowerCycleTime = performanceMetrics.PowerCycleTime.Add(powerCycleTime) };
+            }
+
+            // Create PLC client with the specified configuration
+            using var plcClient = CreatePlcClient(options.ChannelConfig);
+
+            // Perform handshake if requested
+            if (options.PerformHandshake)
+            {
+                var handshakeStart = Stopwatch.StartNew();
+                Logger.LogInformation("Performing handshake. CorrelationId: {CorrelationId}", options.CorrelationId);
                 
-                var payload = await _payloadManager.LoadPayloadAsync(command.PayloadPath, cancellationToken).ConfigureAwait(false);
-
-                // Perform power cycling before installation if requested
-                if (command.PowerCycleBeforeInstall && command.PowerConfig != null)
-                {
-                    var powerCycleTime = await PerformPowerCycleAsync(command.PowerConfig, "before installation", command.CorrelationId, cancellationToken).ConfigureAwait(false);
-                    performanceMetrics = performanceMetrics with { PowerCycleTime = performanceMetrics.PowerCycleTime.Add(powerCycleTime) };
-                }
-
-                // Create PLC client with the specified configuration
-                using var plcClient = CreatePlcClient(command.ChannelConfig);
-
-                // Perform handshake if requested
-                if (command.PerformHandshake)
-                {
-                    var handshakeStart = Stopwatch.StartNew();
-                    _logger.LogInformation("Performing handshake. CorrelationId: {CorrelationId}", command.CorrelationId);
-                    
-                    await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
-                    handshakeStart.Stop();
-                    performanceMetrics = performanceMetrics with { HandshakeTime = handshakeStart.Elapsed };
-                    
-                    _logger.LogInformation("Handshake completed in {Duration}ms. CorrelationId: {CorrelationId}",
-                        handshakeStart.ElapsedMilliseconds, command.CorrelationId);
-                }
-
-                // Install the stager with retry logic
-                var installationResult = await InstallStagerWithRetryAsync(plcClient, command, payload, cancellationToken).ConfigureAwait(false);
-                performanceMetrics = performanceMetrics with 
-                { 
-                    PayloadTransferTime = installationResult.TransferTime,
-                    RetryAttempts = installationResult.RetryAttempts,
-                    AverageTransferSpeed = installationResult.TransferSpeed,
-                    TotalBytesTransferred = (uint)payload.Length
-                };
-
-                if (!installationResult.IsSuccess)
-                {
-                    return CommandResult<StagerInstallResult>.Failure(
-                        installationResult.ErrorMessage ?? "Stager installation failed", 
-                        command.CorrelationId);
-                }
-
-                // Verify installation if requested
-                bool isVerified = false;
-                if (command.VerifyInstallation)
-                {
-                    var verificationStart = Stopwatch.StartNew();
-                    isVerified = await VerifyStagerInstallationAsync(plcClient, installationResult.InstallationAddress, payload, command.CorrelationId, cancellationToken).ConfigureAwait(false);
-                    verificationStart.Stop();
-                    performanceMetrics = performanceMetrics with { VerificationTime = verificationStart.Elapsed };
-                    
-                    if (!isVerified)
-                    {
-                        warnings.Add("Stager installation verification failed");
-                    }
-                }
-
-                // Get version information if requested
-                string? stagerVersion = null;
-                if (command.GetVersionInfo)
-                {
-                    try
-                    {
-                        stagerVersion = await GetStagerVersionAsync(plcClient, installationResult.InstallationAddress, cancellationToken).ConfigureAwait(false);
-                        _logger.LogInformation("Stager version: {Version}. CorrelationId: {CorrelationId}",
-                            stagerVersion, command.CorrelationId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to retrieve stager version. CorrelationId: {CorrelationId}", command.CorrelationId);
-                        warnings.Add("Failed to retrieve stager version information");
-                    }
-                }
-
-                // Perform power cycling after installation if requested
-                if (command.PowerCycleAfterInstall && command.PowerConfig != null)
-                {
-                    var powerCycleTime = await PerformPowerCycleAsync(command.PowerConfig, "after installation", command.CorrelationId, cancellationToken).ConfigureAwait(false);
-                    performanceMetrics = performanceMetrics with { PowerCycleTime = performanceMetrics.PowerCycleTime.Add(powerCycleTime) };
-                }
-
-                stopwatch.Stop();
-
-                // Calculate checksum
-                var checksum = CalculateChecksum(payload);
-
-                // Create the result
-                var result = new StagerInstallResult
-                {
-                    IsInstalled = true,
-                    StagerVersion = stagerVersion,
-                    InstallationAddress = installationResult.InstallationAddress,
-                    StagerSize = (uint)payload.Length,
-                    Duration = stopwatch.Elapsed,
-                    Checksum = checksum,
-                    IsVerified = isVerified,
-                    AdditionalHooks = installationResult.AdditionalHooks,
-                    PerformanceMetrics = performanceMetrics,
-                    Warnings = warnings.Count > 0 ? warnings.ToArray() : null
-                };
-
-                _logger.LogInformation("Stager installation completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
-                    stopwatch.ElapsedMilliseconds, command.CorrelationId);
-
-                return CommandResult<StagerInstallResult>.Success(result, command.CorrelationId);
+                await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
+                handshakeStart.Stop();
+                performanceMetrics = performanceMetrics with { HandshakeTime = handshakeStart.Elapsed };
+                
+                Logger.LogInformation("Handshake completed in {Duration}ms. CorrelationId: {CorrelationId}",
+                    handshakeStart.ElapsedMilliseconds, options.CorrelationId);
             }
-            catch (OperationCanceledException)
+
+            // Install the stager with retry logic
+            var installationResult = await InstallStagerWithRetryAsync(plcClient, options, payload, cancellationToken).ConfigureAwait(false);
+            performanceMetrics = performanceMetrics with 
+            { 
+                PayloadTransferTime = installationResult.TransferTime,
+                RetryAttempts = installationResult.RetryAttempts,
+                AverageTransferSpeed = installationResult.TransferSpeed,
+                TotalBytesTransferred = (uint)payload.Length
+            };
+
+            if (!installationResult.IsSuccess)
             {
-                _logger.LogInformation("Stager installation operation was cancelled. CorrelationId: {CorrelationId}", command.CorrelationId);
-                return CommandResult<StagerInstallResult>.Failure("Operation was cancelled", command.CorrelationId);
+                throw new InvalidOperationException(installationResult.ErrorMessage ?? "Stager installation failed");
             }
-            catch (Exception ex)
+
+            // Verify installation if requested
+            bool isVerified = false;
+            if (options.VerifyInstallation)
             {
-                stopwatch.Stop();
-                _logger.LogError(ex, "Stager installation operation failed after {Duration}ms. CorrelationId: {CorrelationId}",
-                    stopwatch.ElapsedMilliseconds, command.CorrelationId);
-                return CommandResult<StagerInstallResult>.FromException(ex, command.CorrelationId);
+                var verificationStart = Stopwatch.StartNew();
+                isVerified = await VerifyStagerInstallationAsync(plcClient, installationResult.InstallationAddress, payload, options.CorrelationId, cancellationToken).ConfigureAwait(false);
+                verificationStart.Stop();
+                performanceMetrics = performanceMetrics with { VerificationTime = verificationStart.Elapsed };
+                
+                if (!isVerified)
+                {
+                    warnings.Add("Stager installation verification failed");
+                }
             }
-        }
 
-        private Abstractions.Validation.ValidationResult ValidateCommand(StagerInstallCommand command)
-        {
-            var errors = new List<string>();
+            // Get version information if requested
+            string? stagerVersion = null;
+            if (options.GetVersionInfo)
+            {
+                try
+                {
+                    stagerVersion = await GetStagerVersionAsync(plcClient, installationResult.InstallationAddress, cancellationToken).ConfigureAwait(false);
+                    Logger.LogInformation("Stager version: {Version}. CorrelationId: {CorrelationId}",
+                        stagerVersion, options.CorrelationId);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to retrieve stager version. CorrelationId: {CorrelationId}", options.CorrelationId);
+                    warnings.Add("Failed to retrieve stager version information");
+                }
+            }
 
-            if (!File.Exists(command.PayloadPath))
-                errors.Add($"Stager payload file not found: {command.PayloadPath}");
+            // Perform power cycling after installation if requested
+            if (options.PowerCycleAfterInstall && options.PowerConfig != null)
+            {
+                var powerCycleTime = await PerformPowerCycleAsync(options.PowerConfig, "after installation", options.CorrelationId, cancellationToken).ConfigureAwait(false);
+                performanceMetrics = performanceMetrics with { PowerCycleTime = performanceMetrics.PowerCycleTime.Add(powerCycleTime) };
+            }
 
-            if ((command.PowerCycleBeforeInstall || command.PowerCycleAfterInstall) && command.PowerConfig == null)
-                errors.Add("Power cycling requested but power controller configuration is missing");
+            stopwatch.Stop();
 
-            if (command.PowerConfig != null && _powerController == null)
-                errors.Add("Power controller configuration provided but no power controller service is available");
+            // Calculate checksum
+            var checksum = CalculateChecksum(payload);
 
-            return errors.Count > 0 
-                ? Abstractions.Validation.ValidationResult.Failure(errors)
-                : Abstractions.Validation.ValidationResult.Success();
+            // Create the result
+            var result = new StagerInstallResult
+            {
+                IsInstalled = true,
+                StagerVersion = stagerVersion,
+                InstallationAddress = installationResult.InstallationAddress,
+                StagerSize = (uint)payload.Length,
+                Duration = stopwatch.Elapsed,
+                Checksum = checksum,
+                IsVerified = isVerified,
+                AdditionalHooks = installationResult.AdditionalHooks,
+                PerformanceMetrics = performanceMetrics,
+                Warnings = warnings.Count > 0 ? warnings.ToArray() : null
+            };
+
+            Logger.LogInformation("Stager installation completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
+                stopwatch.ElapsedMilliseconds, options.CorrelationId);
+
+            return (TResult)(object)result;
         }
 
         private PlcClient CreatePlcClient(Abstractions.Configuration.CommunicationChannelConfig config)
@@ -224,7 +212,7 @@ namespace S7.Core.Commands.Handlers
             };
 
             // Create logger action for PlcClient
-            Action<string> logger = message => _logger.LogDebug("{Message}", message);
+            Action<string> logger = message => Logger.LogDebug("{Message}", message);
 
             return new PlcClient(channel, logger);
         }
@@ -239,12 +227,12 @@ namespace S7.Core.Commands.Handlers
                 throw new InvalidOperationException("Power controller is not available");
 
             var stopwatch = Stopwatch.StartNew();
-            _logger.LogInformation("Performing power cycle {Phase}. CorrelationId: {CorrelationId}", phase, correlationId);
+            Logger.LogInformation("Performing power cycle {Phase}. CorrelationId: {CorrelationId}", phase, correlationId);
             
             await _powerController.PowerCycleAsync(powerConfig, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
             
-            _logger.LogInformation("Power cycle {Phase} completed in {Duration}ms. CorrelationId: {CorrelationId}",
+            Logger.LogInformation("Power cycle {Phase} completed in {Duration}ms. CorrelationId: {CorrelationId}",
                 phase, stopwatch.ElapsedMilliseconds, correlationId);
             
             return stopwatch.Elapsed;
@@ -252,22 +240,22 @@ namespace S7.Core.Commands.Handlers
 
         private async Task<StagerInstallationResult> InstallStagerWithRetryAsync(
             PlcClient plcClient, 
-            StagerInstallCommand command, 
+            StagerInstallOptions options, 
             byte[] payload, 
             CancellationToken cancellationToken)
         {
             var attempt = 0;
             var transferStart = Stopwatch.StartNew();
             
-            while (attempt <= command.RetryAttempts)
+            while (attempt <= options.RetryAttempts)
             {
                 try
                 {
-                    _logger.LogInformation("Installing stager (attempt {Attempt}/{MaxAttempts}). CorrelationId: {CorrelationId}",
-                        attempt + 1, command.RetryAttempts + 1, command.CorrelationId);
+                    Logger.LogInformation("Installing stager (attempt {Attempt}/{MaxAttempts}). CorrelationId: {CorrelationId}",
+                        attempt + 1, options.RetryAttempts + 1, options.CorrelationId);
 
-                    // Simplified stager installation - in reality, this would use PLC client methods
-                    var installationAddress = 0x1000u; // Default installation address
+                    // Use target address if specified, otherwise use default
+                    var installationAddress = options.TargetAddress ?? 0x1000u;
                     
                     // Simulate payload transfer
                     await Task.Delay(100, cancellationToken).ConfigureAwait(false); // Simulate transfer time
@@ -285,18 +273,18 @@ namespace S7.Core.Commands.Handlers
                         AdditionalHooks = "Hook installed at 0x2000" // Example
                     };
                 }
-                catch (Exception ex) when (attempt < command.RetryAttempts)
+                catch (Exception ex) when (attempt < options.RetryAttempts)
                 {
-                    _logger.LogWarning(ex, "Stager installation attempt {Attempt} failed, retrying in {Delay}ms. CorrelationId: {CorrelationId}",
-                        attempt + 1, command.RetryDelay.TotalMilliseconds, command.CorrelationId);
+                    Logger.LogWarning(ex, "Stager installation attempt {Attempt} failed, retrying in {Delay}ms. CorrelationId: {CorrelationId}",
+                        attempt + 1, options.RetryDelayMs, options.CorrelationId);
                     
                     attempt++;
-                    await Task.Delay(command.RetryDelay, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(options.RetryDelayMs, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Stager installation failed after {Attempts} attempts. CorrelationId: {CorrelationId}",
-                        attempt + 1, command.CorrelationId);
+                    Logger.LogError(ex, "Stager installation failed after {Attempts} attempts. CorrelationId: {CorrelationId}",
+                        attempt + 1, options.CorrelationId);
                     
                     transferStart.Stop();
                     return new StagerInstallationResult
@@ -313,7 +301,7 @@ namespace S7.Core.Commands.Handlers
             return new StagerInstallationResult
             {
                 IsSuccess = false,
-                ErrorMessage = $"Installation failed after {command.RetryAttempts + 1} attempts",
+                ErrorMessage = $"Installation failed after {options.RetryAttempts + 1} attempts",
                 RetryAttempts = attempt,
                 TransferTime = transferStart.Elapsed
             };
@@ -328,7 +316,7 @@ namespace S7.Core.Commands.Handlers
         {
             try
             {
-                _logger.LogInformation("Verifying stager installation at address 0x{Address:X8}. CorrelationId: {CorrelationId}",
+                Logger.LogInformation("Verifying stager installation at address 0x{Address:X8}. CorrelationId: {CorrelationId}",
                     installationAddress, correlationId);
 
                 // Simplified verification - in reality, you'd read back the installed data and compare
@@ -338,7 +326,7 @@ namespace S7.Core.Commands.Handlers
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Stager installation verification failed. CorrelationId: {CorrelationId}", correlationId);
+                Logger.LogWarning(ex, "Stager installation verification failed. CorrelationId: {CorrelationId}", correlationId);
                 return false;
             }
         }
