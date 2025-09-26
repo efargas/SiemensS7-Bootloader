@@ -1,1 +1,112 @@
-No exact duplicates found.
+=== Duplicate group: ce7088090f7fe2b5c96941efb02cedd38f3b859d
+src/S7_Csharp_Utility/Resources/dump_mem/lib/print.d
+src/S7_Csharp_Utility/Resources/hello_loop/lib/print.d
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/print.d
+
+=== Duplicate group: 19c8f78a07e8756774e37a0bf3ce3859427b17f2
+src/S7_Csharp_Utility/Resources/dump_mem/lib/print.o
+src/S7_Csharp_Utility/Resources/hello_loop/lib/print.o
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/print.o
+
+=== Duplicate group: f1a28e28d970806d940986814b6d19d2612d8900
+src/S7_Csharp_Utility/Resources/dump_mem/lib/read.d
+src/S7_Csharp_Utility/Resources/hello_loop/lib/read.d
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/read.d
+
+=== Duplicate group: 36f3b0859a1b50a355608d6efd40cdb5b4ae4206
+src/S7_Csharp_Utility/Resources/dump_mem/lib/read.o
+src/S7_Csharp_Utility/Resources/hello_loop/lib/read.o
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/read.o
+
+=== Duplicate group: 8e9dffd08852ce60dacf45aa6d477e13e41a8fc1
+src/S7_Csharp_Utility/Resources/dump_mem/lib/stdlib.d
+src/S7_Csharp_Utility/Resources/hello_loop/lib/stdlib.d
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/stdlib.d
+
+=== Duplicate group: 69e6a50fab5f85d7acbff30546f21d517dec97af
+src/S7_Csharp_Utility/Resources/dump_mem/lib/stdlib.o
+src/S7_Csharp_Utility/Resources/hello_loop/lib/stdlib.o
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/stdlib.o
+
+=== Duplicate group: a2bb5132f960449a9c41bffd385952b93a5d4c7f
+src/S7_Csharp_Utility/Resources/dump_mem/lib/string.d
+src/S7_Csharp_Utility/Resources/hello_loop/lib/string.d
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/string.d
+
+=== Duplicate group: 7a07862974bfd4de2ff93dda91df170bfd86203f
+src/S7_Csharp_Utility/Resources/dump_mem/lib/string.o
+src/S7_Csharp_Utility/Resources/hello_loop/lib/string.o
+src/S7_Csharp_Utility/Resources/tic_tac_toe/lib/string.o
+
+=== Duplicate group: 72b13f2554531cb98b2661ece06776755116ca6f
+src/S7_Csharp_Utility/Resources/dump_mem/link.ld
+src/S7_Csharp_Utility/Resources/hello_loop/link.ld
+src/S7_Csharp_Utility/Resources/tic_tac_toe/link.ld
+
+=== Duplicate group: 15469abe37b55aba34d1ce52bb8e6080c617a558
+src/S7_Csharp_Utility/Resources/dump_mem/memory.h
+src/S7_Csharp_Utility/Resources/hello_loop/memory.h
+src/S7_Csharp_Utility/Resources/tic_tac_toe/memory.h
+
+=== Duplicate group: 06bb2126a292304eb47913caab88239fccad8887
+src/Resources/payloads/hello_world/hello_world.bin
+src/S7_Csharp_Utility/Resources/hello_world/hello_world.bin
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/hello_world/hello_world.bin
+
+=== Duplicate group: 95ac83c149679946e608aaf0f05236b73e1e81cf
+src/Resources/payloads/stager/stager.bin
+src/S7_Csharp_Utility/Resources/stager/stager.bin
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/stager/stager.bin
+
+=== Duplicate group: 5ce0042bbd16348e69736a0b8b43464d8352ae83
+src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs/exported_20250925_045745.txt
+src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs/exported_20250925_045748.txt
+
+=== Duplicate group: f5cb252554756c749c060b0172fd5791bca32ea0
+src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs/exported_20250925_095252.txt
+src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs/exported_20250925_095253.txt
+
+=== Duplicate group: 56e9c1e0ef142e86581391027e349599a49affa8
+src/Resources/Settings/Settings.json
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/Settings/Settings.json
+
+=== Duplicate group: 3ce66e1ce04b83ec5a658584cef2dd71728fb6d4
+src/Resources/payloads/README.md
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/README.md
+
+=== Duplicate group: 138c9d3184499b06002c89febc44490245eda03c
+src/Resources/payloads/dump_mem/dump_mem
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/dump_mem/dump_mem
+
+=== Duplicate group: 1c64b2e8099494488d0aac0f082f9b4e532c65d5
+src/Resources/payloads/dump_mem/dump_mem.bin
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/dump_mem/dump_mem.bin
+
+=== Duplicate group: 53f2ab20970ee57956bc970ed9138fad5901b3ab
+src/Resources/payloads/dump_mem/dump_mem.ihex
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/dump_mem/dump_mem.ihex
+
+=== Duplicate group: 373d78d372bb945b5411c3e864f7623d36f682d7
+src/Resources/payloads/hello_loop/hello_loop
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/hello_loop/hello_loop
+
+=== Duplicate group: 517332da58e35c92da958d0357064fe7a1f779ec
+src/Resources/payloads/hello_loop/hello_loop.bin
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/hello_loop/hello_loop.bin
+
+=== Duplicate group: c0be1597e3c081582eee7c9e100748c87fa44671
+src/Resources/payloads/hello_loop/hello_loop.ihex
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/hello_loop/hello_loop.ihex
+
+=== Duplicate group: d73fc73fe57939aecdabdaf5a6eace5c0630fa42
+src/Resources/payloads/tic_tac_toe/tic_tac_toe
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/tic_tac_toe/tic_tac_toe
+
+=== Duplicate group: e79de0e1d5c7bf9118452e766a7b734b78cc3d8a
+src/Resources/payloads/tic_tac_toe/tic_tac_toe.bin
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/tic_tac_toe/tic_tac_toe.bin
+
+=== Duplicate group: ee7b76e48f3d311d49f462a4cfc4aed342a785f9
+src/Resources/payloads/tic_tac_toe/tic_tac_toe.ihex
+src/S7_Csharp_Utility/bin/Release/net8.0/Resources/payloads/tic_tac_toe/tic_tac_toe.ihex
+
