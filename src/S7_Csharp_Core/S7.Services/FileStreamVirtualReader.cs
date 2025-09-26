@@ -7,23 +7,15 @@ using S7.Utils.Models;
 
 namespace S7.Services
 {
-    public class FileStreamVirtualReader : IVirtualFileReader, IDisposable
+    public class FileStreamVirtualReader(string filePath, int preferredPageSize = 4096) : IVirtualFileReader, IDisposable
     {
-        private readonly FileStream _fs;
-        private readonly long _length;
-        private readonly int _preferredPageSize;
-
-        public FileStreamVirtualReader(string filePath, int preferredPageSize = 4096)
-        {
-            if (filePath == null)
-                throw new ArgumentNullException(nameof(filePath));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found.", filePath);
-
-            _fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            _length = _fs.Length;
-            _preferredPageSize = preferredPageSize;
-        }
+        private readonly FileStream _fs = filePath == null 
+            ? throw new ArgumentNullException(nameof(filePath))
+            : !File.Exists(filePath) 
+                ? throw new FileNotFoundException("File not found.", filePath)
+                : new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        private readonly long _length = _fs.Length;
+        private readonly int _preferredPageSize = preferredPageSize;
 
         public long Length => _length;
         public int PageSize => _preferredPageSize;

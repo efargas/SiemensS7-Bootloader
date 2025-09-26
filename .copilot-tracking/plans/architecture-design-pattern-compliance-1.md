@@ -116,7 +116,7 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-031 | Convert all service classes in `src/S7_Csharp_Core/S7.Services/` to primary constructor syntax | | |
+| TASK-031 | Convert all service classes in `src/S7_Csharp_Core/S7.Services/` to primary constructor syntax | [x] | 2024-12-26 |
 | TASK-032 | Convert all repository classes in `src/S7_Csharp_Core/S7.Infrastructure/Repositories/` to primary constructor syntax | | |
 | TASK-033 | Convert all provider classes in `src/S7_Csharp_Core/S7.Infrastructure/Providers/` to primary constructor syntax | | |
 | TASK-034 | Convert all command handler classes in `src/S7_Csharp_Core/S7.Core.Commands/Handlers/` to primary constructor syntax | | |

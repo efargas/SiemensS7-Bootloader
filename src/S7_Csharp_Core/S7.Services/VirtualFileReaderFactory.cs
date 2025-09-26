@@ -10,19 +10,9 @@ namespace S7.Services
     /// Factory for creating virtual file readers with dependency injection support.
     /// Provides configuration-driven reader selection and caching capabilities.
     /// </summary>
-    public class VirtualFileReaderFactory : IVirtualFileReaderFactory
+    public class VirtualFileReaderFactory(IOptions<VirtualFileReaderConfiguration> options) : IVirtualFileReaderFactory
     {
-        private readonly VirtualFileReaderConfiguration _configuration;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="VirtualFileReaderFactory"/> class.
-        /// </summary>
-        /// <param name="options">The configuration options for the factory.</param>
-        /// <exception cref="ArgumentNullException">Thrown when options is null.</exception>
-        public VirtualFileReaderFactory(IOptions<VirtualFileReaderConfiguration> options)
-        {
-            _configuration = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        }
+        private readonly VirtualFileReaderConfiguration _configuration = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
         /// <summary>
         /// Creates a virtual file reader for the specified file path using default configuration.

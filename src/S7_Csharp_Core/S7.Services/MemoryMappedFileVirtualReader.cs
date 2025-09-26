@@ -8,25 +8,16 @@ using S7.Utils.Models;
 
 namespace S7.Services
 {
-    public class MemoryMappedFileVirtualReader : IVirtualFileReader, IDisposable
+    public class MemoryMappedFileVirtualReader(string filePath, int preferredPageSize = 4096) : IVirtualFileReader, IDisposable
     {
-        private readonly MemoryMappedFile _mmf;
-        private readonly long _length;
-        private readonly int _preferredPageSize;
-
-        public MemoryMappedFileVirtualReader(string filePath, int preferredPageSize = 4096)
-        {
-            if (filePath == null)
-                throw new ArgumentNullException(nameof(filePath));
-            if (!File.Exists(filePath))
-                throw new FileNotFoundException("File not found.", filePath);
-
-            var fileInfo = new FileInfo(filePath);
-            _length = fileInfo.Length;
-            _preferredPageSize = preferredPageSize;
-
-            _mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
-        }
+        private readonly FileInfo _fileInfo = filePath == null 
+            ? throw new ArgumentNullException(nameof(filePath))
+            : !File.Exists(filePath) 
+                ? throw new FileNotFoundException("File not found.", filePath)
+                : new FileInfo(filePath);
+        private readonly long _length = _fileInfo.Length;
+        private readonly int _preferredPageSize = preferredPageSize;
+        private readonly MemoryMappedFile _mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
 
         public long Length => _length;
         public int PageSize => _preferredPageSize;

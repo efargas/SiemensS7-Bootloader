@@ -17,25 +17,14 @@ namespace S7.Services
     /// <summary>
     /// Service implementation for PLC operations providing comprehensive PLC communication and exploit sequence execution.
     /// </summary>
-    public class PlcOperationService : IPlcOperationService
+    public class PlcOperationService(
+        ILogger<PlcOperationService> logger,
+        PayloadManager payloadManager) : IPlcOperationService
     {
-        private readonly ILogger<PlcOperationService> _logger;
-        private readonly PayloadManager _payloadManager;
+        private readonly ILogger<PlcOperationService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly PayloadManager _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
         private PlcClient? _currentClient;
         private PlcConnectionStatus _connectionStatus = PlcConnectionStatus.Disconnected;
-
-        /// <summary>
-        /// Initializes a new instance of the PlcOperationService class.
-        /// </summary>
-        /// <param name="logger">The logger instance</param>
-        /// <param name="payloadManager">The payload manager for handling payloads</param>
-        public PlcOperationService(
-            ILogger<PlcOperationService> logger,
-            PayloadManager payloadManager)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
-        }
 
         /// <inheritdoc />
         public event EventHandler<PlcConnectionStatusChangedEventArgs>? ConnectionStatusChanged;
