@@ -134,9 +134,9 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
 | TASK-041 | Create custom validation attributes in `src/S7_Csharp_Core/S7.Core.Abstractions/Validation/ValidationAttributes.cs` for hex addresses, file paths, and network endpoints | [x] | 2024-12-26 |
-| TASK-042 | Add data validation attributes to all command option classes with appropriate error messages | | |
+| TASK-042 | Add data validation attributes to all command option classes with appropriate error messages | [x] | 2024-12-26 |
 | TASK-043 | Create strongly-typed configuration classes in `src/S7_Csharp_Core/S7.Core.Abstractions/Configuration/` with validation attributes | [x] | 2024-12-26 |
-| TASK-044 | Implement configuration validation service in `src/S7_Csharp_Core/S7.Services/ConfigurationValidationService.cs` | | |
+| TASK-044 | Implement configuration validation service in `src/S7_Csharp_Core/S7.Services/ConfigurationValidationService.cs` | [x] | 2024-12-26 |
 | TASK-045 | Add input validation to all ViewModel properties that accept user input | | |
 | TASK-046 | Implement validation error handling and user feedback in UI layer | | |
 | TASK-047 | Create validation middleware for command handlers to validate options before execution | | |

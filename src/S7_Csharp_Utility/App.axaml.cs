@@ -103,6 +103,7 @@ namespace S7_Csharp_Utility
             services.AddScoped<IPayloadService, PayloadService>();
             services.AddScoped<ICommunicationChannelService, CommunicationChannelService>();
             services.AddScoped<IPowerSupplyService, PowerSupplyService>();
+            services.AddScoped<IConfigurationValidationService, ConfigurationValidationService>();
 
             // Register ViewModels
             services.AddSingleton<MainWindowViewModel>();

@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using S7.Core.Abstractions.Configuration;
+using S7.Core.Abstractions.Validation;
 
 namespace S7.Core.Abstractions.Commands
 {
@@ -15,7 +16,7 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets the starting memory address for the dump operation.
         /// </summary>
         [Required(ErrorMessage = "Memory address is required")]
-        [Range(0, uint.MaxValue, ErrorMessage = "Address must be a valid 32-bit unsigned integer")]
+        [NumericRange(0, uint.MaxValue, ErrorMessage = "Address must be a valid 32-bit unsigned integer")]
         public uint Address { get; set; }
 
         /// <summary>
@@ -31,21 +32,21 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets the length of memory to dump in bytes.
         /// </summary>
         [Required(ErrorMessage = "Memory length is required")]
-        [Range(1, uint.MaxValue, ErrorMessage = "Length must be at least 1 byte")]
+        [NumericRange(1, uint.MaxValue, Alignment = 4, ErrorMessage = "Length must be at least 1 byte and aligned to 4-byte boundary")]
         public uint Length { get; set; }
 
         /// <summary>
         /// Gets or sets the path to the payload file to use for the operation.
         /// </summary>
         [Required(ErrorMessage = "Payload path is required")]
-        [FileExists(ErrorMessage = "Payload file does not exist")]
+        [FilePath(AllowedExtensions = new[] { "bin", "hex", "elf" }, ErrorMessage = "Payload file must exist and have a valid extension (.bin, .hex, .elf)")]
         public string PayloadPath { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the output directory path where the dump file will be saved.
         /// </summary>
         [Required(ErrorMessage = "Output path is required")]
-        [DirectoryPath(ErrorMessage = "Output path must be a valid directory")]
+        [FilePath(MustExist = false, AllowDirectories = true, AllowEmpty = false, ErrorMessage = "Output path must be a valid directory path")]
         public string OutputPath { get; set; } = string.Empty;
 
         /// <summary>
@@ -76,14 +77,14 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets the timeout for the entire dump operation in milliseconds.
         /// Overrides the base TimeoutMs property with dump-specific default.
         /// </summary>
-        [Range(5000, int.MaxValue, ErrorMessage = "Operation timeout must be at least 5 seconds")]
+        [Timeout(MinTimeoutMs = 5000, MaxTimeoutMs = 3600000, ErrorMessage = "Operation timeout must be between 5 seconds and 1 hour")]
         public new int TimeoutMs { get; set; } = 600000; // 10 minutes default for memory dumps
 
         /// <summary>
         /// Gets or sets the chunk size for reading memory in bytes.
         /// Larger chunks may be faster but use more memory.
         /// </summary>
-        [Range(1, 65536, ErrorMessage = "Chunk size must be between 1 and 65536 bytes")]
+        [NumericRange(1, 65536, Alignment = 4, ErrorMessage = "Chunk size must be between 1 and 65536 bytes and aligned to 4-byte boundary")]
         public uint ChunkSize { get; set; } = 1024;
 
         /// <summary>
@@ -135,14 +136,14 @@ namespace S7.Core.Abstractions.Commands
         /// Validates the memory dump options and returns validation results.
         /// </summary>
         /// <returns>A collection of validation results</returns>
-        public override System.Collections.Generic.IEnumerable<ValidationResult> Validate()
+        public override System.Collections.Generic.IEnumerable<System.ComponentModel.DataAnnotations.ValidationResult> Validate()
         {
             var results = base.Validate().ToList();
 
             // Validate address + length doesn't overflow
             if (Address > uint.MaxValue - Length)
             {
-                results.Add(new ValidationResult(
+                results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                     "Address + Length would cause integer overflow",
                     new[] { nameof(Address), nameof(Length) }));
             }
@@ -153,7 +154,7 @@ namespace S7.Core.Abstractions.Commands
                 var outputPath = Path.Combine(OutputPath, CustomFilename);
                 if (File.Exists(outputPath))
                 {
-                    results.Add(new ValidationResult(
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                         $"Output file already exists and overwrite is disabled: {outputPath}",
                         new[] { nameof(CustomFilename), nameof(OverwriteExisting) }));
                 }
@@ -162,59 +163,12 @@ namespace S7.Core.Abstractions.Commands
             // Validate chunk size is reasonable for the total length
             if (ChunkSize > Length)
             {
-                results.Add(new ValidationResult(
+                results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                     "Chunk size cannot be larger than total length",
                     new[] { nameof(ChunkSize), nameof(Length) }));
             }
 
             return results;
-        }
-    }
-
-    /// <summary>
-    /// Validation attribute to check if a file exists.
-    /// </summary>
-    public class FileExistsAttribute : ValidationAttribute
-    {
-        /// <summary>
-        /// Validates that the specified file exists.
-        /// </summary>
-        /// <param name="value">The file path to validate</param>
-        /// <returns>True if the file exists, false otherwise</returns>
-        public override bool IsValid(object? value)
-        {
-            if (value is not string filePath || string.IsNullOrWhiteSpace(filePath))
-                return false;
-
-            return File.Exists(filePath);
-        }
-    }
-
-    /// <summary>
-    /// Validation attribute to check if a path is a valid directory.
-    /// </summary>
-    public class DirectoryPathAttribute : ValidationAttribute
-    {
-        /// <summary>
-        /// Validates that the specified path is a valid directory path.
-        /// </summary>
-        /// <param name="value">The directory path to validate</param>
-        /// <returns>True if the path is valid, false otherwise</returns>
-        public override bool IsValid(object? value)
-        {
-            if (value is not string directoryPath || string.IsNullOrWhiteSpace(directoryPath))
-                return false;
-
-            try
-            {
-                // Check if the path is valid
-                Path.GetFullPath(directoryPath);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
     }
 }

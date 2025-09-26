@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using S7.Core.Abstractions.Configuration;
+using S7.Core.Abstractions.Validation;
 
 namespace S7.Core.Abstractions.Commands
 {
@@ -15,7 +16,7 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets the path to the stager payload file.
         /// </summary>
         [Required(ErrorMessage = "Payload path is required")]
-        [FileExists(ErrorMessage = "Stager payload file does not exist")]
+        [FilePath(AllowedExtensions = new[] { "bin", "hex", "elf", "s" }, ErrorMessage = "Stager payload file must exist and have a valid extension (.bin, .hex, .elf, .s)")]
         public string PayloadPath { get; set; } = string.Empty;
 
         /// <summary>
@@ -44,7 +45,7 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets the timeout for the entire installation operation in milliseconds.
         /// Overrides the base TimeoutMs property with installation-specific default.
         /// </summary>
-        [Range(10000, int.MaxValue, ErrorMessage = "Installation timeout must be at least 10 seconds")]
+        [Timeout(MinTimeoutMs = 10000, MaxTimeoutMs = 1800000, ErrorMessage = "Installation timeout must be between 10 seconds and 30 minutes")]
         public new int TimeoutMs { get; set; } = 300000; // 5 minutes default for stager installation
 
         /// <summary>
@@ -84,13 +85,13 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets the target installation address (optional).
         /// If not specified, the stager will determine the appropriate address.
         /// </summary>
-        [Range(0, uint.MaxValue, ErrorMessage = "Installation address must be a valid 32-bit unsigned integer")]
+        [HexAddress(MinValue = 0x1000, MaxValue = 0xFFFFFFFF, AllowEmpty = true, ErrorMessage = "Installation address must be a valid 32-bit hex address (0x1000-0xFFFFFFFF)")]
         public uint? TargetAddress { get; set; }
 
         /// <summary>
         /// Gets or sets the maximum payload size allowed in bytes.
         /// </summary>
-        [Range(1024, int.MaxValue, ErrorMessage = "Maximum payload size must be at least 1024 bytes")]
+        [NumericRange(1024, int.MaxValue, Alignment = 1024, ErrorMessage = "Maximum payload size must be at least 1024 bytes and aligned to 1KB boundary")]
         public int MaxPayloadSize { get; set; } = 1048576; // 1MB default
 
         /// <summary>
@@ -102,7 +103,7 @@ namespace S7.Core.Abstractions.Commands
         /// Gets or sets the backup file path (optional).
         /// If not specified, a default backup filename will be generated.
         /// </summary>
-        [StringLength(260, ErrorMessage = "Backup file path cannot exceed 260 characters")]
+        [FilePath(MustExist = false, AllowEmpty = true, AllowedExtensions = new[] { "bin", "bak", "dump" }, ErrorMessage = "Backup file path must be valid and have extension (.bin, .bak, .dump)")]
         public string? BackupFilePath { get; set; }
 
         /// <summary>
@@ -136,7 +137,7 @@ namespace S7.Core.Abstractions.Commands
         /// Validates the stager installation options and returns validation results.
         /// </summary>
         /// <returns>A collection of validation results</returns>
-        public override System.Collections.Generic.IEnumerable<ValidationResult> Validate()
+        public override System.Collections.Generic.IEnumerable<System.ComponentModel.DataAnnotations.ValidationResult> Validate()
         {
             var results = base.Validate().ToList();
 
@@ -146,14 +147,14 @@ namespace S7.Core.Abstractions.Commands
                 var fileInfo = new FileInfo(PayloadPath);
                 if (fileInfo.Length > MaxPayloadSize)
                 {
-                    results.Add(new ValidationResult(
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                         $"Payload file size ({fileInfo.Length} bytes) exceeds maximum allowed size ({MaxPayloadSize} bytes)",
                         new[] { nameof(PayloadPath), nameof(MaxPayloadSize) }));
                 }
 
                 if (fileInfo.Length == 0)
                 {
-                    results.Add(new ValidationResult(
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                         "Payload file is empty",
                         new[] { nameof(PayloadPath) }));
                 }
@@ -162,7 +163,7 @@ namespace S7.Core.Abstractions.Commands
             // Validate power cycling configuration
             if ((PowerCycleBeforeInstall || PowerCycleAfterInstall) && PowerConfig == null)
             {
-                results.Add(new ValidationResult(
+                results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                     "Power controller configuration is required when power cycling is enabled",
                     new[] { nameof(PowerConfig), nameof(PowerCycleBeforeInstall), nameof(PowerCycleAfterInstall) }));
             }
@@ -175,14 +176,14 @@ namespace S7.Core.Abstractions.Commands
                     var backupDir = Path.GetDirectoryName(BackupFilePath);
                     if (!string.IsNullOrEmpty(backupDir) && !Directory.Exists(backupDir))
                     {
-                        results.Add(new ValidationResult(
+                        results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                             $"Backup directory does not exist: {backupDir}",
                             new[] { nameof(BackupFilePath) }));
                     }
                 }
                 catch (Exception ex)
                 {
-                    results.Add(new ValidationResult(
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                         $"Invalid backup file path: {ex.Message}",
                         new[] { nameof(BackupFilePath) }));
                 }
@@ -197,7 +198,7 @@ namespace S7.Core.Abstractions.Commands
                 }
                 catch (System.Text.Json.JsonException ex)
                 {
-                    results.Add(new ValidationResult(
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                         $"Installation options must be valid JSON: {ex.Message}",
                         new[] { nameof(InstallationOptions) }));
                 }
@@ -206,7 +207,7 @@ namespace S7.Core.Abstractions.Commands
             // Validate retry configuration consistency
             if (RetryAttempts > 0 && RetryDelayMs <= 0)
             {
-                results.Add(new ValidationResult(
+                results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
                     "Retry delay must be greater than 0 when retry attempts are configured",
                     new[] { nameof(RetryAttempts), nameof(RetryDelayMs) }));
             }
