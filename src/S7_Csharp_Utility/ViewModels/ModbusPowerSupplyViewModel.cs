@@ -16,16 +16,12 @@ namespace S7_Csharp_Utility.ViewModels
     /// <summary>
     /// The view model for the Modbus power supply with service layer integration.
     /// </summary>
-    public class ModbusPowerSupplyViewModel(
-        IPowerSupplyService powerSupplyService,
-        IDialogService dialogService,
-        LoggingService loggingService,
-        ILogger<ModbusPowerSupplyViewModel> logger) : ViewModelBase
+    public class ModbusPowerSupplyViewModel : ViewModelBase
     {
-        private readonly IPowerSupplyService _powerSupplyService = powerSupplyService ?? throw new ArgumentNullException(nameof(powerSupplyService));
-        private readonly IDialogService _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
-        private readonly LoggingService _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
-        private readonly ILogger<ModbusPowerSupplyViewModel> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly IPowerSupplyService _powerSupplyService;
+        private readonly IDialogService _dialogService;
+        private readonly LoggingService _loggingService;
+        private readonly ILogger<ModbusPowerSupplyViewModel> _logger;
 
         /// <summary>
         /// Occurs when the Modbus status changes.
@@ -135,24 +131,36 @@ namespace S7_Csharp_Utility.ViewModels
         /// Gets the command to connect to Modbus.
         /// </summary>
         public ICommand ConnectModbusCommand { get; }
+
         /// <summary>
         /// Gets the command to disconnect from Modbus.
         /// </summary>
         public ICommand DisconnectModbusCommand { get; }
+
         /// <summary>
         /// Gets the command to power on.
         /// </summary>
         public ICommand PowerOnCommand { get; }
+
         /// <summary>
         /// Gets the command to power off.
         /// </summary>
         public ICommand PowerOffCommand { get; }
 
         /// <summary>
-        /// Initializes the commands and subscribes to service events.
+        /// Initializes a new instance of the <see cref="ModbusPowerSupplyViewModel"/> class.
         /// </summary>
-        public ModbusPowerSupplyViewModel()
+        public ModbusPowerSupplyViewModel(
+            IPowerSupplyService powerSupplyService,
+            IDialogService dialogService,
+            LoggingService loggingService,
+            ILogger<ModbusPowerSupplyViewModel> logger)
         {
+            _powerSupplyService = powerSupplyService ?? throw new ArgumentNullException(nameof(powerSupplyService));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+            _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
             // Subscribe to power supply service events
             _powerSupplyService.ConnectionStatusChanged += OnConnectionStatusChanged;
             _powerSupplyService.PowerStateChanged += OnPowerStateChanged;

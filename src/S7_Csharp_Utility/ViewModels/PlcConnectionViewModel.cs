@@ -395,7 +395,7 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 else
                 {
-                    _loggingService.Log($"Failed to kill socat processes: {result.ErrorMessage}", LogCategory.Error);
+                    _loggingService.Log($"Failed to kill socat processes: {result.Error.Message}", LogCategory.Error);
                 }
             }
             catch (Exception ex)
@@ -442,7 +442,7 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 else
                 {
-                    _loggingService.Log($"Failed to discover serial ports: {result.ErrorMessage}", LogCategory.Error);
+                    _loggingService.Log($"Failed to discover serial ports: {result.Error.Message}", LogCategory.Error);
                 }
             }
             catch (Exception ex)
@@ -489,8 +489,8 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 else
                 {
-                    _loggingService.Log($"❌ Failed to start socat: {result.ErrorMessage}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Error", $"Failed to start socat: {result.ErrorMessage}");
+                    _loggingService.Log($"❌ Failed to start socat: {result.Error.Message}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", $"Failed to start socat: {result.Error.Message}");
                 }
             }
             catch (Exception ex)
@@ -519,8 +519,8 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 else
                 {
-                    _loggingService.Log($"❌ Failed to stop socat: {result.ErrorMessage}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Error", $"Failed to stop socat: {result.ErrorMessage}");
+                    _loggingService.Log($"❌ Failed to stop socat: {result.Error.Message}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", $"Failed to stop socat: {result.Error.Message}");
                 }
             }
             catch (Exception ex)
