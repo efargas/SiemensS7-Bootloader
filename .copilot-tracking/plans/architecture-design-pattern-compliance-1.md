@@ -139,8 +139,8 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-044 | Implement configuration validation service in `src/S7_Csharp_Core/S7.Services/ConfigurationValidationService.cs` | [x] | 2024-12-26 |
 | TASK-045 | Add input validation to all ViewModel properties that accept user input | [x] | 2024-12-26 |
 | TASK-046 | Implement validation error handling and user feedback in UI layer | [x] | 2024-12-26 |
-| TASK-047 | Create validation middleware for command handlers to validate options before execution | | |
-| TASK-048 | Add comprehensive validation tests in `tests/S7.Core.Tests/Validation/` directory | | |
+| TASK-047 | Create validation middleware for command handlers to validate options before execution | [x] | 2024-12-26 |
+| TASK-048 | Add comprehensive validation tests in `tests/S7.Core.Tests/Validation/` directory | [x] | 2024-12-26 |
 | TASK-049 | Implement configuration validation on application startup with clear error messages | | |
 | TASK-050 | Document validation patterns and custom attributes for future development | | |
 

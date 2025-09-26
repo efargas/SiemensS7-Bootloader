@@ -10,10 +10,10 @@ using S7.Core.Abstractions.Middleware;
 namespace S7.Core.Abstractions.Commands
 {
     /// <summary>
-    /// Generic base class for command handlers providing common functionality including validation, logging, and exception handling.
+    /// Enhanced command handler base class that integrates with validation pipeline middleware.
     /// </summary>
     /// <typeparam name="TOptions">The type of options for this command handler</typeparam>
-    public abstract class CommandHandler<TOptions> where TOptions : CommandHandlerOptions
+    public abstract class ValidatedCommandHandler<TOptions> where TOptions : CommandHandlerOptions
     {
         /// <summary>
         /// Gets the logger instance for this command handler.
@@ -21,18 +21,28 @@ namespace S7.Core.Abstractions.Commands
         protected ILogger Logger { get; }
 
         /// <summary>
-        /// Gets the validator for command options.
+        /// Gets the validation pipeline for command options.
+        /// </summary>
+        protected IValidationPipeline? ValidationPipeline { get; }
+
+        /// <summary>
+        /// Gets the legacy validator for backward compatibility.
         /// </summary>
         protected IValidator<TOptions>? Validator { get; }
 
         /// <summary>
-        /// Initializes a new instance of the CommandHandler class.
+        /// Initializes a new instance of the ValidatedCommandHandler class.
         /// </summary>
         /// <param name="logger">The logger instance</param>
-        /// <param name="validator">The optional validator for command options</param>
-        protected CommandHandler(ILogger logger, IValidator<TOptions>? validator = null)
+        /// <param name="validationPipeline">The validation pipeline for middleware-based validation</param>
+        /// <param name="validator">The optional legacy validator for backward compatibility</param>
+        protected ValidatedCommandHandler(
+            ILogger logger, 
+            IValidationPipeline? validationPipeline = null,
+            IValidator<TOptions>? validator = null)
         {
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            ValidationPipeline = validationPipeline;
             Validator = validator;
         }
 
@@ -53,7 +63,7 @@ namespace S7.Core.Abstractions.Commands
 
             if (options.EnableDetailedLogging)
             {
-                Logger.LogInformation("Starting command execution. CorrelationId: {CorrelationId}, CommandType: {CommandType}, Priority: {Priority}",
+                Logger.LogInformation("Starting validated command execution. CorrelationId: {CorrelationId}, CommandType: {CommandType}, Priority: {Priority}",
                     correlationId, GetType().Name, options.Priority);
             }
 
@@ -66,13 +76,15 @@ namespace S7.Core.Abstractions.Commands
                     timeoutCts.Token, 
                     options.CancellationToken);
 
-                // Validate options
-                var validationResult = await ValidateOptionsAsync(options, combinedCts.Token).ConfigureAwait(false);
+                // Execute validation pipeline
+                var validationResult = await ValidateOptionsWithPipelineAsync(options, combinedCts.Token).ConfigureAwait(false);
                 if (!validationResult.IsValid)
                 {
-                    Logger.LogWarning("Command validation failed. CorrelationId: {CorrelationId}, Errors: {Errors}",
-                        correlationId, string.Join(", ", validationResult.Errors));
-                    return CommandResult<TResult>.ValidationFailure(validationResult.Errors, correlationId);
+                    var errorMessages = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+                    Logger.LogWarning("Command validation pipeline failed. CorrelationId: {CorrelationId}, Errors: {ErrorCount}, Details: {Errors}",
+                        correlationId, errorMessages.Count, string.Join("; ", errorMessages));
+                    
+                    return CommandResult<TResult>.ValidationFailure(errorMessages, correlationId);
                 }
 
                 // Execute the command with retry policy if configured
@@ -90,7 +102,7 @@ namespace S7.Core.Abstractions.Commands
 
                 if (options.EnableDetailedLogging)
                 {
-                    Logger.LogInformation("Command execution completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
+                    Logger.LogInformation("Validated command execution completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
                         stopwatch.ElapsedMilliseconds, correlationId);
                 }
 
@@ -99,33 +111,122 @@ namespace S7.Core.Abstractions.Commands
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 stopwatch.Stop();
-                Logger.LogInformation("Command execution was cancelled by caller after {Duration}ms. CorrelationId: {CorrelationId}",
+                Logger.LogInformation("Validated command execution was cancelled by caller after {Duration}ms. CorrelationId: {CorrelationId}",
                     stopwatch.ElapsedMilliseconds, correlationId);
                 return CommandResult<TResult>.Failure("Operation was cancelled", correlationId);
             }
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
-                Logger.LogWarning("Command execution timed out after {Duration}ms. CorrelationId: {CorrelationId}",
+                Logger.LogWarning("Validated command execution timed out after {Duration}ms. CorrelationId: {CorrelationId}",
                     stopwatch.ElapsedMilliseconds, correlationId);
                 return CommandResult<TResult>.Failure($"Operation timed out after {options.TimeoutMs}ms", correlationId);
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                Logger.LogError(ex, "Command execution failed after {Duration}ms. CorrelationId: {CorrelationId}",
+                Logger.LogError(ex, "Validated command execution failed after {Duration}ms. CorrelationId: {CorrelationId}",
                     stopwatch.ElapsedMilliseconds, correlationId);
                 return CommandResult<TResult>.FromException(ex, correlationId);
             }
         }
 
         /// <summary>
-        /// Validates the command options asynchronously.
+        /// Validates the command options using the validation pipeline and legacy validator.
         /// </summary>
         /// <param name="options">The command options to validate</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
-        /// <returns>A task representing the validation result</returns>
-        protected virtual async Task<ValidationResult> ValidateOptionsAsync(
+        /// <returns>A task representing the validation pipeline result</returns>
+        protected virtual async Task<ValidationPipelineResult> ValidateOptionsWithPipelineAsync(
+            TOptions options, 
+            CancellationToken cancellationToken = default)
+        {
+            var pipelineResult = new ValidationPipelineResult { IsValid = true };
+
+            try
+            {
+                // Execute validation pipeline if available
+                if (ValidationPipeline != null)
+                {
+                    Logger.LogDebug("Executing validation pipeline for {OptionsType} with CorrelationId {CorrelationId}",
+                        typeof(TOptions).Name, options.CorrelationId);
+
+                    var pipelineExecutionResult = await ValidationPipeline.ExecuteAsync(options, cancellationToken).ConfigureAwait(false);
+                    
+                    if (pipelineExecutionResult.IsSuccess && pipelineExecutionResult.Value != null)
+                    {
+                        pipelineResult = pipelineExecutionResult.Value;
+                        
+                        Logger.LogDebug("Validation pipeline completed. Valid: {IsValid}, Middleware Executed: {MiddlewareExecuted}, Duration: {Duration}ms",
+                            pipelineResult.IsValid, pipelineResult.MiddlewareExecuted, pipelineResult.ExecutionTime.TotalMilliseconds);
+                    }
+                    else
+                    {
+                        Logger.LogWarning("Validation pipeline execution failed: {ErrorMessage}", pipelineExecutionResult.Error.Message);
+                        pipelineResult.IsValid = false;
+                        pipelineResult.Errors.Add(new ValidationError
+                        {
+                            PropertyName = "Pipeline",
+                            ErrorMessage = pipelineExecutionResult.Error.Message,
+                            MiddlewareName = "ValidationPipeline",
+                            Severity = ValidationSeverity.Critical
+                        });
+                    }
+                }
+                else
+                {
+                    Logger.LogDebug("No validation pipeline configured, falling back to legacy validation");
+                }
+
+                // Execute legacy validation for backward compatibility
+                if (pipelineResult.IsValid)
+                {
+                    var legacyValidationResult = await ValidateLegacyAsync(options, cancellationToken).ConfigureAwait(false);
+                    if (!legacyValidationResult.IsValid)
+                    {
+                        pipelineResult.IsValid = false;
+                        
+                        // Convert legacy validation errors to pipeline format
+                        foreach (var error in legacyValidationResult.Errors)
+                        {
+                            pipelineResult.Errors.Add(new ValidationError
+                            {
+                                PropertyName = "Legacy",
+                                ErrorMessage = error,
+                                MiddlewareName = "LegacyValidator",
+                                Severity = ValidationSeverity.Error
+                            });
+                        }
+                    }
+                }
+
+                return pipelineResult;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Unexpected error during validation pipeline execution for {OptionsType}",
+                    typeof(TOptions).Name);
+
+                pipelineResult.IsValid = false;
+                pipelineResult.Errors.Add(new ValidationError
+                {
+                    PropertyName = "Pipeline",
+                    ErrorMessage = $"Validation pipeline error: {ex.Message}",
+                    MiddlewareName = "ValidationPipeline",
+                    Severity = ValidationSeverity.Critical
+                });
+
+                return pipelineResult;
+            }
+        }
+
+        /// <summary>
+        /// Executes legacy validation for backward compatibility.
+        /// </summary>
+        /// <param name="options">The command options to validate</param>
+        /// <param name="cancellationToken">Cancellation token for the operation</param>
+        /// <returns>A task representing the legacy validation result</returns>
+        protected virtual async Task<ValidationResult> ValidateLegacyAsync(
             TOptions options, 
             CancellationToken cancellationToken = default)
         {
@@ -189,7 +290,7 @@ namespace S7.Core.Abstractions.Commands
                             ? retryPolicy.RetryDelayMs * (int)Math.Pow(2, attempt - 1)
                             : retryPolicy.RetryDelayMs;
 
-                        Logger.LogInformation("Retrying command execution (attempt {Attempt}/{MaxRetries}) after {Delay}ms delay. CorrelationId: {CorrelationId}",
+                        Logger.LogInformation("Retrying validated command execution (attempt {Attempt}/{MaxRetries}) after {Delay}ms delay. CorrelationId: {CorrelationId}",
                             attempt, retryPolicy.MaxRetries, delay, options.CorrelationId);
 
                         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
@@ -204,16 +305,16 @@ namespace S7.Core.Abstractions.Commands
 
                     if (attempt <= retryPolicy.MaxRetries)
                     {
-                        Logger.LogWarning(ex, "Command execution failed (attempt {Attempt}/{MaxRetries}), will retry. CorrelationId: {CorrelationId}",
+                        Logger.LogWarning(ex, "Validated command execution failed (attempt {Attempt}/{MaxRetries}), will retry. CorrelationId: {CorrelationId}",
                             attempt, retryPolicy.MaxRetries, options.CorrelationId);
                     }
                 }
             }
 
             // All retries exhausted
-            Logger.LogError(lastException, "Command execution failed after {MaxRetries} retries. CorrelationId: {CorrelationId}",
+            Logger.LogError(lastException, "Validated command execution failed after {MaxRetries} retries. CorrelationId: {CorrelationId}",
                 retryPolicy.MaxRetries, options.CorrelationId);
-            throw lastException ?? new InvalidOperationException("Command execution failed with unknown error");
+            throw lastException ?? new InvalidOperationException("Validated command execution failed with unknown error");
         }
 
         /// <summary>

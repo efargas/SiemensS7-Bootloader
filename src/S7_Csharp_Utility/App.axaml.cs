@@ -9,9 +9,11 @@ using S7_Csharp_Utility.ViewModels;
 using S7.Net;
 using S7.Core.Abstractions.Services;
 using S7.Services;
+using S7.Core.Commands.Extensions;
 using System;
 using System.Linq;
 using Avalonia.Threading;
+using Microsoft.Extensions.Hosting;
 
 namespace S7_Csharp_Utility
 {
@@ -104,6 +106,9 @@ namespace S7_Csharp_Utility
             services.AddScoped<ICommunicationChannelService, CommunicationChannelService>();
             services.AddScoped<IPowerSupplyService, PowerSupplyService>();
             services.AddScoped<IConfigurationValidationService, ConfigurationValidationService>();
+
+            // Register Validation Pipeline and Middleware
+            services.AddValidationPipeline();
 
             // Register ViewModels
             services.AddSingleton<MainWindowViewModel>();
