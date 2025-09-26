@@ -91,7 +91,7 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-017 | Implement StagerService in `src/S7_Csharp_Core/S7.Services/StagerService.cs` with installation validation and retry logic | [x] | 2024-12-26 |
 | TASK-018 | Implement PayloadService in `src/S7_Csharp_Core/S7.Services/PayloadService.cs` with async scanning and caching capabilities | [x] | 2024-12-26 |
 | TASK-019 | Register all new services in dependency injection container in `src/S7_Csharp_Utility/App.axaml.cs` | [x] | 2024-12-26 |
-| TASK-020 | Create comprehensive unit tests for all service implementations in `tests/S7_Csharp_Utility.Tests/Services/` directory | [ ] | |
+| TASK-020 | Create comprehensive unit tests for all service implementations in `tests/S7_Csharp_Utility.Tests/Services/` directory | [x] | 2024-12-26 |
 
 ### Implementation Phase 3: ViewModel Refactoring and Thread Safety
 
@@ -106,7 +106,7 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-025 | Implement proper async/await patterns in all ViewModels with CancellationToken support | [x] | 2024-12-26 |
 | TASK-026 | Add progress reporting interfaces and implementations for long-running operations | [x] | 2024-12-26 |
 | TASK-027 | Implement proper error handling in ViewModels that delegates to service layer | [x] | 2024-12-26 |
-| TASK-028 | Create ViewModel unit tests in `tests/S7_Csharp_Utility.Tests/ViewModels/` focusing on UI state management only | | |
+| TASK-028 | Create ViewModel unit tests in `tests/S7_Csharp_Utility.Tests/ViewModels/` focusing on UI state management only | [x] | 2024-12-26 |
 | TASK-029 | Validate thread safety with dedicated thread safety tests in `tests/S7.UI.Tests/ThreadSafetyTests.cs` | | |
 | TASK-030 | Performance test ViewModels to ensure no regression from refactoring | | |
 
@@ -137,7 +137,7 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-042 | Add data validation attributes to all command option classes with appropriate error messages | [x] | 2024-12-26 |
 | TASK-043 | Create strongly-typed configuration classes in `src/S7_Csharp_Core/S7.Core.Abstractions/Configuration/` with validation attributes | [x] | 2024-12-26 |
 | TASK-044 | Implement configuration validation service in `src/S7_Csharp_Core/S7.Services/ConfigurationValidationService.cs` | [x] | 2024-12-26 |
-| TASK-045 | Add input validation to all ViewModel properties that accept user input | | |
+| TASK-045 | Add input validation to all ViewModel properties that accept user input | [x] | 2024-12-26 |
 | TASK-046 | Implement validation error handling and user feedback in UI layer | | |
 | TASK-047 | Create validation middleware for command handlers to validate options before execution | | |
 | TASK-048 | Add comprehensive validation tests in `tests/S7.Core.Tests/Validation/` directory | | |

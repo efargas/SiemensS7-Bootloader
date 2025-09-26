@@ -32,14 +32,18 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Gets or sets the Modbus host.
         /// </summary>
-        [Required]
+        [Required(ErrorMessage = "Modbus host is required")]
+        [RegularExpression(@"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$", 
+            ErrorMessage = "Must be a valid IP address (e.g., 192.168.1.100) or hostname (e.g., localhost)")]
         public string ModbusHost
         {
             get => _modbusHost;
             set
             {
-                _modbusHost = value;
-                OnPropertyChanged();
+                if (SetProperty(ref _modbusHost, value))
+                {
+                    ValidateProperty(value, nameof(ModbusHost));
+                }
             }
         }
 
@@ -47,14 +51,17 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Gets or sets the Modbus port.
         /// </summary>
-        [Range(1, 65535)]
+        [Range(1, 65535, ErrorMessage = "Modbus port must be between 1 and 65535")]
+        [Display(Name = "Modbus Port", Description = "TCP port for Modbus communication (default: 502)")]
         public int ModbusPort
         {
             get => _modbusPort;
             set
             {
-                _modbusPort = value;
-                OnPropertyChanged();
+                if (SetProperty(ref _modbusPort, value))
+                {
+                    ValidateProperty(value, nameof(ModbusPort));
+                }
             }
         }
 
@@ -62,14 +69,17 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Gets or sets the Modbus coil.
         /// </summary>
-        [Range(1, 65535)]
+        [Range(1, 65535, ErrorMessage = "Modbus coil address must be between 1 and 65535")]
+        [Display(Name = "Coil Address", Description = "Modbus coil address for power control")]
         public ushort ModbusCoil
         {
             get => _modbusCoil;
             set
             {
-                _modbusCoil = value;
-                OnPropertyChanged();
+                if (SetProperty(ref _modbusCoil, value))
+                {
+                    ValidateProperty(value, nameof(ModbusCoil));
+                }
             }
         }
 
@@ -77,14 +87,17 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Gets or sets the Modbus slave ID.
         /// </summary>
-        [Range(0, 255)]
+        [Range(0, 255, ErrorMessage = "Modbus slave ID must be between 0 and 255")]
+        [Display(Name = "Slave ID", Description = "Modbus slave device ID")]
         public byte ModbusSlaveId
         {
             get => _modbusSlaveId;
             set
             {
-                _modbusSlaveId = value;
-                OnPropertyChanged();
+                if (SetProperty(ref _modbusSlaveId, value))
+                {
+                    ValidateProperty(value, nameof(ModbusSlaveId));
+                }
             }
         }
 
@@ -92,13 +105,17 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Gets or sets the delay in seconds.
         /// </summary>
+        [Range(0, 300, ErrorMessage = "Delay must be between 0 and 300 seconds (5 minutes)")]
+        [Display(Name = "Power Cycle Delay", Description = "Delay in seconds between power off and power on")]
         public int DelaySeconds
         {
             get => _delaySeconds;
             set
             {
-                _delaySeconds = value;
-                OnPropertyChanged();
+                if (SetProperty(ref _delaySeconds, value))
+                {
+                    ValidateProperty(value, nameof(DelaySeconds));
+                }
             }
         }
 

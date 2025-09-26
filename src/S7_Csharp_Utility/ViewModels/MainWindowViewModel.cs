@@ -56,20 +56,33 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly ILogger<MainWindowViewModel> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         private string _dumpAddress = "0x691E28";
-        [Required]
-        [RegularExpression(@"^0x[0-9a-fA-F]+$", ErrorMessage = "Must be a valid hex address (e.g., 0x10000000)")]
+        [Required(ErrorMessage = "Dump address is required")]
+        [RegularExpression(@"^0x[0-9a-fA-F]{1,8}$", ErrorMessage = "Must be a valid hex address (e.g., 0x10000000). Format: 0x followed by 1-8 hex digits")]
         public string DumpAddress
         {
             get => _dumpAddress;
-            set => SetProperty(ref _dumpAddress, value);
+            set 
+            { 
+                if (SetProperty(ref _dumpAddress, value))
+                {
+                    ValidateProperty(value, nameof(DumpAddress));
+                }
+            }
         }
 
         private uint _dumpLength = 16;
-        [Range(1, uint.MaxValue)]
+        [Range(1, uint.MaxValue, ErrorMessage = "Dump length must be at least 1 byte")]
+        [Display(Name = "Dump Length", Description = "Number of bytes to dump from memory")]
         public uint DumpLength
         {
             get => _dumpLength;
-            set => SetProperty(ref _dumpLength, value);
+            set 
+            { 
+                if (SetProperty(ref _dumpLength, value))
+                {
+                    ValidateProperty(value, nameof(DumpLength));
+                }
+            }
         }
 
         private bool _isUploadingStager;

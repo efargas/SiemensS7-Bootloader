@@ -135,6 +135,70 @@ namespace S7_Csharp_Utility.ViewModels
             ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
         }
 
+        /// <summary>
+        /// Validates a property with a specific value.
+        /// </summary>
+        /// <param name="value">The value to validate.</param>
+        /// <param name="propertyName">The name of the property to validate.</param>
+        protected void ValidateProperty(object? value, [CallerMemberName] string? propertyName = null)
+        {
+            if (string.IsNullOrEmpty(propertyName)) return;
+
+            var validationContext = new ValidationContext(this) { MemberName = propertyName };
+            var validationResults = new List<ValidationResult>();
+            Validator.TryValidateProperty(value, validationContext, validationResults);
+
+            if (_errors.ContainsKey(propertyName))
+                _errors.Remove(propertyName);
+
+            if (validationResults.Any())
+            {
+                _errors.Add(propertyName, validationResults.Select(c => c.ErrorMessage ?? string.Empty).ToList());
+            }
+
+            ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+        }
+
+        /// <summary>
+        /// Gets validation errors for a specific property as a formatted string.
+        /// </summary>
+        /// <param name="propertyName">The name of the property.</param>
+        /// <returns>A formatted string containing all validation errors for the property.</returns>
+        protected string GetValidationErrorsString(string propertyName)
+        {
+            if (!_errors.ContainsKey(propertyName))
+                return string.Empty;
+
+            return string.Join(Environment.NewLine, _errors[propertyName]);
+        }
+
+        /// <summary>
+        /// Clears all validation errors for a specific property.
+        /// </summary>
+        /// <param name="propertyName">The name of the property.</param>
+        protected void ClearValidationErrors(string propertyName)
+        {
+            if (_errors.ContainsKey(propertyName))
+            {
+                _errors.Remove(propertyName);
+                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+            }
+        }
+
+        /// <summary>
+        /// Clears all validation errors.
+        /// </summary>
+        protected void ClearAllValidationErrors()
+        {
+            var propertyNames = _errors.Keys.ToList();
+            _errors.Clear();
+            
+            foreach (var propertyName in propertyNames)
+            {
+                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
+            }
+        }
+
         protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             if (EqualityComparer<T>.Default.Equals(field, value)) return false;

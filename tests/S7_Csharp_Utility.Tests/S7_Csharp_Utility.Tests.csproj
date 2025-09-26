@@ -27,6 +27,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\S7_Csharp_Utility\S7_Csharp_Utility.csproj" />
     <ProjectReference Include="..\..\src\S7_Csharp_Core\S7.Net\S7.Net.csproj" />
+    <ProjectReference Include="..\..\src\S7_Csharp_Core\S7.Services\S7.Services.csproj" />
+    <ProjectReference Include="..\..\src\S7_Csharp_Core\S7.Core.Abstractions\S7.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\S7_Csharp_Core\S7.Utils\S7.Utils.csproj" />
   </ItemGroup>
 
 </Project>
