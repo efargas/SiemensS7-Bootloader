@@ -100,9 +100,9 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
 | TASK-021 | Refactor MainWindowViewModel in `src/S7_Csharp_Utility/ViewModels/MainWindowViewModel.cs` to use service layer and remove PLC business logic | [x] | 2024-12-26 |
-| TASK-022 | Implement thread-safe collection updates in MainWindowViewModel using Dispatcher.UIThread.InvokeAsync for DiscoveredPayloads | | |
+| TASK-022 | Implement thread-safe collection updates in MainWindowViewModel using Dispatcher.UIThread.InvokeAsync for DiscoveredPayloads | [x] | 2024-12-26 |
 | TASK-023 | Refactor PlcConnectionViewModel in `src/S7_Csharp_Utility/ViewModels/PlcConnectionViewModel.cs` to delegate connection logic to service layer | [x] | 2024-12-26 |
-| TASK-024 | Refactor ModbusPowerSupplyViewModel in `src/S7_Csharp_Utility/ViewModels/ModbusPowerSupplyViewModel.cs` to use service abstractions | | |
+| TASK-024 | Refactor ModbusPowerSupplyViewModel in `src/S7_Csharp_Utility/ViewModels/ModbusPowerSupplyViewModel.cs` to use service abstractions | [x] | 2024-12-26 |
 | TASK-025 | Implement proper async/await patterns in all ViewModels with CancellationToken support | | |
 | TASK-026 | Add progress reporting interfaces and implementations for long-running operations | | |
 | TASK-027 | Implement proper error handling in ViewModels that delegates to service layer | | |

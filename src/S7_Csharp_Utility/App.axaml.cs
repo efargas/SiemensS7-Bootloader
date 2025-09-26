@@ -94,6 +94,7 @@ namespace S7_Csharp_Utility
                 return new PowerController((message, isError) =>
                     loggingService.Log(message, isError ? LogCategory.Error : LogCategory.Info));
             });
+            services.AddSingleton<IPowerController>(sp => sp.GetRequiredService<PowerController>());
 
             // Register New Service Layer (Enterprise Architecture)
             services.AddScoped<IPlcOperationService, PlcOperationService>();
@@ -101,6 +102,7 @@ namespace S7_Csharp_Utility
             services.AddScoped<IStagerService, StagerService>();
             services.AddScoped<IPayloadService, PayloadService>();
             services.AddScoped<ICommunicationChannelService, CommunicationChannelService>();
+            services.AddScoped<IPowerSupplyService, PowerSupplyService>();
 
             // Register ViewModels
             services.AddSingleton<MainWindowViewModel>();
