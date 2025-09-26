@@ -91,7 +91,7 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-017 | Implement StagerService in `src/S7_Csharp_Core/S7.Services/StagerService.cs` with installation validation and retry logic | [x] | 2024-12-26 |
 | TASK-018 | Implement PayloadService in `src/S7_Csharp_Core/S7.Services/PayloadService.cs` with async scanning and caching capabilities | [x] | 2024-12-26 |
 | TASK-019 | Register all new services in dependency injection container in `src/S7_Csharp_Utility/App.axaml.cs` | [x] | 2024-12-26 |
-| TASK-020 | Create comprehensive unit tests for all service implementations in `tests/S7_Csharp_Utility.Tests/Services/` directory | | |
+| TASK-020 | Create comprehensive unit tests for all service implementations in `tests/S7_Csharp_Utility.Tests/Services/` directory | [ ] | |
 
 ### Implementation Phase 3: ViewModel Refactoring and Thread Safety
 

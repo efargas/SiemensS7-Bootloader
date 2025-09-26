@@ -386,7 +386,7 @@ namespace S7.Services
         }
 
         /// <inheritdoc />
-        public async Task<Result<ValidationResult>> ValidateConnectionAsync(
+        public async Task<Result<S7.Core.Abstractions.Validation.ValidationResult>> ValidateConnectionAsync(
             CommunicationChannelConfig channelConfig,
             CancellationToken cancellationToken = default)
         {
@@ -401,35 +401,35 @@ namespace S7.Services
             {
                 SetConnectionStatus(PlcConnectionStatus.Validating);
 
-                var validationResult = new ValidationResult();
+                var errors = new List<string>();
 
                 // Validate configuration
                 if (string.IsNullOrWhiteSpace(channelConfig.Mode))
                 {
-                    validationResult.AddError("Connection mode is required");
+                    errors.Add("Connection mode is required");
                 }
 
                 if (channelConfig.Mode?.ToUpperInvariant() == "TCP")
                 {
                     if (string.IsNullOrWhiteSpace(channelConfig.Host))
                     {
-                        validationResult.AddError("Host is required for TCP connection");
+                        errors.Add("Host is required for TCP connection");
                     }
                     if (channelConfig.Port <= 0 || channelConfig.Port > 65535)
                     {
-                        validationResult.AddError("Port must be between 1 and 65535");
+                        errors.Add("Port must be between 1 and 65535");
                     }
                 }
                 else if (channelConfig.Mode?.ToUpperInvariant() == "SERIAL")
                 {
                     if (string.IsNullOrWhiteSpace(channelConfig.SerialPort))
                     {
-                        validationResult.AddError("Serial port is required for serial connection");
+                        errors.Add("Serial port is required for serial connection");
                     }
                 }
 
                 // Test connection if configuration is valid
-                if (validationResult.IsValid)
+                if (errors.Count == 0)
                 {
                     try
                     {
@@ -437,34 +437,38 @@ namespace S7.Services
                         if (connectionResult.IsSuccess)
                         {
                             await DisconnectAsync(cancellationToken).ConfigureAwait(false);
-                            validationResult.AddInfo("Connection test successful");
+                            _logger.LogInformation("Connection test successful");
                         }
                         else
                         {
-                            validationResult.AddWarning($"Connection test failed: {connectionResult.ErrorMessage}");
+                            errors.Add($"Connection test failed: {connectionResult.ErrorMessage}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        validationResult.AddWarning($"Connection test failed: {ex.Message}");
+                        errors.Add($"Connection test failed: {ex.Message}");
                     }
                 }
 
                 stopwatch.Stop();
                 SetConnectionStatus(PlcConnectionStatus.Disconnected);
 
+                var validationResult = errors.Count == 0 
+                    ? S7.Core.Abstractions.Validation.ValidationResult.Success()
+                    : S7.Core.Abstractions.Validation.ValidationResult.Failure(errors);
+
                 _logger.LogInformation("Connection validation completed in {Duration}ms. Valid: {IsValid}",
                     stopwatch.ElapsedMilliseconds, validationResult.IsValid);
 
                 OnOperationCompleted(operationName, validationResult.IsValid, stopwatch.Elapsed);
-                return Result<ValidationResult>.Success(validationResult);
+                return Result<S7.Core.Abstractions.Validation.ValidationResult>.Success(validationResult);
             }
             catch (Exception ex)
             {
                 SetConnectionStatus(PlcConnectionStatus.Error);
                 _logger.LogError(ex, "Connection validation failed");
                 OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
-                return Result<ValidationResult>.Failure($"Validation failed: {ex.Message}");
+                return Result<S7.Core.Abstractions.Validation.ValidationResult>.Failure($"Validation failed: {ex.Message}");
             }
         }
 
