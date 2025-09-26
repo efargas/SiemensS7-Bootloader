@@ -9,29 +9,35 @@ namespace S7.Services
 {
     public class FileStreamVirtualReader(string filePath, int preferredPageSize = 4096) : IVirtualFileReader, IDisposable
     {
-        private readonly FileStream _fs = filePath == null 
-            ? throw new ArgumentNullException(nameof(filePath))
-            : !File.Exists(filePath) 
-                ? throw new FileNotFoundException("File not found.", filePath)
-                : new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        private readonly long _length = _fs.Length;
+        private readonly FileStream _fs = InitializeFileStream(filePath);
         private readonly int _preferredPageSize = preferredPageSize;
 
-        public long Length => _length;
+        private static FileStream InitializeFileStream(string filePath)
+        {
+            ArgumentNullException.ThrowIfNull(filePath);
+            
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException("File not found.", filePath);
+                
+            return new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        }
+
+        public long Length => _fs.Length;
         public int PageSize => _preferredPageSize;
 
         public async Task<Page> ReadPageAsync(long pageIndex, int pageSize, CancellationToken ct)
         {
             long offset = pageIndex * pageSize;
+            long length = _fs.Length;
 
-            if (offset >= _length)
+            if (offset >= length)
             {
                 return new Page(pageIndex, ReadOnlyMemory<byte>.Empty, 0);
             }
 
             ct.ThrowIfCancellationRequested();
 
-            long bytesToRead = Math.Min(pageSize, _length - offset);
+            long bytesToRead = Math.Min(pageSize, length - offset);
             var buffer = new byte[bytesToRead];
 
             _fs.Seek(offset, SeekOrigin.Begin);

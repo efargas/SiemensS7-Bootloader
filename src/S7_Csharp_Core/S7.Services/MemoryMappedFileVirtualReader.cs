@@ -10,30 +10,36 @@ namespace S7.Services
 {
     public class MemoryMappedFileVirtualReader(string filePath, int preferredPageSize = 4096) : IVirtualFileReader, IDisposable
     {
-        private readonly FileInfo _fileInfo = filePath == null 
-            ? throw new ArgumentNullException(nameof(filePath))
-            : !File.Exists(filePath) 
-                ? throw new FileNotFoundException("File not found.", filePath)
-                : new FileInfo(filePath);
-        private readonly long _length = _fileInfo.Length;
+        private readonly FileInfo _fileInfo = InitializeFileInfo(filePath);
         private readonly int _preferredPageSize = preferredPageSize;
         private readonly MemoryMappedFile _mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
 
-        public long Length => _length;
+        private static FileInfo InitializeFileInfo(string filePath)
+        {
+            ArgumentNullException.ThrowIfNull(filePath);
+            
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException("File not found.", filePath);
+                
+            return new FileInfo(filePath);
+        }
+
+        public long Length => _fileInfo.Length;
         public int PageSize => _preferredPageSize;
 
         public Task<Page> ReadPageAsync(long pageIndex, int pageSize, CancellationToken ct)
         {
             long offset = pageIndex * pageSize;
+            long length = _fileInfo.Length;
 
-            if (offset >= _length)
+            if (offset >= length)
             {
                 return Task.FromResult(new Page(pageIndex, ReadOnlyMemory<byte>.Empty, 0));
             }
 
             ct.ThrowIfCancellationRequested();
 
-            long bytesToRead = Math.Min(pageSize, _length - offset);
+            long bytesToRead = Math.Min(pageSize, length - offset);
 
             using (var accessor = _mmf.CreateViewAccessor(offset, bytesToRead, MemoryMappedFileAccess.Read))
             {

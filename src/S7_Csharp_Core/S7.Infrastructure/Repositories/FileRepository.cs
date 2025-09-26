@@ -18,25 +18,13 @@ namespace S7.Infrastructure.Repositories;
 /// File-based repository implementation that provides data access operations for file entities.
 /// Integrates with the existing virtual file reader infrastructure for optimal performance.
 /// </summary>
-public class FileRepository : IFileRepository
+public class FileRepository(int maxCacheSize = 50) : IFileRepository
 {
-    private readonly ConcurrentDictionary<string, IVirtualFileReader> _readerCache;
-    private readonly ConcurrentDictionary<string, FileEntity> _entityCache;
-    private readonly SemaphoreSlim _cacheSemaphore;
-    private readonly int _maxCacheSize;
+    private readonly ConcurrentDictionary<string, IVirtualFileReader> _readerCache = new();
+    private readonly ConcurrentDictionary<string, FileEntity> _entityCache = new();
+    private readonly SemaphoreSlim _cacheSemaphore = new(1, 1);
+    private readonly int _maxCacheSize = maxCacheSize;
     private bool _disposed;
-
-    /// <summary>
-    /// Initializes a new instance of the FileRepository class.
-    /// </summary>
-    /// <param name="maxCacheSize">Maximum number of file readers to cache</param>
-    public FileRepository(int maxCacheSize = 50)
-    {
-        _maxCacheSize = maxCacheSize;
-        _readerCache = new ConcurrentDictionary<string, IVirtualFileReader>();
-        _entityCache = new ConcurrentDictionary<string, FileEntity>();
-        _cacheSemaphore = new SemaphoreSlim(1, 1);
-    }
 
     /// <inheritdoc />
     public async Task<FileEntity?> GetByIdAsync(string id, CancellationToken cancellationToken = default)

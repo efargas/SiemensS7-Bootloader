@@ -11,22 +11,12 @@ namespace S7.Infrastructure.Repositories;
 /// File-based Unit of Work implementation that coordinates transactions across multiple file repositories.
 /// Provides atomic operations and rollback capabilities for file-based data operations.
 /// </summary>
-public class FileUnitOfWork : IUnitOfWork
+public class FileUnitOfWork() : IUnitOfWork
 {
-    private readonly ConcurrentDictionary<Type, object> _repositories;
-    private readonly List<ITransactionOperation> _pendingOperations;
-    private readonly SemaphoreSlim _operationSemaphore;
+    private readonly ConcurrentDictionary<Type, object> _repositories = new();
+    private readonly List<ITransactionOperation> _pendingOperations = new();
+    private readonly SemaphoreSlim _operationSemaphore = new(1, 1);
     private bool _disposed;
-
-    /// <summary>
-    /// Initializes a new instance of the FileUnitOfWork class.
-    /// </summary>
-    public FileUnitOfWork()
-    {
-        _repositories = new ConcurrentDictionary<Type, object>();
-        _pendingOperations = new List<ITransactionOperation>();
-        _operationSemaphore = new SemaphoreSlim(1, 1);
-    }
 
     /// <inheritdoc />
     public bool HasPendingChanges => _pendingOperations.Count > 0;
@@ -171,20 +161,13 @@ public class FileUnitOfWork : IUnitOfWork
 /// <summary>
 /// File-based transaction scope implementation.
 /// </summary>
-internal class FileTransactionScope : ITransactionScope
+internal class FileTransactionScope(FileUnitOfWork unitOfWork) : ITransactionScope
 {
-    private readonly FileUnitOfWork _unitOfWork;
+    private readonly FileUnitOfWork _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
     private bool _disposed;
 
-    public FileTransactionScope(FileUnitOfWork unitOfWork)
-    {
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        TransactionId = Guid.NewGuid();
-        IsCompleted = false;
-    }
-
     /// <inheritdoc />
-    public Guid TransactionId { get; }
+    public Guid TransactionId { get; } = Guid.NewGuid();
 
     /// <inheritdoc />
     public bool IsCompleted { get; private set; }
@@ -276,21 +259,14 @@ internal interface ITransactionOperation
 /// <summary>
 /// File copy operation that can be rolled back.
 /// </summary>
-internal class FileCopyOperation : ITransactionOperation
+internal class FileCopyOperation(string sourcePath, string destinationPath, bool overwrite = false) : ITransactionOperation
 {
-    private readonly string _sourcePath;
-    private readonly string _destinationPath;
-    private readonly bool _overwrite;
+    private readonly string _sourcePath = sourcePath ?? throw new ArgumentNullException(nameof(sourcePath));
+    private readonly string _destinationPath = destinationPath ?? throw new ArgumentNullException(nameof(destinationPath));
+    private readonly bool _overwrite = overwrite;
     private bool _executed;
     private bool _destinationExisted;
     private string? _backupPath;
-
-    public FileCopyOperation(string sourcePath, string destinationPath, bool overwrite = false)
-    {
-        _sourcePath = sourcePath ?? throw new ArgumentNullException(nameof(sourcePath));
-        _destinationPath = destinationPath ?? throw new ArgumentNullException(nameof(destinationPath));
-        _overwrite = overwrite;
-    }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {

@@ -16,25 +16,13 @@ namespace S7.Infrastructure.Repositories;
 /// Memory dump repository implementation that provides specialized operations for PLC memory dumps.
 /// Integrates with the file repository infrastructure while adding memory-specific functionality.
 /// </summary>
-public class MemoryDumpRepository : IMemoryDumpRepository
+public class MemoryDumpRepository(IFileRepository fileRepository) : IMemoryDumpRepository
 {
-    private readonly IFileRepository _fileRepository;
-    private readonly ConcurrentDictionary<string, MemoryDump> _dumpCache;
-    private readonly ConcurrentDictionary<string, IVirtualFileReader> _readerCache;
-    private readonly SemaphoreSlim _cacheSemaphore;
+    private readonly IFileRepository _fileRepository = fileRepository ?? throw new ArgumentNullException(nameof(fileRepository));
+    private readonly ConcurrentDictionary<string, MemoryDump> _dumpCache = new();
+    private readonly ConcurrentDictionary<string, IVirtualFileReader> _readerCache = new();
+    private readonly SemaphoreSlim _cacheSemaphore = new(1, 1);
     private bool _disposed;
-
-    /// <summary>
-    /// Initializes a new instance of the MemoryDumpRepository class.
-    /// </summary>
-    /// <param name="fileRepository">The underlying file repository for file operations</param>
-    public MemoryDumpRepository(IFileRepository fileRepository)
-    {
-        _fileRepository = fileRepository ?? throw new ArgumentNullException(nameof(fileRepository));
-        _dumpCache = new ConcurrentDictionary<string, MemoryDump>();
-        _readerCache = new ConcurrentDictionary<string, IVirtualFileReader>();
-        _cacheSemaphore = new SemaphoreSlim(1, 1);
-    }
 
     /// <inheritdoc />
     public async Task<MemoryDump?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
