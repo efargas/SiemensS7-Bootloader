@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using S7.Core.Abstractions.Configuration;
 using S7.Core.Abstractions.Providers;
-using S7.Core.Commands.Extensions;
+using S7.Infrastructure.Extensions;
 using S7.Infrastructure.Providers;
 using Xunit;
 
@@ -223,7 +223,7 @@ namespace S7.Core.Tests.Providers
             var serviceProvider = services.BuildServiceProvider();
 
             // Assert
-            Assert.NotNull(serviceProvider.GetService<IServiceProvider<string>>());
+            Assert.NotNull(serviceProvider.GetService<IDynamicProvider<string>>());
             Assert.NotNull(serviceProvider.GetService<FileSystemProvider<string>>());
             Assert.NotNull(serviceProvider.GetService<MemoryProvider<string>>());
             Assert.NotNull(serviceProvider.GetService<CachingProvider<string>>());

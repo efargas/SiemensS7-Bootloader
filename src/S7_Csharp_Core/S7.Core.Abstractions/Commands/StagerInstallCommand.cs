@@ -6,77 +6,29 @@ namespace S7.Core.Abstractions.Commands
 {
     /// <summary>
     /// Command for installing a stager on a PLC.
+    /// This command encapsulates the options required for the operation.
     /// </summary>
     public class StagerInstallCommand : ICommand<StagerInstallResult>
     {
         /// <summary>
+        /// Gets the options for the stager installation operation.
+        /// </summary>
+        [Required]
+        public StagerInstallOptions Options { get; }
+
+        /// <summary>
         /// Gets the correlation ID for tracking this command execution.
         /// </summary>
-        public string CorrelationId { get; init; } = Guid.NewGuid().ToString();
+        public string CorrelationId => Options.CorrelationId;
 
         /// <summary>
-        /// Gets the path to the stager payload file.
+        /// Initializes a new instance of the <see cref="StagerInstallCommand"/> class.
         /// </summary>
-        [Required]
-        public string PayloadPath { get; init; } = string.Empty;
-
-        /// <summary>
-        /// Gets the communication channel configuration.
-        /// </summary>
-        [Required]
-        public CommunicationChannelConfig ChannelConfig { get; init; } = new();
-
-        /// <summary>
-        /// Gets the power controller configuration (optional).
-        /// If provided, power cycling will be performed as part of the installation.
-        /// </summary>
-        public PowerControllerConfig? PowerConfig { get; init; }
-
-        /// <summary>
-        /// Gets a value indicating whether to perform a handshake before installation.
-        /// </summary>
-        public bool PerformHandshake { get; init; } = true;
-
-        /// <summary>
-        /// Gets a value indicating whether to retrieve version information after installation.
-        /// </summary>
-        public bool GetVersionInfo { get; init; } = false;
-
-        /// <summary>
-        /// Gets the timeout for the entire installation operation.
-        /// </summary>
-        public TimeSpan OperationTimeout { get; init; } = TimeSpan.FromMinutes(5);
-
-        /// <summary>
-        /// Gets a value indicating whether to perform power cycling before installation.
-        /// </summary>
-        public bool PowerCycleBeforeInstall { get; init; } = false;
-
-        /// <summary>
-        /// Gets a value indicating whether to perform power cycling after installation.
-        /// </summary>
-        public bool PowerCycleAfterInstall { get; init; } = false;
-
-        /// <summary>
-        /// Gets the number of retry attempts for the installation.
-        /// </summary>
-        [Range(0, 10)]
-        public int RetryAttempts { get; init; } = 3;
-
-        /// <summary>
-        /// Gets the delay between retry attempts.
-        /// </summary>
-        public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(2);
-
-        /// <summary>
-        /// Gets a value indicating whether to verify the stager installation.
-        /// </summary>
-        public bool VerifyInstallation { get; init; } = true;
-
-        /// <summary>
-        /// Gets additional installation options as key-value pairs.
-        /// </summary>
-        public string? InstallationOptions { get; init; }
+        /// <param name="options">The options for the stager installation operation.</param>
+        public StagerInstallCommand(StagerInstallOptions options)
+        {
+            Options = options ?? throw new ArgumentNullException(nameof(options));
+        }
     }
 
     /// <summary>

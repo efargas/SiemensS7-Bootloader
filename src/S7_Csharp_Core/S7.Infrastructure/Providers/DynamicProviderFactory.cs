@@ -12,32 +12,32 @@ using S7.Core.Abstractions.Providers;
 namespace S7.Infrastructure.Providers
 {
     /// <summary>
-    /// Provides factory methods for creating service provider instances with dependency injection support.
+    /// Provides factory methods for creating dynamic provider instances with dependency injection support.
     /// </summary>
     /// <remarks>
     /// This factory supports configuration-driven provider selection and integrates with
     /// the Microsoft.Extensions.DependencyInjection container.
     /// </remarks>
-    public class ServiceProviderFactory(
+    public class DynamicProviderFactory(
         IServiceProvider serviceProvider,
         IProviderRegistry providerRegistry,
         IOptionsMonitor<ProviderConfiguration> configuration,
-        ILogger<ServiceProviderFactory> logger) : IProviderFactory
+        ILogger<DynamicProviderFactory> logger) : IProviderFactory
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         private readonly IProviderRegistry _providerRegistry = providerRegistry ?? throw new ArgumentNullException(nameof(providerRegistry));
         private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        private readonly ILogger<ServiceProviderFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly ILogger<DynamicProviderFactory> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         /// <summary>
-        /// Creates a service provider for the specified type using the default configuration.
+        /// Creates a dynamic provider for the specified type using the default configuration.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
-        /// <returns>A configured service provider instance.</returns>
+        /// <returns>A configured dynamic provider instance.</returns>
         /// <exception cref="InvalidOperationException">
         /// Thrown when the provider cannot be created due to configuration issues.
         /// </exception>
-        public IServiceProvider<T> CreateProvider<T>() where T : class
+        public IDynamicProvider<T> CreateProvider<T>() where T : class
         {
             try
             {
@@ -49,7 +49,7 @@ namespace S7.Infrastructure.Providers
                 // Check if there's a default provider configured for this type
                 if (config.DefaultProviders.TryGetValue(serviceTypeName, out var defaultProviderName))
                 {
-                    _logger.LogDebug("Using configured default provider {ProviderName} for type {ServiceType}", 
+                    _logger.LogDebug("Using configured default provider {ProviderName} for type {ServiceType}",
                         defaultProviderName, typeof(T).Name);
                     return CreateProvider<T>(defaultProviderName);
                 }
@@ -63,7 +63,7 @@ namespace S7.Infrastructure.Providers
                 }
 
                 var selectedProvider = SelectProvider<T>(availableProviders, config.DefaultSelectionStrategy);
-                _logger.LogDebug("Selected provider {ProviderName} for type {ServiceType} using strategy {Strategy}", 
+                _logger.LogDebug("Selected provider {ProviderName} for type {ServiceType} using strategy {Strategy}",
                     selectedProvider, typeof(T).Name, config.DefaultSelectionStrategy);
 
                 return CreateProvider<T>(selectedProvider);
@@ -76,16 +76,16 @@ namespace S7.Infrastructure.Providers
         }
 
         /// <summary>
-        /// Creates a service provider for the specified type using the provided configuration.
+        /// Creates a dynamic provider for the specified type using the provided configuration.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="configuration">The provider configuration to use.</param>
-        /// <returns>A configured service provider instance.</returns>
+        /// <returns>A configured dynamic provider instance.</returns>
         /// <exception cref="ArgumentNullException">Thrown when configuration is null.</exception>
         /// <exception cref="InvalidOperationException">
         /// Thrown when the provider cannot be created due to configuration issues.
         /// </exception>
-        public IServiceProvider<T> CreateProvider<T>(ProviderConfiguration configuration) where T : class
+        public IDynamicProvider<T> CreateProvider<T>(ProviderConfiguration configuration) where T : class
         {
             if (configuration == null)
                 throw new ArgumentNullException(nameof(configuration));
@@ -120,16 +120,16 @@ namespace S7.Infrastructure.Providers
         }
 
         /// <summary>
-        /// Creates a service provider for the specified type with a specific name.
+        /// Creates a dynamic provider for the specified type with a specific name.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="providerName">The name of the provider to create.</param>
-        /// <returns>A configured service provider instance.</returns>
+        /// <returns>A configured dynamic provider instance.</returns>
         /// <exception cref="ArgumentException">Thrown when providerName is null or empty.</exception>
         /// <exception cref="InvalidOperationException">
         /// Thrown when the provider cannot be created.
         /// </exception>
-        public IServiceProvider<T> CreateProvider<T>(string providerName) where T : class
+        public IDynamicProvider<T> CreateProvider<T>(string providerName) where T : class
         {
             if (string.IsNullOrWhiteSpace(providerName))
                 throw new ArgumentException("Provider name cannot be null or empty", nameof(providerName));
@@ -156,24 +156,24 @@ namespace S7.Infrastructure.Providers
         }
 
         /// <summary>
-        /// Asynchronously creates a service provider for the specified type.
+        /// Asynchronously creates a dynamic provider for the specified type.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the provider instance.</returns>
-        public async Task<IServiceProvider<T>> CreateProviderAsync<T>(CancellationToken cancellationToken = default) where T : class
+        public async Task<IDynamicProvider<T>> CreateProviderAsync<T>(CancellationToken cancellationToken = default) where T : class
         {
             return await Task.Run(() => CreateProvider<T>(), cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Asynchronously creates a service provider for the specified type using the provided configuration.
+        /// Asynchronously creates a dynamic provider for the specified type using the provided configuration.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="configuration">The provider configuration to use.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the provider instance.</returns>
-        public async Task<IServiceProvider<T>> CreateProviderAsync<T>(ProviderConfiguration configuration, CancellationToken cancellationToken = default) where T : class
+        public async Task<IDynamicProvider<T>> CreateProviderAsync<T>(ProviderConfiguration configuration, CancellationToken cancellationToken = default) where T : class
         {
             return await Task.Run(() => CreateProvider<T>(configuration), cancellationToken).ConfigureAwait(false);
         }
@@ -323,7 +323,7 @@ namespace S7.Infrastructure.Providers
             // Simple round-robin implementation - in production, this would use a more sophisticated approach
             var serviceTypeName = typeof(T).FullName ?? typeof(T).Name;
             var key = $"RoundRobin_{serviceTypeName}";
-            
+
             // This is a simplified implementation - in production, you'd use a proper state management approach
             var index = Math.Abs(key.GetHashCode()) % availableProviders.Count;
             return availableProviders[index];

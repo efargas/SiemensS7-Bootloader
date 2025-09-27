@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using S7.Core.Abstractions.Configuration;
 
 namespace S7.Core.Abstractions.Providers
 {
     /// <summary>
-    /// Provides factory methods for creating service provider instances with dependency injection support.
+    /// Provides factory methods for creating dynamic provider instances with dependency injection support.
     /// </summary>
     /// <remarks>
     /// This factory supports configuration-driven provider selection and integrates with
@@ -16,55 +17,55 @@ namespace S7.Core.Abstractions.Providers
     public interface IProviderFactory
     {
         /// <summary>
-        /// Creates a service provider for the specified type using the default configuration.
+        /// Creates a dynamic provider for the specified type using the default configuration.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
-        /// <returns>A configured service provider instance.</returns>
+        /// <returns>A configured dynamic provider instance.</returns>
         /// <exception cref="InvalidOperationException">
         /// Thrown when the provider cannot be created due to configuration issues.
         /// </exception>
-        IServiceProvider<T> CreateProvider<T>() where T : class;
+        IDynamicProvider<T> CreateProvider<T>() where T : class;
 
         /// <summary>
-        /// Creates a service provider for the specified type using the provided configuration.
+        /// Creates a dynamic provider for the specified type using the provided configuration.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="configuration">The provider configuration to use.</param>
-        /// <returns>A configured service provider instance.</returns>
+        /// <returns>A configured dynamic provider instance.</returns>
         /// <exception cref="ArgumentNullException">Thrown when configuration is null.</exception>
         /// <exception cref="InvalidOperationException">
         /// Thrown when the provider cannot be created due to configuration issues.
         /// </exception>
-        IServiceProvider<T> CreateProvider<T>(ProviderConfiguration configuration) where T : class;
+        IDynamicProvider<T> CreateProvider<T>(ProviderConfiguration configuration) where T : class;
 
         /// <summary>
-        /// Creates a service provider for the specified type with a specific name.
+        /// Creates a dynamic provider for the specified type with a specific name.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="providerName">The name of the provider to create.</param>
-        /// <returns>A configured service provider instance.</returns>
+        /// <returns>A configured dynamic provider instance.</returns>
         /// <exception cref="ArgumentException">Thrown when providerName is null or empty.</exception>
         /// <exception cref="InvalidOperationException">
         /// Thrown when the provider cannot be created.
         /// </exception>
-        IServiceProvider<T> CreateProvider<T>(string providerName) where T : class;
+        IDynamicProvider<T> CreateProvider<T>(string providerName) where T : class;
 
         /// <summary>
-        /// Asynchronously creates a service provider for the specified type.
+        /// Asynchronously creates a dynamic provider for the specified type.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the provider instance.</returns>
-        Task<IServiceProvider<T>> CreateProviderAsync<T>(CancellationToken cancellationToken = default) where T : class;
+        Task<IDynamicProvider<T>> CreateProviderAsync<T>(CancellationToken cancellationToken = default) where T : class;
 
         /// <summary>
-        /// Asynchronously creates a service provider for the specified type using the provided configuration.
+        /// Asynchronously creates a dynamic provider for the specified type using the provided configuration.
         /// </summary>
         /// <typeparam name="T">The type of service to provide.</typeparam>
         /// <param name="configuration">The provider configuration to use.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the provider instance.</returns>
-        Task<IServiceProvider<T>> CreateProviderAsync<T>(ProviderConfiguration configuration, CancellationToken cancellationToken = default) where T : class;
+        Task<IDynamicProvider<T>> CreateProviderAsync<T>(ProviderConfiguration configuration, CancellationToken cancellationToken = default) where T : class;
 
         /// <summary>
         /// Determines whether a provider can be created for the specified type.

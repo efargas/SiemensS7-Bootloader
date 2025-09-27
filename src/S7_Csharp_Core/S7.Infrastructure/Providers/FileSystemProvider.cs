@@ -23,7 +23,7 @@ namespace S7.Infrastructure.Providers
     public class FileSystemProvider<T>(
         IServiceProvider serviceProvider,
         IOptionsMonitor<ProviderConfiguration> configuration,
-        ILogger<FileSystemProvider<T>> logger) : IServiceProvider<T> where T : class
+        ILogger<FileSystemProvider<T>> logger) : IDynamicProvider<T> where T : class
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -60,7 +60,7 @@ namespace S7.Infrastructure.Providers
 
                 if (config.DefaultProviders.TryGetValue(serviceTypeName, out var defaultProviderName))
                 {
-                    _logger.LogDebug("Using configured default provider {ProviderName} for type {ServiceType}", 
+                    _logger.LogDebug("Using configured default provider {ProviderName} for type {ServiceType}",
                         defaultProviderName, typeof(T).Name);
                     return GetService(defaultProviderName);
                 }
@@ -374,7 +374,7 @@ namespace S7.Infrastructure.Providers
                         Name = name,
                         ServiceType = typeof(T),
                         IsAvailable = true,
-                        Lifetime = S7.Core.Abstractions.Providers.ServiceLifetime.Scoped
+                        Lifetime = ServiceLifetime.Scoped
                     };
 
                     serviceMetadata.Name = name;
@@ -477,7 +477,7 @@ namespace S7.Infrastructure.Providers
                     }
                 }
 
-                _logger.LogDebug("Initialized file system provider for type {ServiceType} with {ServiceCount} services", 
+                _logger.LogDebug("Initialized file system provider for type {ServiceType} with {ServiceCount} services",
                     typeof(T).Name, _serviceMetadata.Count);
             }
             catch (Exception ex)
@@ -555,7 +555,7 @@ namespace S7.Infrastructure.Providers
                     Name = name,
                     ServiceType = typeof(T),
                     IsAvailable = true,
-                    Lifetime = S7.Core.Abstractions.Providers.ServiceLifetime.Scoped,
+                    Lifetime = ServiceLifetime.Scoped,
                     Description = "File system persisted service"
                 };
             }

@@ -11,7 +11,7 @@ using S7.Services.Configuration;
 using S7.Services.Interfaces;
 using S7.Services;
 
-namespace S7.Core.Commands.Extensions
+namespace S7.Infrastructure.Extensions
 {
     /// <summary>
     /// Extension methods for registering factory services in the dependency injection container.

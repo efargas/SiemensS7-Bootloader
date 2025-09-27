@@ -23,7 +23,7 @@ namespace S7.Infrastructure.Providers
     public class MemoryProvider<T>(
         IServiceProvider serviceProvider,
         IOptionsMonitor<ProviderConfiguration> configuration,
-        ILogger<MemoryProvider<T>> logger) : IServiceProvider<T> where T : class
+        ILogger<MemoryProvider<T>> logger) : IDynamicProvider<T> where T : class
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -89,7 +89,7 @@ namespace S7.Infrastructure.Providers
                 var serviceTypeName = typeof(T).FullName ?? typeof(T).Name;
                 if (config.DefaultProviders.TryGetValue(serviceTypeName, out var defaultProviderName))
                 {
-                    _logger.LogDebug("Using configured default provider {ProviderName} for type {ServiceType}", 
+                    _logger.LogDebug("Using configured default provider {ProviderName} for type {ServiceType}",
                         defaultProviderName, typeof(T).Name);
                     return GetService(defaultProviderName);
                 }
@@ -132,7 +132,7 @@ namespace S7.Infrastructure.Providers
                 // Check if caching is enabled and we have a cached instance
                 if (config.EnableProviderCaching && _serviceInstances.TryGetValue(name, out var cachedInstance))
                 {
-                    if (_instanceCreationTimes.TryGetValue(name, out var creationTime) && 
+                    if (_instanceCreationTimes.TryGetValue(name, out var creationTime) &&
                         !IsInstanceExpired(creationTime, config))
                     {
                         _logger.LogDebug("Retrieved cached named service {ServiceName} for type {ServiceType}", name, typeof(T).Name);
@@ -379,7 +379,7 @@ namespace S7.Infrastructure.Providers
                     Name = name,
                     ServiceType = typeof(T),
                     IsAvailable = true,
-                    Lifetime = S7.Core.Abstractions.Providers.ServiceLifetime.Scoped
+                    Lifetime = ServiceLifetime.Scoped
                 };
 
                 serviceMetadata.Name = name;
@@ -468,8 +468,8 @@ namespace S7.Infrastructure.Providers
                     ["NamedServiceCount"] = _namedServices.Count,
                     ["MetadataCount"] = _serviceMetadata.Count,
                     ["HasDefaultService"] = _defaultServiceInstance != null,
-                    ["DefaultServiceAge"] = _defaultServiceInstance != null 
-                        ? DateTime.UtcNow - _defaultServiceCreationTime 
+                    ["DefaultServiceAge"] = _defaultServiceInstance != null
+                        ? DateTime.UtcNow - _defaultServiceCreationTime
                         : TimeSpan.Zero
                 };
             }
@@ -496,7 +496,7 @@ namespace S7.Infrastructure.Providers
                     RegisterNamedService(serviceName, () => service);
                 }
 
-                _logger.LogDebug("Initialized memory provider for type {ServiceType} with {ServiceCount} services", 
+                _logger.LogDebug("Initialized memory provider for type {ServiceType} with {ServiceCount} services",
                     typeof(T).Name, serviceCount);
             }
             catch (Exception ex)
@@ -548,7 +548,7 @@ namespace S7.Infrastructure.Providers
 
                 if (expiredKeys.Count > 0)
                 {
-                    _logger.LogDebug("Cleaned up {ExpiredCount} expired service instances for type {ServiceType}", 
+                    _logger.LogDebug("Cleaned up {ExpiredCount} expired service instances for type {ServiceType}",
                         expiredKeys.Count, typeof(T).Name);
                 }
             }

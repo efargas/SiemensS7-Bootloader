@@ -23,22 +23,24 @@ namespace S7.Core.Commands.Handlers
         ILogger<MemoryDumpCommandHandler> logger,
         PayloadManager payloadManager,
         IPlcClientFactory plcClientFactory,
-    IValidator<MemoryDumpOptions>? validator = null) : CommandHandler<MemoryDumpOptions, MemoryDumpResult>(logger, validator)
+        IValidator<MemoryDumpOptions>? validator = null)
+        : CommandHandler<MemoryDumpOptions, MemoryDumpResult>(logger, validator), ICommandHandler<MemoryDumpCommand, MemoryDumpResult>
     {
         private readonly PayloadManager _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
         private readonly IPlcClientFactory _plcClientFactory = plcClientFactory ?? throw new ArgumentNullException(nameof(plcClientFactory));
 
         /// <summary>
-        /// Handles the memory dump command execution using the new options-based approach.
+        /// Handles the execution of a memory dump command asynchronously.
         /// </summary>
-        /// <param name="options">The memory dump options</param>
-        /// <param name="cancellationToken">Cancellation token for the operation</param>
-        /// <returns>A task representing the command execution result</returns>
+        /// <param name="command">The memory dump command to execute.</param>
+        /// <param name="cancellationToken">A token to cancel the operation.</param>
+        /// <returns>A task representing the result of the command execution.</returns>
         public async Task<CommandResult<MemoryDumpResult>> HandleAsync(
-        MemoryDumpOptions options,
+            MemoryDumpCommand command,
             CancellationToken cancellationToken = default)
         {
-        return await ExecuteAsync(options, cancellationToken).ConfigureAwait(false);
+            ArgumentNullException.ThrowIfNull(command);
+            return await ExecuteAsync(command.Options, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>

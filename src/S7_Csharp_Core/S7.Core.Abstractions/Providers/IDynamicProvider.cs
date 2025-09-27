@@ -2,18 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace S7.Core.Abstractions.Providers
 {
     /// <summary>
-    /// Defines a service provider that integrates with dependency injection containers
+    /// Defines a dynamic provider that integrates with dependency injection containers
     /// and provides service discovery and lifetime management capabilities.
     /// </summary>
     /// <remarks>
     /// This interface extends the standard .NET service provider pattern with additional
     /// capabilities for service discovery, metadata, and async operations.
     /// </remarks>
-    public interface IServiceProvider<T> where T : class
+    public interface IDynamicProvider<T> where T : class
     {
         /// <summary>
         /// Gets a service instance using the default configuration.
@@ -141,26 +142,5 @@ namespace S7.Core.Abstractions.Providers
         /// Gets or sets the service priority for selection.
         /// </summary>
         public int Priority { get; set; } = 0;
-    }
-
-    /// <summary>
-    /// Defines the lifetime of a service.
-    /// </summary>
-    public enum ServiceLifetime
-    {
-        /// <summary>
-        /// A new instance is created every time the service is requested.
-        /// </summary>
-        Transient,
-
-        /// <summary>
-        /// A single instance is created per scope.
-        /// </summary>
-        Scoped,
-
-        /// <summary>
-        /// A single instance is created for the entire application lifetime.
-        /// </summary>
-        Singleton
     }
 }

@@ -23,7 +23,7 @@ namespace S7.Core.Abstractions.Providers
         /// <exception cref="ArgumentException">Thrown when name is null or empty.</exception>
         /// <exception cref="ArgumentNullException">Thrown when factory is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown when a provider with the same name is already registered.</exception>
-        void RegisterProvider<T>(string name, Func<IServiceProvider<T>> factory) where T : class;
+        void RegisterProvider<T>(string name, Func<IDynamicProvider<T>> factory) where T : class;
 
         /// <summary>
         /// Registers a provider instance with the specified name.
@@ -34,7 +34,7 @@ namespace S7.Core.Abstractions.Providers
         /// <exception cref="ArgumentException">Thrown when name is null or empty.</exception>
         /// <exception cref="ArgumentNullException">Thrown when provider is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown when a provider with the same name is already registered.</exception>
-        void RegisterProvider<T>(string name, IServiceProvider<T> provider) where T : class;
+        void RegisterProvider<T>(string name, IDynamicProvider<T> provider) where T : class;
 
         /// <summary>
         /// Registers a provider with metadata.
@@ -45,7 +45,7 @@ namespace S7.Core.Abstractions.Providers
         /// <param name="metadata">The provider metadata.</param>
         /// <exception cref="ArgumentException">Thrown when name is null or empty.</exception>
         /// <exception cref="ArgumentNullException">Thrown when factory or metadata is null.</exception>
-        void RegisterProvider<T>(string name, Func<IServiceProvider<T>> factory, ProviderMetadata metadata) where T : class;
+        void RegisterProvider<T>(string name, Func<IDynamicProvider<T>> factory, ProviderMetadata metadata) where T : class;
 
         /// <summary>
         /// Unregisters a provider with the specified name.
@@ -75,7 +75,7 @@ namespace S7.Core.Abstractions.Providers
         /// </summary>
         /// <typeparam name="T">The type of service to get providers for.</typeparam>
         /// <returns>An enumerable of registered providers with their names.</returns>
-        IEnumerable<(string Name, IServiceProvider<T> Provider)> GetRegisteredProviders<T>() where T : class;
+        IEnumerable<(string Name, IDynamicProvider<T> Provider)> GetRegisteredProviders<T>() where T : class;
 
         /// <summary>
         /// Gets a provider by name for the specified type.
@@ -83,7 +83,7 @@ namespace S7.Core.Abstractions.Providers
         /// <typeparam name="T">The type of service the provider handles.</typeparam>
         /// <param name="name">The name of the provider to retrieve.</param>
         /// <returns>The provider instance, or null if not found.</returns>
-        IServiceProvider<T>? GetProvider<T>(string name) where T : class;
+        IDynamicProvider<T>? GetProvider<T>(string name) where T : class;
 
         /// <summary>
         /// Gets a required provider by name for the specified type.
@@ -92,7 +92,7 @@ namespace S7.Core.Abstractions.Providers
         /// <param name="name">The name of the provider to retrieve.</param>
         /// <returns>The provider instance.</returns>
         /// <exception cref="InvalidOperationException">Thrown when the provider is not found.</exception>
-        IServiceProvider<T> GetRequiredProvider<T>(string name) where T : class;
+        IDynamicProvider<T> GetRequiredProvider<T>(string name) where T : class;
 
         /// <summary>
         /// Asynchronously gets a provider by name for the specified type.
@@ -101,7 +101,7 @@ namespace S7.Core.Abstractions.Providers
         /// <param name="name">The name of the provider to retrieve.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the provider instance.</returns>
-        Task<IServiceProvider<T>?> GetProviderAsync<T>(string name, CancellationToken cancellationToken = default) where T : class;
+        Task<IDynamicProvider<T>?> GetProviderAsync<T>(string name, CancellationToken cancellationToken = default) where T : class;
 
         /// <summary>
         /// Gets metadata for all registered providers of the specified type.

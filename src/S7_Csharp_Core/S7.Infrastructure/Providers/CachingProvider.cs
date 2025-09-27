@@ -26,7 +26,7 @@ namespace S7.Infrastructure.Providers
         IServiceProvider serviceProvider,
         IOptionsMonitor<ProviderConfiguration> configuration,
         ILogger<CachingProvider<T>> logger,
-        IMemoryCache cache) : IServiceProvider<T> where T : class
+        IMemoryCache cache) : IDynamicProvider<T> where T : class
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -385,7 +385,7 @@ namespace S7.Infrastructure.Providers
                     Name = name,
                     ServiceType = typeof(T),
                     IsAvailable = true,
-                    Lifetime = S7.Core.Abstractions.Providers.ServiceLifetime.Scoped
+                    Lifetime = ServiceLifetime.Scoped
                 };
 
                 serviceMetadata.Name = name;

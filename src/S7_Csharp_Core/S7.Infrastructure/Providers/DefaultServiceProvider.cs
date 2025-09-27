@@ -22,7 +22,7 @@ namespace S7.Infrastructure.Providers
     public class DefaultServiceProvider<T>(
         IServiceProvider serviceProvider,
         IOptionsMonitor<ProviderConfiguration> configuration,
-        ILogger<DefaultServiceProvider<T>> logger) : IServiceProvider<T> where T : class
+        ILogger<DefaultServiceProvider<T>> logger) : IDynamicProvider<T> where T : class
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         private readonly IOptionsMonitor<ProviderConfiguration> _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -341,7 +341,7 @@ namespace S7.Infrastructure.Providers
                         Name = name,
                         ServiceType = typeof(T),
                         IsAvailable = true,
-                        Lifetime = S7.Core.Abstractions.Providers.ServiceLifetime.Scoped
+                        Lifetime = ServiceLifetime.Scoped
                     };
 
                     serviceMetadata.Name = name;

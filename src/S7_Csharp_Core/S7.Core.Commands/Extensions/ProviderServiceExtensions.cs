@@ -46,9 +46,9 @@ namespace S7.Core.Commands.Extensions
             }
 
             // Register core provider services
-            services.TryAddScoped<IProviderFactory, ServiceProviderFactory>();
+            services.TryAddScoped<IProviderFactory, DynamicProviderFactory>();
             services.TryAddSingleton<IProviderRegistry, ProviderRegistry>();
-            services.TryAddScoped(typeof(IServiceProvider<>), typeof(DefaultServiceProvider<>));
+            services.TryAddScoped(typeof(IDynamicProvider<>), typeof(DefaultServiceProvider<>));
 
             return services;
         }
@@ -141,9 +141,9 @@ namespace S7.Core.Commands.Extensions
             }
 
             // Register provider services with specified lifetimes
-            services.Add(ServiceDescriptor.Describe(typeof(IProviderFactory), typeof(ServiceProviderFactory), factoryLifetime));
+            services.Add(ServiceDescriptor.Describe(typeof(IProviderFactory), typeof(DynamicProviderFactory), factoryLifetime));
             services.Add(ServiceDescriptor.Describe(typeof(IProviderRegistry), typeof(ProviderRegistry), registryLifetime));
-            services.Add(ServiceDescriptor.Describe(typeof(IServiceProvider<>), typeof(DefaultServiceProvider<>), providerLifetime));
+            services.Add(ServiceDescriptor.Describe(typeof(IDynamicProvider<>), typeof(DefaultServiceProvider<>), providerLifetime));
 
             // Register specialized providers with specified lifetime
             services.Add(ServiceDescriptor.Describe(typeof(FileSystemProvider<>), typeof(FileSystemProvider<>), providerLifetime));

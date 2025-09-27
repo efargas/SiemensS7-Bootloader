@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using S7.Core.Abstractions.Providers;
 
@@ -39,7 +40,7 @@ namespace S7.Infrastructure.Providers
         /// <exception cref="ArgumentException">Thrown when name is null or empty.</exception>
         /// <exception cref="ArgumentNullException">Thrown when factory is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown when a provider with the same name is already registered.</exception>
-        public void RegisterProvider<T>(string name, Func<IServiceProvider<T>> factory) where T : class
+        public void RegisterProvider<T>(string name, Func<IDynamicProvider<T>> factory) where T : class
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Provider name cannot be null or empty", nameof(name));
@@ -59,7 +60,7 @@ namespace S7.Infrastructure.Providers
                 _logger.LogDebug("Registering provider {ProviderName} for type {ServiceType}", name, typeof(T).Name);
 
                 // Create a lazy provider that uses the factory
-                var lazyProvider = new Lazy<IServiceProvider<T>>(factory, LazyThreadSafetyMode.ExecutionAndPublication);
+                var lazyProvider = new Lazy<IDynamicProvider<T>>(factory, LazyThreadSafetyMode.ExecutionAndPublication);
                 _providers.TryAdd(key, lazyProvider);
 
                 // Add to type-specific provider list
@@ -69,7 +70,7 @@ namespace S7.Infrastructure.Providers
                 var metadata = new ProviderMetadata
                 {
                     Name = name,
-                    ProviderType = typeof(IServiceProvider<T>),
+                    ProviderType = typeof(IDynamicProvider<T>),
                     ServiceType = typeof(T),
                     IsAvailable = true,
                     SupportedLifetime = ServiceLifetime.Scoped
@@ -95,7 +96,7 @@ namespace S7.Infrastructure.Providers
         /// <exception cref="ArgumentException">Thrown when name is null or empty.</exception>
         /// <exception cref="ArgumentNullException">Thrown when provider is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown when a provider with the same name is already registered.</exception>
-        public void RegisterProvider<T>(string name, IServiceProvider<T> provider) where T : class
+        public void RegisterProvider<T>(string name, IDynamicProvider<T> provider) where T : class
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Provider name cannot be null or empty", nameof(name));
@@ -114,7 +115,7 @@ namespace S7.Infrastructure.Providers
         /// <param name="metadata">The provider metadata.</param>
         /// <exception cref="ArgumentException">Thrown when name is null or empty.</exception>
         /// <exception cref="ArgumentNullException">Thrown when factory or metadata is null.</exception>
-        public void RegisterProvider<T>(string name, Func<IServiceProvider<T>> factory, ProviderMetadata metadata) where T : class
+        public void RegisterProvider<T>(string name, Func<IDynamicProvider<T>> factory, ProviderMetadata metadata) where T : class
         {
             if (metadata == null)
                 throw new ArgumentNullException(nameof(metadata));
@@ -205,12 +206,12 @@ namespace S7.Infrastructure.Providers
         /// </summary>
         /// <typeparam name="T">The type of service to get providers for.</typeparam>
         /// <returns>An enumerable of registered providers with their names.</returns>
-        public IEnumerable<(string Name, IServiceProvider<T> Provider)> GetRegisteredProviders<T>() where T : class
+        public IEnumerable<(string Name, IDynamicProvider<T> Provider)> GetRegisteredProviders<T>() where T : class
         {
             try
             {
                 var names = GetRegisteredNames<T>();
-                var providers = new List<(string Name, IServiceProvider<T> Provider)>();
+                var providers = new List<(string Name, IDynamicProvider<T> Provider)>();
 
                 foreach (var name in names)
                 {
@@ -226,7 +227,7 @@ namespace S7.Infrastructure.Providers
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error getting registered providers for type {ServiceType}", typeof(T).Name);
-                return Enumerable.Empty<(string, IServiceProvider<T>)>();
+                return Enumerable.Empty<(string, IDynamicProvider<T>)>();
             }
         }
 
@@ -236,7 +237,7 @@ namespace S7.Infrastructure.Providers
         /// <typeparam name="T">The type of service the provider handles.</typeparam>
         /// <param name="name">The name of the provider to retrieve.</param>
         /// <returns>The provider instance, or null if not found.</returns>
-        public IServiceProvider<T>? GetProvider<T>(string name) where T : class
+        public IDynamicProvider<T>? GetProvider<T>(string name) where T : class
         {
             if (string.IsNullOrWhiteSpace(name))
                 return null;
@@ -245,7 +246,7 @@ namespace S7.Infrastructure.Providers
             {
                 var key = GetProviderKey<T>(name);
                 
-                if (_providers.TryGetValue(key, out var providerObj) && providerObj is Lazy<IServiceProvider<T>> lazyProvider)
+                if (_providers.TryGetValue(key, out var providerObj) && providerObj is Lazy<IDynamicProvider<T>> lazyProvider)
                 {
                     return lazyProvider.Value;
                 }
@@ -266,7 +267,7 @@ namespace S7.Infrastructure.Providers
         /// <param name="name">The name of the provider to retrieve.</param>
         /// <returns>The provider instance.</returns>
         /// <exception cref="InvalidOperationException">Thrown when the provider is not found.</exception>
-        public IServiceProvider<T> GetRequiredProvider<T>(string name) where T : class
+        public IDynamicProvider<T> GetRequiredProvider<T>(string name) where T : class
         {
             var provider = GetProvider<T>(name);
             if (provider == null)
@@ -285,7 +286,7 @@ namespace S7.Infrastructure.Providers
         /// <param name="name">The name of the provider to retrieve.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation with the provider instance.</returns>
-        public async Task<IServiceProvider<T>?> GetProviderAsync<T>(string name, CancellationToken cancellationToken = default) where T : class
+        public async Task<IDynamicProvider<T>?> GetProviderAsync<T>(string name, CancellationToken cancellationToken = default) where T : class
         {
             return await Task.Run(() => GetProvider<T>(name), cancellationToken).ConfigureAwait(false);
         }
@@ -365,7 +366,7 @@ namespace S7.Infrastructure.Providers
                     {
                         var types = assembly.GetTypes()
                             .Where(t => t.IsClass && !t.IsAbstract)
-                            .Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IServiceProvider<>)))
+                            .Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDynamicProvider<>)))
                             .ToList();
 
                         foreach (var type in types)
