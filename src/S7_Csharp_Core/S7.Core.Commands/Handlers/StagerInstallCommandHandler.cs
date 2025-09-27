@@ -20,6 +20,8 @@ using S7.Net.Channels;
 using CommandsStagerInstallResult = S7.Core.Abstractions.Commands.StagerInstallResult;
 using ServicesStagerInstallResult = S7.Core.Abstractions.Services.StagerInstallResult;
 
+using S7.Core.Abstractions.Factories;
+
 namespace S7.Core.Commands.Handlers
 {
     /// <summary>
@@ -28,30 +30,13 @@ namespace S7.Core.Commands.Handlers
     public class StagerInstallCommandHandler(
         ILogger<StagerInstallCommandHandler> logger,
         PayloadManager payloadManager,
+    IPlcClientFactory plcClientFactory,
         IPowerController? powerController = null,
-        IValidator<StagerInstallOptions>? validator = null) : CommandHandler<StagerInstallOptions>(logger, validator), ICommandServiceSetup
+    IValidator<StagerInstallOptions>? validator = null) : CommandHandler<StagerInstallOptions, CommandsStagerInstallResult>(logger, validator)
     {
         private readonly PayloadManager _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
+    private readonly IPlcClientFactory _plcClientFactory = plcClientFactory ?? throw new ArgumentNullException(nameof(plcClientFactory));
         private readonly IPowerController? _powerController = powerController;
-
-        /// <summary>
-        /// Sets up the stager installation command handler dependencies.
-        /// </summary>
-        /// <param name="services">The service collection</param>
-        public static void SetupServices(IServiceCollection services)
-        {
-            // Register any specific dependencies for stager installation operations
-            services.AddTransient<StagerInstallCommandHandler>();
-            
-            // Register payload manager if not already registered
-            services.AddSingleton<PayloadManager>();
-            
-            // Register power controller if available
-            // services.AddTransient<IPowerController, PowerController>();
-            
-            // Register stager install specific validator if needed
-            // services.AddTransient<IValidator<StagerInstallOptions>, StagerInstallOptionsValidator>();
-        }
 
         /// <summary>
         /// Handles the stager installation command execution using the new options-based approach.
@@ -60,21 +45,20 @@ namespace S7.Core.Commands.Handlers
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
         public async Task<CommandResult<CommandsStagerInstallResult>> HandleAsync(
-            StagerInstallOptions options, 
+        StagerInstallOptions options,
             CancellationToken cancellationToken = default)
         {
-            return await ExecuteAsync<CommandsStagerInstallResult>(options, cancellationToken).ConfigureAwait(false);
+        return await ExecuteAsync(options, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Executes the stager installation operation internally.
         /// </summary>
-        /// <typeparam name="TResult">The result type</typeparam>
         /// <param name="options">The stager installation options</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
-        protected override async Task<TResult> ExecuteInternalAsync<TResult>(
-            StagerInstallOptions options, 
+        protected override async Task<CommandsStagerInstallResult> ExecuteInternalAsync(
+            StagerInstallOptions options,
             CancellationToken cancellationToken = default)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -84,7 +68,7 @@ namespace S7.Core.Commands.Handlers
             // Load the stager payload
             Logger.LogInformation("Loading stager payload from {PayloadPath}. CorrelationId: {CorrelationId}",
                 options.PayloadPath, options.CorrelationId);
-            
+
             var payload = await _payloadManager.LoadPayloadAsync(options.PayloadPath, cancellationToken).ConfigureAwait(false);
 
             // Perform power cycling before installation if requested
@@ -95,26 +79,26 @@ namespace S7.Core.Commands.Handlers
             }
 
             // Create PLC client with the specified configuration
-            using var plcClient = CreatePlcClient(options.ChannelConfig);
+            using var plcClient = _plcClientFactory.Create(options.ChannelConfig);
 
             // Perform handshake if requested
             if (options.PerformHandshake)
             {
                 var handshakeStart = Stopwatch.StartNew();
                 Logger.LogInformation("Performing handshake. CorrelationId: {CorrelationId}", options.CorrelationId);
-                
+
                 await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
                 handshakeStart.Stop();
                 performanceMetrics = performanceMetrics with { HandshakeTime = handshakeStart.Elapsed };
-                
+
                 Logger.LogInformation("Handshake completed in {Duration}ms. CorrelationId: {CorrelationId}",
                     handshakeStart.ElapsedMilliseconds, options.CorrelationId);
             }
 
             // Install the stager with retry logic
             var installationResult = await InstallStagerWithRetryAsync(plcClient, options, payload, cancellationToken).ConfigureAwait(false);
-            performanceMetrics = performanceMetrics with 
-            { 
+            performanceMetrics = performanceMetrics with
+            {
                 PayloadTransferTime = installationResult.TransferTime,
                 RetryAttempts = installationResult.RetryAttempts,
                 AverageTransferSpeed = installationResult.TransferSpeed,
@@ -134,7 +118,7 @@ namespace S7.Core.Commands.Handlers
                 isVerified = await VerifyStagerInstallationAsync(plcClient, installationResult.InstallationAddress, payload, options.CorrelationId, cancellationToken).ConfigureAwait(false);
                 verificationStart.Stop();
                 performanceMetrics = performanceMetrics with { VerificationTime = verificationStart.Elapsed };
-                
+
                 if (!isVerified)
                 {
                     warnings.Add("Stager installation verification failed");
@@ -188,23 +172,7 @@ namespace S7.Core.Commands.Handlers
             Logger.LogInformation("Stager installation completed successfully in {Duration}ms. CorrelationId: {CorrelationId}",
                 stopwatch.ElapsedMilliseconds, options.CorrelationId);
 
-            return (TResult)(object)result;
-        }
-
-        private PlcClient CreatePlcClient(Abstractions.Configuration.CommunicationChannelConfig config)
-        {
-            // Create communication channel based on configuration
-            ICommunicationChannel channel = config.Mode.ToUpperInvariant() switch
-            {
-                "TCP" => new TcpChannel(config.Host ?? "localhost", config.Port),
-                "SERIAL" => new SerialChannel(config.SerialPort ?? "COM1", config.BaudRate),
-                _ => throw new ArgumentException($"Unsupported communication mode: {config.Mode}")
-            };
-
-            // Create logger action for PlcClient
-            Action<string> logger = message => Logger.LogDebug("{Message}", message);
-
-            return new PlcClient(channel, logger);
+            return result;
         }
 
         private async Task<TimeSpan> PerformPowerCycleAsync(
@@ -229,14 +197,14 @@ namespace S7.Core.Commands.Handlers
         }
 
         private async Task<StagerInstallationResult> InstallStagerWithRetryAsync(
-            PlcClient plcClient, 
-            StagerInstallOptions options, 
-            byte[] payload, 
+            IPlcClient plcClient,
+            StagerInstallOptions options,
+            byte[] payload,
             CancellationToken cancellationToken)
         {
             var attempt = 0;
             var transferStart = Stopwatch.StartNew();
-            
+
             while (attempt <= options.RetryAttempts)
             {
                 try
@@ -246,10 +214,10 @@ namespace S7.Core.Commands.Handlers
 
                     // Use target address if specified, otherwise use default
                     var installationAddress = options.TargetAddress ?? 0x1000u;
-                    
+
                     // Simulate payload transfer
                     await Task.Delay(100, cancellationToken).ConfigureAwait(false); // Simulate transfer time
-                    
+
                     transferStart.Stop();
                     var transferSpeed = payload.Length / transferStart.Elapsed.TotalSeconds;
 
@@ -267,7 +235,7 @@ namespace S7.Core.Commands.Handlers
                 {
                     Logger.LogWarning(ex, "Stager installation attempt {Attempt} failed, retrying in {Delay}ms. CorrelationId: {CorrelationId}",
                         attempt + 1, options.RetryDelayMs, options.CorrelationId);
-                    
+
                     attempt++;
                     await Task.Delay(options.RetryDelayMs, cancellationToken).ConfigureAwait(false);
                 }
@@ -275,7 +243,7 @@ namespace S7.Core.Commands.Handlers
                 {
                     Logger.LogError(ex, "Stager installation failed after {Attempts} attempts. CorrelationId: {CorrelationId}",
                         attempt + 1, options.CorrelationId);
-                    
+
                     transferStart.Stop();
                     return new StagerInstallationResult
                     {
@@ -298,10 +266,10 @@ namespace S7.Core.Commands.Handlers
         }
 
         private async Task<bool> VerifyStagerInstallationAsync(
-            PlcClient plcClient, 
-            uint installationAddress, 
-            byte[] originalPayload, 
-            string correlationId, 
+            IPlcClient plcClient,
+            uint installationAddress,
+            byte[] originalPayload,
+            string correlationId,
             CancellationToken cancellationToken)
         {
             try
@@ -311,7 +279,7 @@ namespace S7.Core.Commands.Handlers
 
                 // Simplified verification - in reality, you'd read back the installed data and compare
                 await Task.Delay(50, cancellationToken).ConfigureAwait(false); // Simulate verification time
-                
+
                 return true; // Assume verification passes for now
             }
             catch (Exception ex)
@@ -322,8 +290,8 @@ namespace S7.Core.Commands.Handlers
         }
 
         private async Task<string?> GetStagerVersionAsync(
-            PlcClient plcClient, 
-            uint installationAddress, 
+            IPlcClient plcClient,
+            uint installationAddress,
             CancellationToken cancellationToken)
         {
             // Simplified version retrieval - in reality, you'd read version info from the installed stager
