@@ -50,11 +50,7 @@ namespace S7_Csharp_Utility.Services
             new FirmwareUnpackerWindow(extractionPath, _dialogService).Show(mainWindow);
         }
 
-        public void ShowHexViewerWindow()
-        {
-            new HexViewerWindow().Show();
-        }
-
+        
         public void Exit()
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)

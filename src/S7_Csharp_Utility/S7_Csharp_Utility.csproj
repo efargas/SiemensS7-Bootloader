@@ -19,13 +19,14 @@
     <PackageReference Include="DiffPlex" Version="1.9.0" />
     <PackageReference Include="NModbus" Version="3.0.81" />
     <PackageReference Include="System.IO.Ports" Version="9.0.9" />
-    <PackageReference Include="AvaloniaHex" Version="0.1.10" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="System.Reactive" Version="6.0.0" />
+    <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,5 +50,7 @@
     <ProjectReference Include="..\S7_Csharp_Core\S7.Utils\S7.Utils.csproj" />
     <ProjectReference Include="..\S7_Csharp_Core\S7.Services\S7.Services.csproj" />
     <ProjectReference Include="..\S7_Csharp_Core\S7.Infrastructure\S7.Infrastructure.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Core.Commands\S7.Core.Commands.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Core.Abstractions\S7.Core.Abstractions.csproj" />
   </ItemGroup>
 </Project>

@@ -6,12 +6,12 @@ using Microsoft.Extensions.Logging;
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.ViewModels;
+using S7_Csharp_Utility.ViewModels.Features;
 using S7.Net;
 using S7.Core.Abstractions.Services;
 using S7.Services;
 using S7.Core.Commands.Extensions;
 using System;
-using System.Linq;
 using Avalonia.Threading;
 using Microsoft.Extensions.Hosting;
 
@@ -28,8 +28,7 @@ namespace S7_Csharp_Utility
         /// </summary>
         public IServiceProvider? Services { get; private set; }
 
-        public string[] HexHeader { get; } = Enumerable.Range(0, 16).Select(i => $"{i:X2}").ToArray();
-
+        
 
         /// <summary>
         /// Initializes the application by loading XAML resources.
@@ -117,8 +116,16 @@ namespace S7_Csharp_Utility
             services.AddTransient<ConfigurationViewModel>();
             services.AddTransient<FileCompareViewModel>();
 
+            // Register Feature ViewModels
+            services.AddTransient<MemoryDumpFeatureViewModel>();
+            services.AddTransient<ExploitSequenceFeatureViewModel>();
+
             // Register the MainWindow itself. It will act as the root view.
             services.AddSingleton<MainWindow>();
+
+            // Register State Management Services
+            services.AddSingleton<IApplicationStateService, ApplicationStateService>();
+            services.AddSingleton<IValidationCoordinatorService, ValidationCoordinatorService>();
 
             // Register UI Services
             services.AddSingleton<IDialogService, DialogService>();

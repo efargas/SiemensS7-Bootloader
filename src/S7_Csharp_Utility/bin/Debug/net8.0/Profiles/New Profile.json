@@ -1,12 +1,12 @@
 {
-  "modelName": "CPU1212DC/DC/DC",
-  "firmwareVersion": "V.4.2.1",
+  "modelName": "New Profile",
+  "firmwareVersion": "v4.2.1",
   "regions": [
     {
-      "name": ".bss",
-      "address": "0x01E01040",
-      "size": 8519448,
-      "endAddress": "0x2620F58"
+      "name": "New Region",
+      "address": "0x010100",
+      "size": 2547,
+      "endAddress": "0x10AF3"
     }
   ]
 }

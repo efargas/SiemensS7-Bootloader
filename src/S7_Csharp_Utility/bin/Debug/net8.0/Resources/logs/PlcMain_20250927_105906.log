@@ -1,0 +1,7 @@
+[2025-09-27 10:59:06] Info Log path updated to: /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs
+[2025-09-27 10:59:12] Info Connecting to Modbus host 192.168.1.18:502...
+[2025-09-27 10:59:15] Error Error connecting to Modbus host: No route to host
+[2025-09-27 10:59:15] Error Failed to connect to Modbus power supply at 192.168.1.18:502
+[2025-09-27 10:59:26] Info No running socat instances detected.
+[2025-09-27 10:59:32] Info No running socat instances detected.
+[2025-09-27 10:59:34] Info Successfully killed 0 socat processes.

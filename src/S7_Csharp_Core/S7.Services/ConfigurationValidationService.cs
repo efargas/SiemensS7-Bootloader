@@ -43,9 +43,9 @@ namespace S7.Services
                 }
 
                 // Validate PLC operation options
-                if (_applicationOptions.PlcOperation != null)
+                if (_applicationOptions.PlcOperations != null)
                 {
-                    var plcValidationResult = await ValidateObjectAsync(_applicationOptions.PlcOperation, "PlcOperationOptions", cancellationToken);
+                    var plcValidationResult = await ValidateObjectAsync(_applicationOptions.PlcOperations, "PlcOperationOptions", cancellationToken);
                     if (!plcValidationResult.IsSuccess)
                     {
                         validationErrors.AddRange(plcValidationResult.Error.Message.Split('\n', StringSplitOptions.RemoveEmptyEntries));
@@ -275,29 +275,29 @@ namespace S7.Services
             try
             {
                 // Validate PLC operation and communication channel consistency
-                if (_applicationOptions.PlcOperation != null && _applicationOptions.CommunicationChannel != null)
+                if (_applicationOptions.PlcOperations != null && _applicationOptions.CommunicationChannel != null)
                 {
                     // Ensure communication channel timeout is not less than PLC operation timeout
-                    if (_applicationOptions.CommunicationChannel.ConnectionTimeoutMs < _applicationOptions.PlcOperation.DefaultTimeoutMs)
+                    if (_applicationOptions.CommunicationChannel.ConnectionTimeoutMs < _applicationOptions.PlcOperations.OperationTimeoutMs)
                     {
-                        validationErrors.Add("Communication channel connection timeout cannot be less than PLC operation default timeout");
+                        validationErrors.Add("Communication channel connection timeout cannot be less than PLC operation timeout");
                     }
 
-                    // Validate socat configuration if enabled
-                    if (_applicationOptions.CommunicationChannel.UseSocat && 
-                        string.IsNullOrWhiteSpace(_applicationOptions.CommunicationChannel.SocatPath))
+                    // Validate socat configuration if enabled - check if socat binary path is configured
+                    if (!string.IsNullOrWhiteSpace(_applicationOptions.CommunicationChannel.SocatBinaryPath) && 
+                        !System.IO.File.Exists(_applicationOptions.CommunicationChannel.SocatBinaryPath))
                     {
-                        validationErrors.Add("Socat path must be specified when socat is enabled");
+                        validationErrors.Add("Socat binary path does not exist or is not accessible");
                     }
                 }
 
                 // Validate memory dump and payload consistency
                 if (_applicationOptions.MemoryDump != null && _applicationOptions.Payload != null)
                 {
-                    // Ensure payload scan directory exists if memory dump is configured
-                    if (string.IsNullOrWhiteSpace(_applicationOptions.Payload.PayloadDirectory))
+                    // Ensure payload scan directories exist if memory dump is configured
+                    if (_applicationOptions.Payload.ScanDirectories == null || _applicationOptions.Payload.ScanDirectories.Length == 0)
                     {
-                        validationErrors.Add("Payload directory must be specified when memory dump operations are configured");
+                        validationErrors.Add("Payload scan directories must be specified when memory dump operations are configured");
                     }
                 }
 
@@ -324,10 +324,10 @@ namespace S7.Services
                         validationErrors.Add("Log file path must be specified when file logging is enabled");
                     }
 
-                    // Validate log level consistency
-                    if (_applicationOptions.Logging.ConsoleLogLevel > _applicationOptions.Logging.FileLogLevel)
+                    // Validate that at least one logging output is enabled
+                    if (!_applicationOptions.Logging.EnableConsoleLogging && !_applicationOptions.Logging.EnableFileLogging)
                     {
-                        validationErrors.Add("Console log level should not be more verbose than file log level for performance reasons");
+                        validationErrors.Add("At least one logging output (console or file) must be enabled");
                     }
                 }
 

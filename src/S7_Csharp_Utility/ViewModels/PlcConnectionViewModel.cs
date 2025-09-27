@@ -351,13 +351,15 @@ namespace S7_Csharp_Utility.ViewModels
         /// <summary>
         /// Checks socat processes using the service layer.
         /// </summary>
-        private async Task CheckSocatProcessesAsync()
+        private Task CheckSocatProcessesAsync()
         {
-            try
+            return Task.Run(() =>
             {
-                _logger.LogDebug("Checking socat processes");
+                try
+                {
+                    _logger.LogDebug("Checking socat processes");
 
-                var processInfo = _communicationChannelService.GetSocatProcessInfo();
+                    var processInfo = _communicationChannelService.GetSocatProcessInfo();
                 
                 if (processInfo.TotalProcesses == 0)
                 {
@@ -369,12 +371,13 @@ namespace S7_Csharp_Utility.ViewModels
                 }
 
                 _logger.LogInformation("Found {ProcessCount} socat processes", processInfo.TotalProcesses);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking socat processes");
-                _loggingService.Log($"Error checking socat processes: {ex.Message}", LogCategory.Error);
-            }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error checking socat processes");
+                    _loggingService.Log($"Error checking socat processes: {ex.Message}", LogCategory.Error);
+                }
+            });
         }
 
         /// <summary>

@@ -1,0 +1,8 @@
+[2025-09-27 09:50:22] Info Discovered 0 serial ports.
+[2025-09-27 09:50:22] Info Discovered 0 serial ports.
+[2025-09-27 09:50:22] Info ✅ Payload scan completed successfully. Found 5 payload files in 0,0s
+[2025-09-27 09:50:22] Debug   - Binary: tic_tac_toe.bin (2,2 KB)
+[2025-09-27 09:50:22] Debug   - Binary: dump_mem.bin (512 B)
+[2025-09-27 09:50:22] Debug   - Binary: hello_loop.bin (600 B)
+[2025-09-27 09:50:22] Debug   - Binary: stager.bin (292 B)
+[2025-09-27 09:50:22] Debug   - Binary: hello_world.bin (68 B)

@@ -9,7 +9,6 @@ namespace S7_Csharp_Utility.Interfaces
         Window GetMainWindow();
         void ShowProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile> onSetActiveProfile);
         void ShowFirmwareUnpackerWindow(string extractionPath);
-        void ShowHexViewerWindow();
-        void Exit();
+                void Exit();
     }
 }

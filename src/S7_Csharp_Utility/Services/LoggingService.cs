@@ -38,20 +38,36 @@ namespace S7_Csharp_Utility.Services
     /// <summary>
     /// Service for handling application logging.
     /// </summary>
-    public class LoggingService(
-        Dispatcher dispatcher, 
-        ResourceManagerService? resourceManager = null, 
-        string? logsPath = null) : INotifyPropertyChanged
+    public class LoggingService : INotifyPropertyChanged
     {
         private readonly object _sync = new object();
         private const int MaxLogLines = 2000;
-        private readonly Dispatcher _dispatcher = dispatcher;
-        private readonly ResourceManagerService? _resourceManager = resourceManager;
-        private string _mainLogFile = Path.Combine(logsPath ?? Path.Combine(AppContext.BaseDirectory, "logs"), $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
-        private string _logsPath = InitializeLogsPath(logsPath);
+        private readonly Dispatcher _dispatcher;
+        private readonly ResourceManagerService? _resourceManager;
+        private string _mainLogFile;
+        private string _logsPath;
         private const long MaxLogFileSize = 5 * 1024 * 1024; // 5MB
 
         private readonly ObservableCollection<LogMessage> _allLogMessages = new();
+
+        /// <summary>
+        /// Initializes a new instance of the LoggingService class.
+        /// </summary>
+        /// <param name="dispatcher">The UI dispatcher for thread-safe UI updates.</param>
+        /// <param name="resourceManager">Optional resource manager for localized messages.</param>
+        /// <param name="logsPath">Optional custom path for log files.</param>
+        public LoggingService(Dispatcher dispatcher, ResourceManagerService? resourceManager = null, string? logsPath = null)
+        {
+            _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+            _resourceManager = resourceManager;
+            _logsPath = InitializeLogsPath(logsPath);
+            _mainLogFile = Path.Combine(_logsPath, $"PlcMain_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+
+            // Initialize commands
+            ClearLogCommand = new Commands.RelayCommand(_ => Clear(), _ => true);
+            ExportLogCommand = new Commands.RelayCommand(_ => ExportLogs(), _ => true);
+            ScrollToEndCommand = new Commands.RelayCommand(_ => ForceScrollToEnd(), _ => true);
+        }
 
         private static string InitializeLogsPath(string? logsPath)
         {
@@ -113,15 +129,15 @@ namespace S7_Csharp_Utility.Services
         /// <summary>
         /// Command to clear the log.
         /// </summary>
-        public System.Windows.Input.ICommand ClearLogCommand { get; } = new Commands.RelayCommand(_ => ((LoggingService)_).Clear(), _ => true);
+        public System.Windows.Input.ICommand ClearLogCommand { get; }
         /// <summary>
         /// Command to export the log to a file.
         /// </summary>
-        public System.Windows.Input.ICommand ExportLogCommand { get; } = new Commands.RelayCommand(_ => ((LoggingService)_).ExportLogs(), _ => true);
+        public System.Windows.Input.ICommand ExportLogCommand { get; }
         /// <summary>
         /// Command to scroll to the end of the log.
         /// </summary>
-        public System.Windows.Input.ICommand ScrollToEndCommand { get; } = new Commands.RelayCommand(_ => ((LoggingService)_).ForceScrollToEnd(), _ => true);
+        public System.Windows.Input.ICommand ScrollToEndCommand { get; }
         /// <summary>
         /// Event triggered to scroll to the end of the log.
         /// </summary>

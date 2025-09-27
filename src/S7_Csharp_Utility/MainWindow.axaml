@@ -26,8 +26,7 @@
             <MenuItem Header="{DynamicResource ToolsMenuHeader}">
                 <MenuItem Header="{DynamicResource ProfileManagementMenuHeader}" Command="{Binding ShowProfileManagementCommand}" />
                 <MenuItem Header="{DynamicResource FirmwareUnpackerMenuHeader}" Command="{Binding ShowFirmwareUnpackerCommand}" />
-                <MenuItem Header="{DynamicResource HexViewerMenuHeader}" Command="{Binding ShowHexViewerCommand}" />
-            </MenuItem>
+                            </MenuItem>
             <MenuItem Header="{DynamicResource HelpMenuHeader}" />
         </Menu>
         
@@ -108,49 +107,49 @@
                             <TextBlock Text="{DynamicResource AddressLabel}" Classes="LabelText" />
                             <StackPanel>
                                 <TextBox Name="DumpAddressTextBox" 
-                                         Text="{Binding DumpAddress, Mode=TwoWay}" 
-                                         HorizontalAlignment="Stretch"
-                                         Watermark="Enter hex address (e.g., 0x691E28)" />
-                                <TextBlock Text="{Binding (Validation.Errors)[0].ErrorContent, ElementName=DumpAddressTextBox}"
+                                Text="{Binding MemoryDumpFeature.DumpAddress, Mode=TwoWay}" 
+                                HorizontalAlignment="Stretch"
+                                Watermark="Enter hex address (e.g., 0x691E28)" />
+                                <TextBlock Text="{Binding (DataValidationErrors.Errors), ElementName=DumpAddressTextBox, Converter={StaticResource ValidationErrorConverter}}"
                                            Foreground="Red"
                                            FontSize="11"
                                            Margin="0,2,0,0"
-                                           IsVisible="{Binding (Validation.HasErrors), ElementName=DumpAddressTextBox}" />
+                                           IsVisible="{Binding (DataValidationErrors.HasErrors), ElementName=DumpAddressTextBox, Converter={StaticResource ValidationErrorVisibilityConverter}}" />
                             </StackPanel>
                             <TextBlock Text="{DynamicResource LengthLabel}" Classes="LabelText" />
                             <StackPanel>
                                 <TextBox Name="DumpLengthTextBox" 
-                                         Text="{Binding DumpLength, Mode=TwoWay}" 
+                                         Text="{Binding MemoryDumpFeature.DumpLength, Mode=TwoWay}" 
                                          HorizontalAlignment="Stretch"
                                          Watermark="Enter number of bytes to dump" />
-                                <TextBlock Text="{Binding (Validation.Errors)[0].ErrorContent, ElementName=DumpLengthTextBox}"
+                                <TextBlock Text="{Binding (DataValidationErrors.Errors), ElementName=DumpLengthTextBox, Converter={StaticResource ValidationErrorConverter}}"
                                            Foreground="Red"
                                            FontSize="11"
                                            Margin="0,2,0,0"
-                                           IsVisible="{Binding (Validation.HasErrors), ElementName=DumpLengthTextBox}" />
+                                           IsVisible="{Binding (DataValidationErrors.HasErrors), ElementName=DumpLengthTextBox, Converter={StaticResource ValidationErrorVisibilityConverter}}" />
                             </StackPanel>
                             
-                            <Border Classes="InfoPanel" Padding="8" Margin="0,8,0,8" IsVisible="{Binding IsDumpingMemory}">
+                            <Border Classes="InfoPanel" Padding="8" Margin="0,8,0,8" IsVisible="{Binding MemoryDumpFeature.IsDumpingMemory}">
                                 <StackPanel>
                                     <TextBlock Text="{DynamicResource MemoryDumpProgressHeader}" Classes="HeaderText" Margin="0,0,0,4" />
                                     <ProgressBar Name="DumpProgressBar" 
-                                                 Value="{Binding DumpProgressPercentage}" 
+                                                 Value="{Binding MemoryDumpFeature.DumpProgressPercentage}" 
                                                  Minimum="0" 
                                                  Maximum="100" 
                                                  HorizontalAlignment="Stretch" 
                                                  Height="20" />
                                     <TextBlock Name="DumpPercentLabel" 
-                                               Text="{Binding DumpProgressPercentage, StringFormat={}{0:F1}%}" 
+                                               Text="{Binding MemoryDumpFeature.DumpProgressPercentage, StringFormat={}{0:F1}%}" 
                                                HorizontalAlignment="Center" 
                                                Margin="0,2,0,0" />
                                     <TextBlock Name="DumpBytesLabel" 
-                                               Text="{Binding DumpProgressBytes}" 
+                                               Text="{Binding MemoryDumpFeature.DumpProgressBytes}" 
                                                HorizontalAlignment="Center" />
                                     <TextBlock Name="DumpTimeLabel" 
-                                               Text="{Binding DumpProgressTime}" 
+                                               Text="{Binding MemoryDumpFeature.DumpProgressTime}" 
                                                HorizontalAlignment="Center" />
                                     <TextBlock Name="DumpSpeedLabel" 
-                                               Text="{Binding DumpProgressSpeed}" 
+                                               Text="{Binding MemoryDumpFeature.DumpProgressSpeed}" 
                                                HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Border>
@@ -162,14 +161,14 @@
                                     CornerRadius="4" 
                                     Padding="8" 
                                     Margin="0,8,0,8"
-                                    IsVisible="{Binding HasValidationErrors}">
+                                    IsVisible="{Binding MemoryDumpFeature.HasErrors}">
                                 <StackPanel>
                                     <TextBlock Text="⚠️ Validation Errors" 
                                                Foreground="Red" 
                                                FontWeight="Bold" 
                                                FontSize="12" 
                                                Margin="0,0,0,4" />
-                                    <TextBlock Text="{Binding ValidationSummary}" 
+                                    <TextBlock Text="Please check the address and length fields for validation errors." 
                                                Foreground="Red" 
                                                FontSize="11" 
                                                TextWrapping="Wrap" />
@@ -179,14 +178,14 @@
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Stretch">
                                 <Button Name="DumpMemoryButton" 
                                         Content="{DynamicResource DumpMemoryButtonContent}"
-                                        Command="{Binding DumpMemoryCommand}" 
-                                        IsVisible="{Binding !IsDumpingMemory}"
+                                        Command="{Binding MemoryDumpFeature.DumpMemoryCommand}" 
+                                        IsVisible="{Binding !MemoryDumpFeature.IsDumpingMemory}"
                                         HorizontalAlignment="Stretch"
                                         Classes="ActionButton" />
                                 <Button Name="CancelDumpButton" 
                                         Content="{DynamicResource CancelDumpButtonContent}"
-                                        Command="{Binding CancelDumpCommand}" 
-                                        IsVisible="{Binding IsDumpingMemory}"
+                                        Command="{Binding MemoryDumpFeature.CancelDumpCommand}" 
+                                        IsVisible="{Binding MemoryDumpFeature.IsDumpingMemory}"
                                         Background="DarkRed"
                                         HorizontalAlignment="Stretch"
                                         Classes="ActionButton" />
@@ -227,7 +226,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button Name="StartExploitSequenceButton" Content="{DynamicResource StartExploitSequenceButtonContent}" Grid.Column="0" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding StartExploitSequenceCommand}" Classes="ActionButton" />
+                <Button Name="StartExploitSequenceButton" Content="{DynamicResource StartExploitSequenceButtonContent}" Grid.Column="0" FontWeight="Bold" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8,0,8,0" Command="{Binding ExploitSequenceFeature.StartExploitSequenceCommand}" Classes="ActionButton" />
             </Grid>
             <Border Grid.Row="3" Margin="0,12,0,0" Padding="8" Classes="ContentPanel" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                 <Grid RowDefinitions="Auto,Auto,*" ColumnDefinitions="*,*">

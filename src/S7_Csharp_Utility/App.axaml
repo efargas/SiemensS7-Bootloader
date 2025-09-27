@@ -20,6 +20,8 @@
             <converters:LogCategoryToColorConverter x:Key="LogCategoryToColorConverter"/>
             <converters:EnumToTabIndexConverter x:Key="EnumToTabIndexConverter"/>
             <converters:DiffLineTypeToBrushConverter x:Key="DiffLineTypeToBrushConverter"/>
+            <converters:ValidationErrorConverter x:Key="ValidationErrorConverter"/>
+            <converters:ValidationErrorVisibilityConverter x:Key="ValidationErrorVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

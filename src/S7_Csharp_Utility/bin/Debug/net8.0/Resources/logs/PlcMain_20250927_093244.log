@@ -1,0 +1,16 @@
+[2025-09-27 09:32:44] Info Log path updated to: /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs
+[2025-09-27 09:35:00] Info Discovered 0 serial ports.
+[2025-09-27 09:35:14] Info Configuration saved successfully to /home/miniyo88/sett.json.
+[2025-09-27 09:35:14] Error Error saving configuration to /home/miniyo88/sett.json: System.InvalidOperationException: Call from invalid thread
+   at Avalonia.Threading.Dispatcher.<VerifyAccess>g__ThrowVerifyAccess|16_0()
+   at Avalonia.AvaloniaObject..ctor()
+   at Avalonia.Controls.NativeMenu..ctor()
+   at Avalonia.FreeDesktop.DBusMenuExporter.DBusMenuExporterImpl..ctor(Connection connection, IntPtr xid)
+   at Avalonia.FreeDesktop.DBusMenuExporter.TryCreateTopLevelNativeMenu(IntPtr xid)
+   at Avalonia.X11.X11Window..ctor(AvaloniaX11Platform platform, IWindowImpl popupParent, X11WindowMode mode, Boolean overrideRedirect)
+   at Avalonia.X11.X11Window..ctor(AvaloniaX11Platform platform, IWindowImpl popupParent, Boolean overrideRedirect)
+   at Avalonia.X11.AvaloniaX11Platform.CreateWindow()
+   at Avalonia.Controls.Platform.PlatformManager.CreateWindow()
+   at Avalonia.Controls.Window..ctor()
+   at S7_Csharp_Utility.Services.DialogService.ShowMessageAsync(String title, String message) in /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/Services/DialogService.cs:line 127
+   at S7_Csharp_Utility.ViewModels.MainWindowViewModel.SaveConfigurationAsync() in /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/ViewModels/MainWindowViewModel.cs:line 454

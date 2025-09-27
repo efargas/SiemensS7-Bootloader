@@ -2,6 +2,7 @@
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Extensions;
+using S7_Csharp_Utility.ViewModels.Features;
 using System.Windows.Input;
 using System.Threading.Tasks;
 using System;
@@ -23,97 +24,75 @@ namespace S7_Csharp_Utility.ViewModels
     /// <summary>
     /// The main view model for the application.
     /// </summary>
-    public class MainWindowViewModel(
-        LoggingService loggingService,
-        SocatLoggerService socatLoggerService,
-        IDialogService dialogService,
-        ConfigurationService configService,
-        IViewService viewService,
-        PlcConnectionViewModel plcConnectionViewModel,
-        ModbusPowerSupplyViewModel modbusPowerSupplyViewModel,
-        ConfigurationViewModel configurationViewModel,
-        FileCompareViewModel fileCompareViewModel,
-        IPlcOperationService plcOperationService,
-        IMemoryDumpService memoryDumpService,
-        IStagerService stagerService,
-        IPayloadService payloadService,
-        ILogger<MainWindowViewModel> logger) : ViewModelBase
+    public class MainWindowViewModel : ViewModelBase
     {
         private const string ConfigFileName = "config.json";
 
-        public PlcConnectionViewModel? PlcConnectionViewModel { get; } = plcConnectionViewModel;
-        public ModbusPowerSupplyViewModel? ModbusPowerSupplyViewModel { get; } = modbusPowerSupplyViewModel;
-        public ConfigurationViewModel ConfigurationViewModel { get; } = configurationViewModel ?? throw new ArgumentNullException(nameof(configurationViewModel));
-        public FileCompareViewModel FileCompareViewModel { get; } = fileCompareViewModel ?? throw new ArgumentNullException(nameof(fileCompareViewModel));
-        public LoggingService Logging { get; } = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
-        public SocatLoggerService SocatLogging { get; } = socatLoggerService ?? throw new ArgumentNullException(nameof(socatLoggerService));
+        /// <summary>
+        /// Initializes a new instance of the MainWindowViewModel class.
+        /// </summary>
+        public MainWindowViewModel(
+            LoggingService loggingService,
+            SocatLoggerService socatLoggerService,
+            IDialogService dialogService,
+            ConfigurationService configService,
+            IViewService viewService,
+            PlcConnectionViewModel plcConnectionViewModel,
+            ModbusPowerSupplyViewModel modbusPowerSupplyViewModel,
+            ConfigurationViewModel configurationViewModel,
+            FileCompareViewModel fileCompareViewModel,
+            MemoryDumpFeatureViewModel memoryDumpFeatureViewModel,
+            ExploitSequenceFeatureViewModel exploitSequenceFeatureViewModel,
+            IPlcOperationService plcOperationService,
+            IMemoryDumpService memoryDumpService,
+            IStagerService stagerService,
+            IPayloadService payloadService,
+            ILogger<MainWindowViewModel> logger)
+        {
+            // Initialize properties
+            PlcConnectionViewModel = plcConnectionViewModel;
+            ModbusPowerSupplyViewModel = modbusPowerSupplyViewModel;
+            ConfigurationViewModel = configurationViewModel ?? throw new ArgumentNullException(nameof(configurationViewModel));
+            FileCompareViewModel = fileCompareViewModel ?? throw new ArgumentNullException(nameof(fileCompareViewModel));
+            MemoryDumpFeature = memoryDumpFeatureViewModel ?? throw new ArgumentNullException(nameof(memoryDumpFeatureViewModel));
+            ExploitSequenceFeature = exploitSequenceFeatureViewModel ?? throw new ArgumentNullException(nameof(exploitSequenceFeatureViewModel));
+            Logging = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+            SocatLogging = socatLoggerService ?? throw new ArgumentNullException(nameof(socatLoggerService));
+            ViewService = viewService ?? throw new ArgumentNullException(nameof(viewService));
+            ConfigService = configService ?? throw new ArgumentNullException(nameof(configService));
+
+            // Initialize service dependencies
+            _plcOperationService = plcOperationService ?? throw new ArgumentNullException(nameof(plcOperationService));
+            _memoryDumpService = memoryDumpService ?? throw new ArgumentNullException(nameof(memoryDumpService));
+            _stagerService = stagerService ?? throw new ArgumentNullException(nameof(stagerService));
+            _payloadService = payloadService ?? throw new ArgumentNullException(nameof(payloadService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+
+            // Initialize commands and start services
+            InitializeCommands();
+        }
+
+        public PlcConnectionViewModel? PlcConnectionViewModel { get; private set; }
+        public ModbusPowerSupplyViewModel? ModbusPowerSupplyViewModel { get; private set; }
+        public ConfigurationViewModel ConfigurationViewModel { get; private set; }
+        public FileCompareViewModel FileCompareViewModel { get; private set; }
+        public MemoryDumpFeatureViewModel MemoryDumpFeature { get; private set; }
+        public ExploitSequenceFeatureViewModel ExploitSequenceFeature { get; private set; }
+        public LoggingService Logging { get; private set; }
+        public SocatLoggerService SocatLogging { get; private set; }
+        public IViewService ViewService { get; private set; }
+        public ConfigurationService ConfigService { get; private set; }
         
         // Service layer dependencies
-        private readonly IPlcOperationService _plcOperationService = plcOperationService ?? throw new ArgumentNullException(nameof(plcOperationService));
-        private readonly IMemoryDumpService _memoryDumpService = memoryDumpService ?? throw new ArgumentNullException(nameof(memoryDumpService));
-        private readonly IStagerService _stagerService = stagerService ?? throw new ArgumentNullException(nameof(stagerService));
-        private readonly IPayloadService _payloadService = payloadService ?? throw new ArgumentNullException(nameof(payloadService));
-        private readonly ILogger<MainWindowViewModel> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly IPlcOperationService _plcOperationService;
+        private readonly IMemoryDumpService _memoryDumpService;
+        private readonly IStagerService _stagerService;
+        private readonly IPayloadService _payloadService;
+        private readonly ILogger<MainWindowViewModel> _logger;
+        private readonly IDialogService _dialogService;
 
-        private string _dumpAddress = "0x691E28";
-        [Required(ErrorMessage = "Dump address is required")]
-        [RegularExpression(@"^0x[0-9a-fA-F]{1,8}$", ErrorMessage = "Must be a valid hex address (e.g., 0x10000000). Format: 0x followed by 1-8 hex digits")]
-        public string DumpAddress
-        {
-            get => _dumpAddress;
-            set 
-            { 
-                if (SetProperty(ref _dumpAddress, value))
-                {
-                    ValidateProperty(value, nameof(DumpAddress));
-                }
-            }
-        }
-
-        private uint _dumpLength = 16;
-        [Range(1, uint.MaxValue, ErrorMessage = "Dump length must be at least 1 byte")]
-        [Display(Name = "Dump Length", Description = "Number of bytes to dump from memory")]
-        public uint DumpLength
-        {
-            get => _dumpLength;
-            set 
-            { 
-                if (SetProperty(ref _dumpLength, value))
-                {
-                    ValidateProperty(value, nameof(DumpLength));
-                }
-            }
-        }
-
-        private bool _isUploadingStager;
-        public bool IsUploadingStager
-        {
-            get => _isUploadingStager;
-            set
-            {
-                _isUploadingStager = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
-            }
-        }
-
-        private bool _isDumpingMemory;
-        public bool IsDumpingMemory
-        {
-            get => _isDumpingMemory;
-            set
-            {
-                _isDumpingMemory = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)CancelDumpCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
-            }
-        }
-
-        private CancellationTokenSource? _dumpCancellationTokenSource;
-
+        
         private bool _isComparing;
         public bool IsComparing
         {
@@ -122,48 +101,6 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 _isComparing = value;
                 OnPropertyChanged();
-                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
-            }
-        }
-
-        private double _dumpProgressPercentage;
-        public double DumpProgressPercentage
-        {
-            get => _dumpProgressPercentage;
-            set => SetProperty(ref _dumpProgressPercentage, value);
-        }
-
-        private string _dumpProgressBytes = "Read: 0 / 0 bytes";
-        public string DumpProgressBytes
-        {
-            get => _dumpProgressBytes;
-            set => SetProperty(ref _dumpProgressBytes, value);
-        }
-
-        private string _dumpProgressTime = "Elapsed: 00:00:00 | Remaining: calculating...";
-        public string DumpProgressTime
-        {
-            get => _dumpProgressTime;
-            set => SetProperty(ref _dumpProgressTime, value);
-        }
-
-        private string _dumpProgressSpeed = "Speed: 0 B/s";
-        public string DumpProgressSpeed
-        {
-            get => _dumpProgressSpeed;
-            set => SetProperty(ref _dumpProgressSpeed, value);
-        }
-
-        private bool _stagerInstalled;
-        public bool StagerInstalled
-        {
-            get => _stagerInstalled;
-            set
-            {
-                _stagerInstalled = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
             }
         }
 
@@ -190,21 +127,15 @@ namespace S7_Csharp_Utility.ViewModels
             set => SetProperty(ref _hasValidationErrors, value);
         }
 
-        public ICommand LoadProfileCommand { get; }
-        public ICommand StartExploitSequenceCommand { get; }
-        public ICommand DumpMemoryCommand { get; }
-        public ICommand CancelDumpCommand { get; }
-        public ICommand ShowProfileManagementCommand { get; }
-        public ICommand ShowFirmwareUnpackerCommand { get; }
-        public ICommand ShowHexViewerCommand { get; }
-        public ICommand SaveConfigurationCommand { get; }
-        public ICommand LoadConfigurationCommand { get; }
-        public ICommand ExitCommand { get; }
-        public ICommand CancelScanCommand { get; }
+        public ICommand LoadProfileCommand { get; private set; } = null!;
+        public ICommand ShowProfileManagementCommand { get; private set; } = null!;
+        public ICommand ShowFirmwareUnpackerCommand { get; private set; } = null!;
+                public ICommand SaveConfigurationCommand { get; private set; } = null!;
+        public ICommand LoadConfigurationCommand { get; private set; } = null!;
+        public ICommand ExitCommand { get; private set; } = null!;
+        public ICommand CancelScanCommand { get; private set; } = null!;
 
-        private readonly IDialogService _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
-        public ConfigurationService ConfigService { get; } = configService ?? throw new ArgumentNullException(nameof(configService));
-
+        
         private CancellationTokenSource? _scanCancellationTokenSource;
         private DeviceProfile? _loadedProfile;
         public DeviceProfile? LoadedProfile
@@ -230,14 +161,13 @@ namespace S7_Csharp_Utility.ViewModels
                 OnPropertyChanged();
                 if (_selectedMemoryRegion != null)
                 {
-                    DumpAddress = _selectedMemoryRegion.Address;
-                    DumpLength = _selectedMemoryRegion.Size;
+                    MemoryDumpFeature.DumpAddress = _selectedMemoryRegion.Address;
+                    MemoryDumpFeature.DumpLength = _selectedMemoryRegion.Size;
                 }
             }
         }
 
-        public IViewService ViewService { get; } = viewService ?? throw new ArgumentNullException(nameof(viewService));
-
+        
         // Primary constructor initialization
         static MainWindowViewModel()
         {
@@ -247,15 +177,14 @@ namespace S7_Csharp_Utility.ViewModels
         // Instance initialization - called automatically after primary constructor
         private void InitializeCommands()
         {
-            // Subscribe to status change events
-            if (PlcConnectionViewModel != null)
-            {
-                PlcConnectionViewModel.SocatStatusChanged += (status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
-            }
-            if (ModbusPowerSupplyViewModel != null)
-            {
-                ModbusPowerSupplyViewModel.ModbusStatusChanged += (status) => ((AsyncRelayCommand)StartExploitSequenceCommand)?.RaiseCanExecuteChanged();
-            }
+            // Initialize commands
+            LoadProfileCommand = new AsyncRelayCommand(async _ => await LoadProfileAsync().ConfigureAwait(false), _ => true);
+            ShowProfileManagementCommand = new RelayCommand(_ => ShowProfileManagement(), _ => true);
+            ShowFirmwareUnpackerCommand = new RelayCommand(_ => ShowFirmwareUnpacker(), _ => true);
+                        SaveConfigurationCommand = new AsyncRelayCommand(async _ => await SaveConfigurationAsync().ConfigureAwait(false), _ => true);
+            LoadConfigurationCommand = new AsyncRelayCommand(async _ => await LoadConfigurationAsync().ConfigureAwait(false), _ => true);
+            ExitCommand = new RelayCommand(_ => Exit(), _ => true);
+            CancelScanCommand = new RelayCommand(_ => CancelScan(), _ => !IsScanning);
 
             // Subscribe to service events
             _plcOperationService.ConnectionStatusChanged += OnPlcConnectionStatusChanged;
@@ -271,29 +200,7 @@ namespace S7_Csharp_Utility.ViewModels
             _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
         }
 
-        /// <summary>
-        /// Determines if the exploit sequence can be executed based on current state.
-        /// </summary>
-        private bool CanExecuteExploitSequence()
-        {
-            return PlcConnectionViewModel?.SocatStatus == "Running" 
-                && ModbusPowerSupplyViewModel?.ModbusStatus == "Connected" 
-                && !IsUploadingStager 
-                && !IsDumpingMemory 
-                && !IsComparing;
-        }
-
-        /// <summary>
-        /// Determines if memory dump can be executed based on current state.
-        /// </summary>
-        private bool CanExecuteMemoryDump()
-        {
-            return StagerInstalled 
-                && !IsUploadingStager 
-                && !IsDumpingMemory 
-                && !IsComparing;
-        }
-
+        
         /// <summary>
         /// Creates a communication channel configuration from the current UI settings.
         /// </summary>
@@ -333,13 +240,6 @@ namespace S7_Csharp_Utility.ViewModels
         {
             _logger.LogInformation("PLC connection status changed from {PreviousStatus} to {CurrentStatus}", 
                 e.PreviousStatus, e.CurrentStatus);
-            
-            // Update UI state based on connection status
-            Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                ((AsyncRelayCommand)StartExploitSequenceCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)DumpMemoryCommand).RaiseCanExecuteChanged();
-            });
         }
 
         /// <summary>
@@ -374,8 +274,7 @@ namespace S7_Csharp_Utility.ViewModels
                 ViewService.ShowFirmwareUnpackerWindow(ConfigurationViewModel.ExtractionPath);
             }
         }
-        private void ShowHexViewer() => ViewService.ShowHexViewerWindow();
-        private void Exit() => ViewService.Exit();
+                private void Exit() => ViewService.Exit();
 
         private async Task LoadProfileAsync()
         {
@@ -390,199 +289,8 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        /// <summary>
-        /// Executes the exploit sequence using the service layer.
-        /// </summary>
-        private async Task StartExploitSequenceAsync()
-        {
-            IsUploadingStager = true;
-            
-            try
-            {
-                _logger.LogInformation("Starting exploit sequence execution");
-                Logging.Log("[EXPLOIT] Starting exploit sequence...", LogCategory.Info);
-                
-                // Power cycle if configured
-                if (ModbusPowerSupplyViewModel != null)
-                {
-                    Logging.Log("[POWER] Performing power cycle...", LogCategory.Info);
-                    await ModbusPowerSupplyViewModel.PowerCycleAsync(ModbusPowerSupplyViewModel.DelaySeconds);
-                    await Task.Delay(50); // Brief delay after power cycle
-                }
-
-                // Create channel configuration
-                var channelConfig = CreateChannelConfig();
-                
-                // Create exploit sequence options
-                var exploitOptions = new ExploitSequenceOptions
-                {
-                    ChannelConfig = channelConfig,
-                    PayloadPaths = new List<string> { System.IO.Path.Combine(ConfigurationViewModel.PayloadsPath, "stager") },
-                    PerformHandshake = true,
-                    ValidateSteps = true,
-                    TimeoutMs = 300000, // 5 minutes
-                    ContinueOnFailure = false
-                };
-
-                // Execute exploit sequence through service
-                var result = await _plcOperationService.ExecuteExploitSequenceAsync(exploitOptions, CancellationToken.None).ConfigureAwait(false);
-                
-                if (result.IsSuccess && result.Value != null)
-                {
-                    StagerInstalled = result.Value.IsSuccess;
-                    
-                    if (result.Value.IsSuccess)
-                    {
-                        Logging.Log("✅ Stager installation completed successfully", LogCategory.Info);
-                        _logger.LogInformation("Stager installed successfully in {Duration}ms", result.Value.Duration.TotalMilliseconds);
-                    }
-                    else
-                    {
-                        Logging.Log($"❌ Stager installation failed: {result.Value.ErrorMessage}", LogCategory.Error);
-                        await _dialogService.ShowMessageAsync("Stager Installation Failed", 
-                            result.Value.ErrorMessage ?? "Unknown error occurred during stager installation");
-                    }
-                }
-                else
-                {
-                    Logging.Log($"❌ Exploit sequence failed: {result.Error.Message}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Exploit Sequence Failed",
-                    result.Error.Message ?? "Unknown error occurred during exploit sequence");
-                }
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "Invalid operation during exploit sequence");
-                Logging.Log($"[ERROR] Configuration error: {ex.Message}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Configuration Error", ex.Message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unexpected error during exploit sequence");
-                Logging.Log($"[ERROR] ❌ Unexpected error during exploit sequence: {ex}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"An error occurred during the exploit sequence: {ex.Message}");
-            }
-            finally
-            {
-                IsUploadingStager = false;
-            }
-        }
-
-        /// <summary>
-        /// Executes memory dump using the service layer.
-        /// </summary>
-        private async Task DumpMemoryAsync()
-        {
-            IsDumpingMemory = true;
-            using (_dumpCancellationTokenSource = new CancellationTokenSource())
-            {
-                try
-                {
-                    _logger.LogInformation("Starting memory dump operation");
-                    
-                    // Validate dump address
-                    if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out uint address))
-                    {
-                        await _dialogService.ShowMessageAsync("Validation Error", "Invalid dump address format. Please use hex format like 0x691E28.");
-                        return;
-                    }
-
-                    // Create memory dump options
-                    var dumpOptions = new S7.Core.Abstractions.Commands.MemoryDumpOptions
-                    {
-                        StartAddress = address,
-                        Length = DumpLength,
-                        ChannelConfig = CreateChannelConfig(),
-                        OutputPath = ApplicationConfiguration.ResolvePath(ConfigurationViewModel.DumpsPath, ApplicationConfiguration.GetDefaultDumpsPath()),
-                        ChunkSize = 1024, // 1KB chunks
-                        ValidateChecksum = true,
-                        CompressOutput = false
-                    };
-
-                    // Create progress reporter for UI updates
-                    var progress = new Progress<MemoryDumpProgress>(progressInfo =>
-                    {
-                        Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            DumpProgressPercentage = progressInfo.PercentComplete;
-                            DumpProgressBytes = $"Read: {FormatBytes((long)progressInfo.BytesRead)} / {FormatBytes((long)progressInfo.TotalBytes)}";
-                            DumpProgressTime = $"Elapsed: {FormatTime(progressInfo.Elapsed)} | ETA: {FormatTime(progressInfo.EstimatedRemaining)}";
-                            
-                            // Calculate speed
-                            var bytesPerSecond = progressInfo.Elapsed.TotalSeconds > 0 
-                                ? progressInfo.BytesRead / progressInfo.Elapsed.TotalSeconds 
-                                : 0;
-                            DumpProgressSpeed = $"Speed: {FormatBytes((long)bytesPerSecond)}/s";
-                        });
-                    });
-
-                    Logging.Log($"Starting memory dump of {DumpLength} bytes from 0x{address:X8}...", LogCategory.Info);
-
-                    // Execute memory dump through service
-                    var result = await _memoryDumpService.DumpMemoryAsync(dumpOptions, progress, _dumpCancellationTokenSource.Token).ConfigureAwait(false);
-
-                    if (result.IsSuccess && result.Value != null)
-                    {
-                        var dumpResult = result.Value;
-                        
-                        // Save the dump to file
-                        string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                        string outFilename = $"mem_dump_{address:x8}_{address + DumpLength:x8}_{timestamp}.bin";
-                        string fullPath = System.IO.Path.Combine(dumpOptions.OutputPath, outFilename);
-                        
-                        var saveResult = await _memoryDumpService.SaveDumpAsync(
-                            dumpResult.Data, 
-                            fullPath, 
-                            dumpResult.Metadata, 
-                            false, // Don't compress
-                            _dumpCancellationTokenSource.Token).ConfigureAwait(false);
-
-                        if (saveResult.IsSuccess)
-                        {
-                            Logging.Log($"✅ Successfully dumped {dumpResult.Data.Length} bytes to {fullPath} in {dumpResult.Duration.TotalSeconds:F1}s", LogCategory.Info);
-                            _logger.LogInformation("Memory dump completed successfully. File: {FilePath}, Size: {Size} bytes, Duration: {Duration}ms", 
-                                fullPath, dumpResult.Data.Length, dumpResult.Duration.TotalMilliseconds);
-                        }
-                        else
-                        {
-                            Logging.Log($"❌ Failed to save memory dump: {saveResult.Error.Message}", LogCategory.Error);
-                            await _dialogService.ShowMessageAsync("Save Error", $"Failed to save memory dump: {saveResult.Error.Message}");
-                        }
-                    }
-                    else
-                    {
-                        Logging.Log($"❌ Memory dump failed: {result.Error.Message}", LogCategory.Error);
-                        await _dialogService.ShowMessageAsync("Memory Dump Failed", 
-                            result.Error.Message ?? "Unknown error occurred during memory dump");
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger.LogInformation("Memory dump operation was cancelled by user");
-                    Logging.Log("Memory dump operation was cancelled by user.", LogCategory.Info);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    _logger.LogError(ex, "Invalid operation during memory dump");
-                    Logging.Log($"[ERROR] Configuration error: {ex.Message}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Configuration Error", ex.Message);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unexpected error during memory dump");
-                    Logging.Log($"An error occurred during the dump sequence: {ex}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Error", $"An error occurred during memory dump: {ex.Message}");
-                }
-                finally
-                {
-                    IsDumpingMemory = false;
-                }
-            }
-            _dumpCancellationTokenSource = null;
-        }
-
-        private void CancelDump() => _dumpCancellationTokenSource?.Cancel();
-
+        
+        
         public async Task LoadConfigurationOnStartup()
         {
             try
@@ -603,8 +311,8 @@ namespace S7_Csharp_Utility.ViewModels
                         ModbusPowerSupplyViewModel.ModbusCoil = config.ModbusCoil;
                         ModbusPowerSupplyViewModel.DelaySeconds = config.DelaySeconds;
                     }
-                    DumpAddress = config.DumpAddress ?? "0x691E28";
-                    DumpLength = config.DumpLength;
+                    MemoryDumpFeature.DumpAddress = config.DumpAddress ?? "0x691E28";
+                    MemoryDumpFeature.DumpLength = config.DumpLength;
                     FileCompareViewModel.CompareFolder = config.CompareFolder ?? string.Empty;
                     FileCompareViewModel.CompareFile1 = config.CompareFile1 ?? string.Empty;
                     FileCompareViewModel.CompareFile2 = config.CompareFile2 ?? string.Empty;
@@ -664,8 +372,8 @@ namespace S7_Csharp_Utility.ViewModels
                             ModbusPowerSupplyViewModel.ModbusCoil = config.ModbusCoil;
                             ModbusPowerSupplyViewModel.DelaySeconds = config.DelaySeconds;
                         }
-                        DumpAddress = config.DumpAddress ?? "0x691E28";
-                        DumpLength = config.DumpLength;
+                        MemoryDumpFeature.DumpAddress = config.DumpAddress ?? "0x691E28";
+                        MemoryDumpFeature.DumpLength = config.DumpLength;
                         FileCompareViewModel.CompareFolder = config.CompareFolder ?? string.Empty;
                         FileCompareViewModel.CompareFile1 = config.CompareFile1 ?? string.Empty;
                         FileCompareViewModel.CompareFile2 = config.CompareFile2 ?? string.Empty;
@@ -704,6 +412,52 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
+        private async Task SaveConfigurationAsync()
+        {
+            var path = await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Configuration Files").ConfigureAwait(false);
+            if (path != null)
+            {
+                try
+                {
+                    var config = new ApplicationConfiguration
+                    {
+                        PlcHost = PlcConnectionViewModel?.PlcHost,
+                        PlcPort = PlcConnectionViewModel?.PlcPort ?? 0,
+                        ModbusHost = ModbusPowerSupplyViewModel?.ModbusHost,
+                        ModbusPort = ModbusPowerSupplyViewModel?.ModbusPort ?? 0,
+                        ModbusCoil = ModbusPowerSupplyViewModel?.ModbusCoil ?? 0,
+                        DelaySeconds = ModbusPowerSupplyViewModel?.DelaySeconds ?? 0,
+                        DumpAddress = MemoryDumpFeature.DumpAddress,
+                        DumpLength = MemoryDumpFeature.DumpLength,
+                        CompareFolder = FileCompareViewModel.CompareFolder,
+                        CompareFile1 = FileCompareViewModel.CompareFile1,
+                        CompareFile2 = FileCompareViewModel.CompareFile2,
+                        SelectedSerialPort = PlcConnectionViewModel?.SelectedSerialPort,
+                        SocatTcpPort = PlcConnectionViewModel?.SocatTcpPort ?? 0,
+                        SelectedBaudRate = PlcConnectionViewModel?.SelectedBaudRate ?? 0,
+                        SelectedParity = PlcConnectionViewModel?.SelectedParity ?? System.IO.Ports.Parity.None,
+                        SelectedStopBits = PlcConnectionViewModel?.SelectedStopBits ?? System.IO.Ports.StopBits.One,
+                        SelectedFlowControl = PlcConnectionViewModel?.SelectedFlowControl ?? System.IO.Ports.Handshake.None,
+                        SocatVerbose = PlcConnectionViewModel?.SocatVerbose ?? false,
+                        SocatHexDump = PlcConnectionViewModel?.SocatHexDump ?? false,
+                        SocatBlockSize = PlcConnectionViewModel?.SocatBlockSize ?? 0,
+                        PayloadsPath = ConfigurationViewModel.PayloadsPath,
+                        DumpsPath = ConfigurationViewModel.DumpsPath,
+                        LogsPath = ConfigurationViewModel.LogsPath,
+                        ExtractionPath = ConfigurationViewModel.ExtractionPath
+                    };
+                    await ConfigService.SaveConfigurationAsync(config, path);
+                    Logging.Log($"Configuration saved successfully to {path}.", LogCategory.Info);
+                    await _dialogService.ShowMessageAsync("Success", "Configuration saved successfully!");
+                }
+                catch (Exception ex)
+                {
+                    Logging.Log($"Error saving configuration to {path}: {ex}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", $"Error saving configuration: {ex.Message}");
+                }
+            }
+        }
+
         public async Task SaveConfigurationOnExit()
         {
             try
@@ -717,8 +471,8 @@ namespace S7_Csharp_Utility.ViewModels
                     ModbusPort = ModbusPowerSupplyViewModel?.ModbusPort ?? 0,
                     ModbusCoil = ModbusPowerSupplyViewModel?.ModbusCoil ?? 0,
                     DelaySeconds = ModbusPowerSupplyViewModel?.DelaySeconds ?? 0,
-                    DumpAddress = DumpAddress,
-                    DumpLength = DumpLength,
+                    DumpAddress = MemoryDumpFeature.DumpAddress,
+                    DumpLength = MemoryDumpFeature.DumpLength,
                     CompareFolder = FileCompareViewModel.CompareFolder,
                     CompareFile1 = FileCompareViewModel.CompareFile1,
                     CompareFile2 = FileCompareViewModel.CompareFile2,
@@ -774,19 +528,8 @@ namespace S7_Csharp_Utility.ViewModels
             
             var allErrors = new List<string>();
             
-            // Collect all validation errors from all properties
-            var propertyNames = new[] { nameof(DumpAddress), nameof(DumpLength) };
-            foreach (var propertyName in propertyNames)
-            {
-                var errors = GetErrors(propertyName);
-                if (errors != null)
-                {
-                    foreach (string error in errors)
-                    {
-                        allErrors.Add(error);
-                    }
-                }
-            }
+            // MainWindowViewModel no longer has validation properties - they've been moved to feature ViewModels
+            // This method is kept for potential future validation needs
             
             // Update validation summary properties
             HasValidationErrors = allErrors.Any();

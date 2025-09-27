@@ -261,16 +261,7 @@
         <Setter Property="CornerRadius" Value="3"/>
     </Style>
 
-    <Style Selector=".Light TextBox.HexDisplay">
-        <Setter Property="FontFamily" Value="JetBrains Mono,Consolas,Monaco,Menlo,monospace"/>
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Foreground" Value="#374151"/>
-        <Setter Property="SelectionBrush" Value="#DBEAFE"/>
-        <Setter Property="SelectionForegroundBrush" Value="#1E40AF"/>
-    </Style>
-
+    
     <Style Selector=".Light TextBlock.StatusIdentical">
         <Setter Property="Foreground" Value="#059669"/>
         <Setter Property="FontWeight" Value="SemiBold"/>

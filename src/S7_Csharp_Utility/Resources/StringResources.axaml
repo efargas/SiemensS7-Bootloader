@@ -12,8 +12,7 @@
     <system:String x:Key="ToolsMenuHeader">_Tools</system:String>
     <system:String x:Key="ProfileManagementMenuHeader">_Profile Management</system:String>
     <system:String x:Key="FirmwareUnpackerMenuHeader">_Firmware Unpacker</system:String>
-    <system:String x:Key="HexViewerMenuHeader">_Hex Viewer</system:String>
-    <system:String x:Key="HelpMenuHeader">_Help</system:String>
+        <system:String x:Key="HelpMenuHeader">_Help</system:String>
 
     <!-- Configuration Section -->
     <system:String x:Key="ConfigurationHeader">Configuration</system:String>

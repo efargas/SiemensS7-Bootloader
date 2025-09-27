@@ -1,0 +1,10 @@
+[2025-09-27 05:27:39] Info Log path updated to: /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs
+[2025-09-27 05:27:52] Info Discovered 0 serial ports.
+[2025-09-27 05:27:52] Info Discovered 0 serial ports.
+[2025-09-27 05:27:59] Info Connecting to Modbus host localhost:502...
+[2025-09-27 05:28:12] Error Error connecting to Modbus host: Connection refused
+[2025-09-27 05:28:12] Error Failed to connect to Modbus power supply at localhost:502
+[2025-09-27 05:42:13] Info Comparison complete. Results shown in dialog.
+[2025-09-27 05:42:23] Info Hashing metadata (copia).json...
+[2025-09-27 05:42:23] Info Hashing metadata.json...
+[2025-09-27 05:42:35] Info Comparison complete. Results shown in dialog.

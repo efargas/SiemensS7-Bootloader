@@ -131,10 +131,13 @@ namespace S7_Csharp_Utility.ViewModels
                 _modbusStatus = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsConnected));
-                ((RelayCommand)ConnectModbusCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)DisconnectModbusCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)PowerOnCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)PowerOffCommand).RaiseCanExecuteChanged();
+                
+                // Safely raise CanExecuteChanged for all commands
+                RaiseCanExecuteChangedSafely(ConnectModbusCommand);
+                RaiseCanExecuteChangedSafely(DisconnectModbusCommand);
+                RaiseCanExecuteChangedSafely(PowerOnCommand);
+                RaiseCanExecuteChangedSafely(PowerOffCommand);
+                
                 ModbusStatusChanged?.Invoke(value);
             }
         }
@@ -216,6 +219,35 @@ namespace S7_Csharp_Utility.ViewModels
             _logger.LogError(ex, "An unexpected error occurred in ModbusPowerSupplyViewModel");
             _loggingService.Log($"An unexpected error occurred: {ex}", LogCategory.Error);
             _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
+        }
+
+        /// <summary>
+        /// Safely raises CanExecuteChanged for both RelayCommand and AsyncRelayCommand types.
+        /// </summary>
+        /// <param name="command">The command to raise CanExecuteChanged for.</param>
+        private void RaiseCanExecuteChangedSafely(ICommand command)
+        {
+            try
+            {
+                switch (command)
+                {
+                    case RelayCommand relayCommand:
+                        relayCommand.RaiseCanExecuteChanged();
+                        break;
+                    case AsyncRelayCommand asyncRelayCommand:
+                        asyncRelayCommand.RaiseCanExecuteChanged();
+                        break;
+                    default:
+                        // For other ICommand implementations, we can't raise CanExecuteChanged
+                        // but this prevents the InvalidCastException
+                        _logger.LogDebug("Command type {CommandType} does not support RaiseCanExecuteChanged", command.GetType().Name);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to raise CanExecuteChanged for command {CommandType}", command.GetType().Name);
+            }
         }
 
         /// <summary>

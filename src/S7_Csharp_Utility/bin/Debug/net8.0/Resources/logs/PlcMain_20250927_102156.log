@@ -1,0 +1,12 @@
+[2025-09-27 10:21:56] Info Log path updated to: /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs
+[2025-09-27 10:21:56] Info Discovered 0 serial ports.
+[2025-09-27 10:21:56] Info Discovered 0 serial ports.
+[2025-09-27 10:21:56] Info ✅ Payload scan completed successfully. Found 5 payload files in 0,0s
+[2025-09-27 10:21:56] Debug   - Binary: tic_tac_toe.bin (2,2 KB)
+[2025-09-27 10:21:56] Debug   - Binary: hello_world.bin (68 B)
+[2025-09-27 10:21:56] Debug   - Binary: dump_mem.bin (512 B)
+[2025-09-27 10:21:56] Debug   - Binary: hello_loop.bin (600 B)
+[2025-09-27 10:21:56] Debug   - Binary: stager.bin (292 B)
+[2025-09-27 10:24:42] Info Starting optimized comparison of files:
+[2025-09-27 10:24:42] Info   File 2: /home/miniyo88/Desktop/1_mem_dump_01e01040_02620f58.bin
+[2025-09-27 10:24:42] Info   File 1: /home/miniyo88/Desktop/2_mem_dump_01e01040_02620f58.bin

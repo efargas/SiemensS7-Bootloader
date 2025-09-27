@@ -1,0 +1,29 @@
+[2025-09-27 09:35:25] Info Configuration loaded successfully from /home/miniyo88/sett.json.
+[2025-09-27 09:35:25] Info Log path updated to: /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/bin/Debug/net8.0/Resources/logs
+[2025-09-27 09:35:25] Error Error loading configuration from /home/miniyo88/sett.json: System.InvalidOperationException: Call from invalid thread
+   at Avalonia.Threading.Dispatcher.<VerifyAccess>g__ThrowVerifyAccess|16_0()
+   at Avalonia.AvaloniaObject..ctor()
+   at Avalonia.Controls.NativeMenu..ctor()
+   at Avalonia.FreeDesktop.DBusMenuExporter.DBusMenuExporterImpl..ctor(Connection connection, IntPtr xid)
+   at Avalonia.FreeDesktop.DBusMenuExporter.TryCreateTopLevelNativeMenu(IntPtr xid)
+   at Avalonia.X11.X11Window..ctor(AvaloniaX11Platform platform, IWindowImpl popupParent, X11WindowMode mode, Boolean overrideRedirect)
+   at Avalonia.X11.X11Window..ctor(AvaloniaX11Platform platform, IWindowImpl popupParent, Boolean overrideRedirect)
+   at Avalonia.X11.AvaloniaX11Platform.CreateWindow()
+   at Avalonia.Controls.Platform.PlatformManager.CreateWindow()
+   at Avalonia.Controls.Window..ctor()
+   at S7_Csharp_Utility.Services.DialogService.ShowMessageAsync(String title, String message) in /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/Services/DialogService.cs:line 127
+   at S7_Csharp_Utility.ViewModels.MainWindowViewModel.LoadConfigurationAsync() in /home/miniyo88/Documents/GithubWS/SiemensS7-Bootloader/src/S7_Csharp_Utility/ViewModels/MainWindowViewModel.cs:line 403
+[2025-09-27 09:37:02] Info Hashing metadata (copia).json...
+[2025-09-27 09:37:02] Info Hashing metadata.json...
+[2025-09-27 09:37:06] Info Comparison complete. Results shown in dialog.
+[2025-09-27 09:37:19] Info Starting optimized comparison of files:
+[2025-09-27 09:37:19] Info   File 1: /home/miniyo88/Desktop/2_mem_dump_01e01040_02620f58.bin
+[2025-09-27 09:37:19] Info   File 2: /home/miniyo88/Desktop/1_mem_dump_01e01040_02620f58.bin
+[2025-09-27 09:37:46] Info Connecting to Modbus host 192.168.1.18:502...
+[2025-09-27 09:37:55] Error Error connecting to Modbus host: No route to host
+[2025-09-27 09:37:55] Error Failed to connect to Modbus power supply at 192.168.1.18:502
+[2025-09-27 09:38:06] Info No running socat instances detected.
+[2025-09-27 09:38:09] Info Successfully killed 0 socat processes.
+[2025-09-27 09:38:09] Info Successfully killed 0 socat processes.
+[2025-09-27 09:38:10] Info Successfully killed 0 socat processes.
+[2025-09-27 09:38:10] Info No running socat instances detected.
