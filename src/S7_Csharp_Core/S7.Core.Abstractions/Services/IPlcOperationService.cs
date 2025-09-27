@@ -85,7 +85,7 @@ namespace S7.Core.Abstractions.Services
         /// <param name="channelConfig">The communication channel configuration to validate</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the validation result</returns>
-        Task<Result<ValidationResult>> ValidateConnectionAsync(
+        Task<Result<ValidationResultInfo>> ValidateConnectionAsync(
             CommunicationChannelConfig channelConfig, 
             CancellationToken cancellationToken = default);
 

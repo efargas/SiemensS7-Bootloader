@@ -111,13 +111,13 @@ namespace S7.Services.Middleware
                     validationErrors.Add("RetryPolicy.MaxRetries cannot exceed 10");
                 }
 
-                if (options.RetryPolicy.DelayMs <= 0)
+                if (options.RetryPolicy.RetryDelayMs <= 0)
                 {
-                    validationErrors.Add("RetryPolicy.DelayMs must be greater than 0");
+                    validationErrors.Add("RetryPolicy.RetryDelayMs must be greater than 0");
                 }
-                else if (options.RetryPolicy.DelayMs > 60000) // 1 minute max
+                else if (options.RetryPolicy.RetryDelayMs > 60000) // 1 minute max
                 {
-                    validationErrors.Add("RetryPolicy.DelayMs cannot exceed 1 minute (60000 ms)");
+                    validationErrors.Add("RetryPolicy.RetryDelayMs cannot exceed 1 minute (60000 ms)");
                 }
             }
         }
@@ -218,9 +218,9 @@ namespace S7.Services.Middleware
             }
 
             // Validate backup configuration
-            if (options.CreateBackup && string.IsNullOrEmpty(options.BackupFilePath))
+            if (options.BackupBeforeInstall && string.IsNullOrEmpty(options.BackupFilePath))
             {
-                validationErrors.Add("BackupFilePath is required when CreateBackup is enabled");
+                validationErrors.Add("BackupFilePath is required when BackupBeforeInstall is enabled");
             }
 
             // Validate power cycling configuration

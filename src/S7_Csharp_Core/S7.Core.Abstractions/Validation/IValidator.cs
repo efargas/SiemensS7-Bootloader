@@ -5,7 +5,7 @@ namespace S7.Core.Abstractions.Validation
     /// <summary>
     /// Represents the result of a validation operation.
     /// </summary>
-    public class ValidationResult
+    public class ValidationResultInfo
     {
         /// <summary>
         /// Gets a value indicating whether the validation was successful.
@@ -26,9 +26,9 @@ namespace S7.Core.Abstractions.Validation
         /// Creates a successful validation result.
         /// </summary>
         /// <returns>A successful validation result</returns>
-        public static ValidationResult Success()
+        public static ValidationResultInfo Success()
         {
-            return new ValidationResult { IsValid = true };
+            return new ValidationResultInfo { IsValid = true };
         }
 
         /// <summary>
@@ -36,9 +36,9 @@ namespace S7.Core.Abstractions.Validation
         /// </summary>
         /// <param name="errors">The validation error messages</param>
         /// <returns>A failed validation result</returns>
-        public static ValidationResult Failure(IEnumerable<string> errors)
+        public static ValidationResultInfo Failure(IEnumerable<string> errors)
         {
-            return new ValidationResult 
+            return new ValidationResultInfo 
             { 
                 IsValid = false, 
                 Errors = new List<string>(errors) 
@@ -50,9 +50,9 @@ namespace S7.Core.Abstractions.Validation
         /// </summary>
         /// <param name="error">The validation error message</param>
         /// <returns>A failed validation result</returns>
-        public static ValidationResult Failure(string error)
+        public static ValidationResultInfo Failure(string error)
         {
-            return new ValidationResult 
+            return new ValidationResultInfo 
             { 
                 IsValid = false, 
                 Errors = new List<string> { error } 
@@ -71,6 +71,6 @@ namespace S7.Core.Abstractions.Validation
         /// </summary>
         /// <param name="instance">The object to validate</param>
         /// <returns>A validation result indicating success or failure</returns>
-        ValidationResult Validate(T instance);
+        ValidationResultInfo Validate(T instance);
     }
 }

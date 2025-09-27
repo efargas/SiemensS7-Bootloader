@@ -385,7 +385,7 @@ namespace S7.Services
         }
 
         /// <inheritdoc />
-        public async Task<Result<S7.Core.Abstractions.Validation.ValidationResult>> ValidateConnectionAsync(
+        public async Task<Result<S7.Core.Abstractions.Validation.ValidationResultInfo>> ValidateConnectionAsync(
             CommunicationChannelConfig channelConfig,
             CancellationToken cancellationToken = default)
         {
@@ -453,21 +453,21 @@ namespace S7.Services
                 SetConnectionStatus(PlcConnectionStatus.Disconnected);
 
                 var validationResult = errors.Count == 0 
-                    ? S7.Core.Abstractions.Validation.ValidationResult.Success()
-                    : S7.Core.Abstractions.Validation.ValidationResult.Failure(errors);
+                    ? S7.Core.Abstractions.Validation.ValidationResultInfo.Success()
+                    : S7.Core.Abstractions.Validation.ValidationResultInfo.Failure(errors);
 
                 _logger.LogInformation("Connection validation completed in {Duration}ms. Valid: {IsValid}",
                     stopwatch.ElapsedMilliseconds, validationResult.IsValid);
 
                 OnOperationCompleted(operationName, validationResult.IsValid, stopwatch.Elapsed);
-                return Result<S7.Core.Abstractions.Validation.ValidationResult>.Success(validationResult);
+                return Result<S7.Core.Abstractions.Validation.ValidationResultInfo>.Success(validationResult);
             }
             catch (Exception ex)
             {
                 SetConnectionStatus(PlcConnectionStatus.Error);
                 _logger.LogError(ex, "Connection validation failed");
                 OnOperationCompleted(operationName, false, stopwatch.Elapsed, ex.Message);
-                return Result<S7.Core.Abstractions.Validation.ValidationResult>.Failure($"Validation failed: {ex.Message}");
+                return Result<S7.Core.Abstractions.Validation.ValidationResultInfo>.Failure($"Validation failed: {ex.Message}");
             }
         }
 

@@ -123,7 +123,7 @@ This implementation plan transforms the SiemensS7-Bootloader project into a full
 | TASK-035 | Convert all ViewModel classes in `src/S7_Csharp_Utility/ViewModels/` to primary constructor syntax | [x] | 2024-12-26 |
 | TASK-036 | Convert utility classes in `src/S7_Csharp_Utility/Services/` to primary constructor syntax | [x] | 2024-12-26 |
 | TASK-037 | Ensure all primary constructors maintain ArgumentNullException.ThrowIfNull validation | [x] | 2024-12-26 |
-| TASK-038 | Update all affected unit tests to work with primary constructor syntax | | |
+| TASK-038 | Update all affected unit tests to work with primary constructor syntax | [x] | 2024-12-26 |
 | TASK-039 | Validate dependency injection continues to work correctly with primary constructors | [x] | 2024-12-26 |
 | TASK-040 | Create coding standard documentation for primary constructor usage in project | | |
 

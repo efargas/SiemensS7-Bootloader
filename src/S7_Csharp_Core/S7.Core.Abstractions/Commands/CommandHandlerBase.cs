@@ -125,7 +125,7 @@ namespace S7.Core.Abstractions.Commands
         /// <param name="options">The command options to validate</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the validation result</returns>
-        protected virtual async Task<ValidationResult> ValidateOptionsAsync(
+        protected virtual async Task<ValidationResultInfo> ValidateOptionsAsync(
             TOptions options, 
             CancellationToken cancellationToken = default)
         {
@@ -134,7 +134,7 @@ namespace S7.Core.Abstractions.Commands
             if (builtInValidation.Any())
             {
                 var errors = builtInValidation.Select(vr => vr.ErrorMessage ?? "Unknown validation error").ToList();
-                return ValidationResult.Failure(errors);
+                return ValidationResultInfo.Failure(errors);
             }
 
             // Use injected validator if available
@@ -157,11 +157,11 @@ namespace S7.Core.Abstractions.Commands
         /// <param name="options">The command options to validate</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the validation result</returns>
-        protected virtual Task<ValidationResult> ValidateOptionsInternalAsync(
+        protected virtual Task<ValidationResultInfo> ValidateOptionsInternalAsync(
             TOptions options, 
             CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(ValidationResult.Success());
+            return Task.FromResult(ValidationResultInfo.Success());
         }
 
         /// <summary>

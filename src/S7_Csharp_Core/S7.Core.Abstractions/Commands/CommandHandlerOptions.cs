@@ -52,10 +52,10 @@ namespace S7.Core.Abstractions.Commands
         /// Validates the command options and returns validation results.
         /// </summary>
         /// <returns>A collection of validation results</returns>
-        public virtual IEnumerable<ValidationResult> Validate()
+        public virtual IEnumerable<System.ComponentModel.DataAnnotations.ValidationResult> Validate()
         {
             var context = new ValidationContext(this);
-            var results = new List<ValidationResult>();
+            var results = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
             Validator.TryValidateObject(this, context, results, true);
             return results;
         }
