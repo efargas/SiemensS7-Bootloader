@@ -12,8 +12,9 @@ namespace S7.Core.Abstractions.Commands
     /// <summary>
     /// Generic base class for command handlers providing common functionality including validation, logging, and exception handling.
     /// </summary>
-    /// <typeparam name="TOptions">The type of options for this command handler</typeparam>
-    public abstract class CommandHandler<TOptions> where TOptions : CommandHandlerOptions
+    /// <typeparam name="TOptions">The type of options for this command handler.</typeparam>
+    /// <typeparam name="TResult">The type of result this command handler produces.</typeparam>
+    public abstract class CommandHandler<TOptions, TResult> where TOptions : CommandHandlerOptions
     {
         /// <summary>
         /// Gets the logger instance for this command handler.
@@ -42,8 +43,8 @@ namespace S7.Core.Abstractions.Commands
         /// <param name="options">The command options</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
-        public async Task<CommandResult<TResult>> ExecuteAsync<TResult>(
-            TOptions options, 
+        public async Task<CommandResult<TResult>> ExecuteAsync(
+            TOptions options,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(options);
@@ -62,8 +63,8 @@ namespace S7.Core.Abstractions.Commands
                 // Create combined cancellation token with timeout
                 using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(options.TimeoutMs));
                 using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(
-                    cancellationToken, 
-                    timeoutCts.Token, 
+                    cancellationToken,
+                    timeoutCts.Token,
                     options.CancellationToken);
 
                 // Validate options
@@ -79,11 +80,11 @@ namespace S7.Core.Abstractions.Commands
                 TResult result;
                 if (options.RetryPolicy != null)
                 {
-                    result = await ExecuteWithRetryAsync<TResult>(options, combinedCts.Token).ConfigureAwait(false);
+                    result = await ExecuteWithRetryAsync(options, combinedCts.Token).ConfigureAwait(false);
                 }
                 else
                 {
-                    result = await ExecuteInternalAsync<TResult>(options, combinedCts.Token).ConfigureAwait(false);
+                    result = await ExecuteInternalAsync(options, combinedCts.Token).ConfigureAwait(false);
                 }
 
                 stopwatch.Stop();
@@ -167,12 +168,11 @@ namespace S7.Core.Abstractions.Commands
         /// <summary>
         /// Executes the command with retry policy.
         /// </summary>
-        /// <typeparam name="TResult">The type of result to return</typeparam>
         /// <param name="options">The command options</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
-        private async Task<TResult> ExecuteWithRetryAsync<TResult>(
-            TOptions options, 
+        private async Task<TResult> ExecuteWithRetryAsync(
+            TOptions options,
             CancellationToken cancellationToken)
         {
             var retryPolicy = options.RetryPolicy!;
@@ -185,7 +185,7 @@ namespace S7.Core.Abstractions.Commands
                 {
                     if (attempt > 0)
                     {
-                        var delay = retryPolicy.UseExponentialBackoff 
+                        var delay = retryPolicy.UseExponentialBackoff
                             ? retryPolicy.RetryDelayMs * (int)Math.Pow(2, attempt - 1)
                             : retryPolicy.RetryDelayMs;
 
@@ -195,7 +195,7 @@ namespace S7.Core.Abstractions.Commands
                         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
 
-                    return await ExecuteInternalAsync<TResult>(options, cancellationToken).ConfigureAwait(false);
+                    return await ExecuteInternalAsync(options, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ShouldRetry(ex, retryPolicy))
                 {
@@ -239,12 +239,11 @@ namespace S7.Core.Abstractions.Commands
         /// <summary>
         /// Executes the command implementation. Must be implemented by derived classes.
         /// </summary>
-        /// <typeparam name="TResult">The type of result to return</typeparam>
         /// <param name="options">The command options</param>
         /// <param name="cancellationToken">Cancellation token for the operation</param>
         /// <returns>A task representing the command execution result</returns>
-        protected abstract Task<TResult> ExecuteInternalAsync<TResult>(
-            TOptions options, 
+        protected abstract Task<TResult> ExecuteInternalAsync(
+            TOptions options,
             CancellationToken cancellationToken = default);
     }
 }

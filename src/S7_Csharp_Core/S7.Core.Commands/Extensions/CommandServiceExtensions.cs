@@ -20,10 +20,6 @@ namespace S7.Core.Commands.Extensions
         /// <returns>The service collection for chaining</returns>
         public static IServiceCollection AddCommandHandlers(this IServiceCollection services)
         {
-            // Register the new command handlers using their static setup methods
-            MemoryDumpCommandHandler.SetupServices(services);
-            StagerInstallCommandHandler.SetupServices(services);
-
             // Register the handlers directly for the new architecture
             services.AddTransient<MemoryDumpCommandHandler>();
             services.AddTransient<StagerInstallCommandHandler>();

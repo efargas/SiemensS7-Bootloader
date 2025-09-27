@@ -13,10 +13,12 @@ namespace S7_Csharp_Utility.Services
     {
         private Window? _mainWindow;
         private readonly IDialogService _dialogService;
+        private readonly ConfigurationService _configService;
 
-        public ViewService(IDialogService dialogService)
+        public ViewService(IDialogService dialogService, ConfigurationService configService)
         {
             _dialogService = dialogService;
+            _configService = configService;
         }
 
         public void SetMainWindow(Window mainWindow)
@@ -38,10 +40,10 @@ namespace S7_Csharp_Utility.Services
             throw new InvalidOperationException("Unable to get main window");
         }
 
-        public void ShowProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile> onSetActiveProfile)
+        public void ShowProfileManagementWindow(Action<DeviceProfile> onSetActiveProfile)
         {
             var mainWindow = GetMainWindow();
-            new ProfileManagementWindow(configService, onSetActiveProfile).Show(mainWindow);
+            new ProfileManagementWindow(_configService, onSetActiveProfile).Show(mainWindow);
         }
 
         public void ShowFirmwareUnpackerWindow(string extractionPath)

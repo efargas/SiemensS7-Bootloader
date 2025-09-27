@@ -52,10 +52,10 @@ namespace S7_Csharp_Utility
 
                 // This resolves the MainWindow, which in turn resolves its dependencies like the ViewModel.
                 desktop.MainWindow = Services.GetRequiredService<MainWindow>();
-                var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();
+                var stateService = Services.GetRequiredService<IApplicationStateService>();
 
-                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartup().ConfigureAwait(false);
-                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExit().ConfigureAwait(false);
+                desktop.MainWindow.Loaded += async (s, e) => await stateService.LoadConfigurationOnStartup().ConfigureAwait(false);
+                desktop.MainWindow.Closing += async (s, e) => await stateService.SaveConfigurationOnExit().ConfigureAwait(false);
                 desktop.Exit += OnApplicationExit;
             }
 
@@ -125,11 +125,12 @@ namespace S7_Csharp_Utility
 
             // Register State Management Services
             services.AddSingleton<IApplicationStateService, ApplicationStateService>();
+            services.AddSingleton<IPayloadDiscoveryService, PayloadDiscoveryService>();
             services.AddSingleton<IValidationCoordinatorService, ValidationCoordinatorService>();
 
             // Register UI Services
             services.AddSingleton<IDialogService, DialogService>();
-            services.AddSingleton<IViewService, ViewService>();
+            services.AddSingleton<IViewService>(sp => new ViewService(sp.GetRequiredService<IDialogService>(), sp.GetRequiredService<ConfigurationService>()));
         }
 
         /// <summary>

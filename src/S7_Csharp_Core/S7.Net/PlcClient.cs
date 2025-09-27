@@ -10,7 +10,7 @@ namespace S7.Net
     /// The main client for communicating with Siemens S7 PLCs using the undocumented bootloader protocol.
     /// Coordinates between protocol handler, memory manager, and stager manager components.
     /// </summary>
-    public sealed class PlcClient : IDisposable
+    public sealed class PlcClient : IPlcClient
     {
         private readonly ICommunicationChannel _channel;
         private readonly PlcProtocolHandler _protocolHandler;

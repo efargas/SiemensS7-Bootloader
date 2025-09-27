@@ -18,168 +18,77 @@ namespace S7_Csharp_Utility.ViewModels
     /// </summary>
     public class ModbusPowerSupplyViewModel : ViewModelBase
     {
+        private readonly IApplicationStateService _state;
         private readonly IPowerSupplyService _powerSupplyService;
         private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
         private readonly ILogger<ModbusPowerSupplyViewModel> _logger;
 
-        /// <summary>
-        /// Occurs when the Modbus status changes.
-        /// </summary>
         public event Action<string>? ModbusStatusChanged;
 
-        private string _modbusHost = "localhost";
-        /// <summary>
-        /// Gets or sets the Modbus host.
-        /// </summary>
         [Required(ErrorMessage = "Modbus host is required")]
-        [RegularExpression(@"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$", 
+        [RegularExpression(@"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
             ErrorMessage = "Must be a valid IP address (e.g., 192.168.1.100) or hostname (e.g., localhost)")]
-        public string ModbusHost
-        {
-            get => _modbusHost;
-            set
-            {
-                if (SetProperty(ref _modbusHost, value))
-                {
-                    ValidateProperty(value, nameof(ModbusHost));
-                }
-            }
-        }
+        public string ModbusHost { get => _state.ModbusHost; set => _state.ModbusHost = value; }
 
-        private int _modbusPort = 502;
-        /// <summary>
-        /// Gets or sets the Modbus port.
-        /// </summary>
         [Range(1, 65535, ErrorMessage = "Modbus port must be between 1 and 65535")]
         [Display(Name = "Modbus Port", Description = "TCP port for Modbus communication (default: 502)")]
-        public int ModbusPort
-        {
-            get => _modbusPort;
-            set
-            {
-                if (SetProperty(ref _modbusPort, value))
-                {
-                    ValidateProperty(value, nameof(ModbusPort));
-                }
-            }
-        }
+        public int ModbusPort { get => _state.ModbusPort; set => _state.ModbusPort = value; }
 
-        private ushort _modbusCoil = 1;
-        /// <summary>
-        /// Gets or sets the Modbus coil.
-        /// </summary>
         [Range(1, 65535, ErrorMessage = "Modbus coil address must be between 1 and 65535")]
         [Display(Name = "Coil Address", Description = "Modbus coil address for power control")]
-        public ushort ModbusCoil
-        {
-            get => _modbusCoil;
-            set
-            {
-                if (SetProperty(ref _modbusCoil, value))
-                {
-                    ValidateProperty(value, nameof(ModbusCoil));
-                }
-            }
-        }
+        public ushort ModbusCoil { get => _state.ModbusCoil; set => _state.ModbusCoil = value; }
 
-        private byte _modbusSlaveId = 1;
-        /// <summary>
-        /// Gets or sets the Modbus slave ID.
-        /// </summary>
         [Range(0, 255, ErrorMessage = "Modbus slave ID must be between 0 and 255")]
         [Display(Name = "Slave ID", Description = "Modbus slave device ID")]
-        public byte ModbusSlaveId
-        {
-            get => _modbusSlaveId;
-            set
-            {
-                if (SetProperty(ref _modbusSlaveId, value))
-                {
-                    ValidateProperty(value, nameof(ModbusSlaveId));
-                }
-            }
-        }
+        public byte ModbusSlaveId { get => _state.ModbusSlaveId; set => _state.ModbusSlaveId = value; }
 
-        private int _delaySeconds = 1;
-        /// <summary>
-        /// Gets or sets the delay in seconds.
-        /// </summary>
         [Range(0, 300, ErrorMessage = "Delay must be between 0 and 300 seconds (5 minutes)")]
         [Display(Name = "Power Cycle Delay", Description = "Delay in seconds between power off and power on")]
-        public int DelaySeconds
+        public int DelaySeconds { get => _state.DelaySeconds; set => _state.DelaySeconds = value; }
+
+        private string _modbusStatus = "Disconnected";
+        public string ModbusStatus
         {
-            get => _delaySeconds;
+            get => _state.ModbusStatus;
             set
             {
-                if (SetProperty(ref _delaySeconds, value))
+                if (_state.ModbusStatus != value)
                 {
-                    ValidateProperty(value, nameof(DelaySeconds));
+                    _state.ModbusStatus = value;
+                    OnPropertyChanged(); // Notify local listeners
+                    OnPropertyChanged(nameof(IsConnected));
+                    RaiseCanExecuteChangedSafely(ConnectModbusCommand);
+                    RaiseCanExecuteChangedSafely(DisconnectModbusCommand);
+                    RaiseCanExecuteChangedSafely(PowerOnCommand);
+                    RaiseCanExecuteChangedSafely(PowerOffCommand);
+                    ModbusStatusChanged?.Invoke(value);
                 }
             }
         }
 
-        private string _modbusStatus = "Disconnected";
-        /// <summary>
-        /// Gets or sets the Modbus status.
-        /// </summary>
-        public string ModbusStatus
-        {
-            get => _modbusStatus;
-            set
-            {
-                _modbusStatus = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsConnected));
-                
-                // Safely raise CanExecuteChanged for all commands
-                RaiseCanExecuteChangedSafely(ConnectModbusCommand);
-                RaiseCanExecuteChangedSafely(DisconnectModbusCommand);
-                RaiseCanExecuteChangedSafely(PowerOnCommand);
-                RaiseCanExecuteChangedSafely(PowerOffCommand);
-                
-                ModbusStatusChanged?.Invoke(value);
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether the Modbus is connected.
-        /// </summary>
         public bool IsConnected => ModbusStatus == "Connected";
 
-        /// <summary>
-        /// Gets the command to connect to Modbus.
-        /// </summary>
         public ICommand ConnectModbusCommand { get; }
-
-        /// <summary>
-        /// Gets the command to disconnect from Modbus.
-        /// </summary>
         public ICommand DisconnectModbusCommand { get; }
-
-        /// <summary>
-        /// Gets the command to power on.
-        /// </summary>
         public ICommand PowerOnCommand { get; }
-
-        /// <summary>
-        /// Gets the command to power off.
-        /// </summary>
         public ICommand PowerOffCommand { get; }
 
-        // Initialize commands in constructor
         public ModbusPowerSupplyViewModel(
+            IApplicationStateService applicationStateService,
             IPowerSupplyService powerSupplyService,
             IDialogService dialogService,
             LoggingService loggingService,
             ILogger<ModbusPowerSupplyViewModel> logger) : base()
         {
+            _state = applicationStateService ?? throw new ArgumentNullException(nameof(applicationStateService));
             _powerSupplyService = powerSupplyService ?? throw new ArgumentNullException(nameof(powerSupplyService));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            // Initialize commands
+            _state.PropertyChanged += (s, e) => OnPropertyChanged(e.PropertyName);
+
             ConnectModbusCommand = new AsyncRelayCommand(
                 async _ => await ConnectModbusAsync(),
                 _ => !IsConnected,

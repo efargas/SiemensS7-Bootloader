@@ -61,8 +61,8 @@ namespace S7.Core.Tests.Commands
             var handler = new TestCommandHandler(_mockLogger.Object, null);
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => 
-                handler.ExecuteAsync<string>(null!, CancellationToken.None));
+            await Assert.ThrowsAsync<ArgumentNullException>(() =>
+                handler.ExecuteAsync(null!, CancellationToken.None));
         }
 
         [Fact]
@@ -74,7 +74,7 @@ namespace S7.Core.Tests.Commands
             handler.SetExecuteResult("test-result");
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -88,10 +88,10 @@ namespace S7.Core.Tests.Commands
             // Arrange
             var handler = new TestCommandHandler(_mockLogger.Object, null);
             var options = new TestCommandOptions();
-            handler.SetValidationResult(S7.Core.Abstractions.Validation.ValidationResult.Failure("Validation error"));
+            handler.SetValidationResult(ValidationResultInfo.Failure("Validation error"));
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -103,7 +103,7 @@ namespace S7.Core.Tests.Commands
         public async Task ExecuteAsync_WithExternalValidatorFailure_ReturnsValidationFailureResult()
         {
             // Arrange
-            var validationResult = S7.Core.Abstractions.Validation.ValidationResult.Failure("External validation error");
+            var validationResult = ValidationResultInfo.Failure("External validation error");
             _mockValidator.Setup(v => v.Validate(It.IsAny<TestCommandOptions>()))
                          .Returns(validationResult);
 
@@ -111,7 +111,7 @@ namespace S7.Core.Tests.Commands
             var options = new TestCommandOptions();
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -128,7 +128,7 @@ namespace S7.Core.Tests.Commands
             options.SetBuiltInValidationErrors(new[] { new System.ComponentModel.DataAnnotations.ValidationResult("Built-in validation error") });
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -144,7 +144,7 @@ namespace S7.Core.Tests.Commands
             handler.SetExecuteException(new InvalidOperationException("Test exception"));
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -159,12 +159,12 @@ namespace S7.Core.Tests.Commands
             var handler = new TestCommandHandler(_mockLogger.Object, null);
             var options = new TestCommandOptions();
             var cts = new CancellationTokenSource();
-            
+
             handler.SetExecuteDelay(TimeSpan.FromMilliseconds(500));
             cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, cts.Token);
+            var result = await handler.ExecuteAsync(options, cts.Token);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -180,7 +180,7 @@ namespace S7.Core.Tests.Commands
             handler.SetExecuteDelay(TimeSpan.FromMilliseconds(2000)); // Longer than timeout
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -212,7 +212,7 @@ namespace S7.Core.Tests.Commands
             handler.SetExecuteResult("success-after-retries");
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.True(result.IsSuccess);
@@ -239,7 +239,7 @@ namespace S7.Core.Tests.Commands
             handler.SetExecuteException(new InvalidOperationException("Persistent failure"));
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -266,7 +266,7 @@ namespace S7.Core.Tests.Commands
             handler.SetExecuteException(new ArgumentException("Non-retryable exception"));
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -295,7 +295,7 @@ namespace S7.Core.Tests.Commands
             var startTime = DateTime.UtcNow;
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             var totalTime = DateTime.UtcNow - startTime;
@@ -313,7 +313,7 @@ namespace S7.Core.Tests.Commands
             handler.SetExecuteResult("test-result");
 
             // Act
-            await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             _mockLogger.Verify(
@@ -341,10 +341,10 @@ namespace S7.Core.Tests.Commands
             // Arrange
             var handler = new TestCommandHandler(_mockLogger.Object, null);
             var options = new TestCommandOptions();
-            handler.SetCustomValidationResult(S7.Core.Abstractions.Validation.ValidationResult.Failure("Custom validation error"));
+            handler.SetCustomValidationResult(ValidationResultInfo.Failure("Custom validation error"));
 
             // Act
-            var result = await handler.ExecuteAsync<string>(options, CancellationToken.None);
+            var result = await handler.ExecuteAsync(options, CancellationToken.None);
 
             // Assert
             Assert.False(result.IsSuccess);
@@ -353,14 +353,14 @@ namespace S7.Core.Tests.Commands
         }
 
         // Test command handler implementation for testing
-        public class TestCommandHandler : CommandHandler<TestCommandOptions>
+        public class TestCommandHandler : CommandHandler<TestCommandOptions, string>
         {
             private string? _executeResult;
             private Exception? _executeException;
             private Queue<Exception>? _executeExceptions;
             private TimeSpan _executeDelay = TimeSpan.Zero;
-            private S7.Core.Abstractions.Validation.ValidationResult? _validationResult;
-            private S7.Core.Abstractions.Validation.ValidationResult? _customValidationResult;
+            private ValidationResultInfo? _validationResult;
+            private ValidationResultInfo? _customValidationResult;
 
             public int ExecuteCallCount { get; private set; }
             public bool CustomValidationCalled { get; private set; }
@@ -399,18 +399,18 @@ namespace S7.Core.Tests.Commands
                 _executeDelay = delay;
             }
 
-            public void SetValidationResult(S7.Core.Abstractions.Validation.ValidationResult result)
+            public void SetValidationResult(ValidationResultInfo result)
             {
                 _validationResult = result;
             }
 
-            public void SetCustomValidationResult(S7.Core.Abstractions.Validation.ValidationResult result)
+            public void SetCustomValidationResult(ValidationResultInfo result)
             {
                 _customValidationResult = result;
             }
 
-            protected override async Task<TResult> ExecuteInternalAsync<TResult>(
-                TestCommandOptions options, 
+            protected override async Task<string> ExecuteInternalAsync(
+                TestCommandOptions options,
                 CancellationToken cancellationToken = default)
             {
                 ExecuteCallCount++;
@@ -433,11 +433,11 @@ namespace S7.Core.Tests.Commands
                 }
 
                 // Return result (success case)
-                return (TResult)(object)(_executeResult ?? "default-result");
+                return _executeResult ?? "default-result";
             }
 
-            protected override async Task<S7.Core.Abstractions.Validation.ValidationResult> ValidateOptionsAsync(
-                TestCommandOptions options, 
+            protected override async Task<ValidationResultInfo> ValidateOptionsAsync(
+                TestCommandOptions options,
                 CancellationToken cancellationToken = default)
             {
                 if (_validationResult != null)
@@ -448,8 +448,8 @@ namespace S7.Core.Tests.Commands
                 return await base.ValidateOptionsAsync(options, cancellationToken).ConfigureAwait(false);
             }
 
-            protected override Task<S7.Core.Abstractions.Validation.ValidationResult> ValidateOptionsInternalAsync(
-                TestCommandOptions options, 
+            protected override Task<ValidationResultInfo> ValidateOptionsInternalAsync(
+                TestCommandOptions options,
                 CancellationToken cancellationToken = default)
             {
                 CustomValidationCalled = true;

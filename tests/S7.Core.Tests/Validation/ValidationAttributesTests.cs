@@ -88,7 +88,7 @@ namespace S7.Core.Tests.Validation
         public void HexAddressAttribute_WithMinMaxRange_ValidatesCorrectly()
         {
             // Arrange
-            var attribute = new HexAddressAttribute(0x1000, 0x2000);
+            var attribute = new HexAddressAttribute { MinValue = 0x1000, MaxValue = 0x2000 };
             var context = new ValidationContext(new object()) { MemberName = "TestProperty" };
 
             // Act & Assert - Valid range
@@ -98,11 +98,13 @@ namespace S7.Core.Tests.Validation
             // Act & Assert - Below minimum
             var belowMinResult = attribute.GetValidationResult("0x500", context);
             Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, belowMinResult);
+            Assert.NotNull(belowMinResult);
             Assert.Contains("between 0x1000 and 0x2000", belowMinResult.ErrorMessage);
 
             // Act & Assert - Above maximum
             var aboveMaxResult = attribute.GetValidationResult("0x3000", context);
             Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, aboveMaxResult);
+            Assert.NotNull(aboveMaxResult);
             Assert.Contains("between 0x1000 and 0x2000", aboveMaxResult.ErrorMessage);
         }
 
@@ -128,7 +130,7 @@ namespace S7.Core.Tests.Validation
         public void FilePathAttribute_WithExistingFile_ReturnsValid()
         {
             // Arrange
-            var attribute = new FilePathAttribute(checkExists: true);
+            var attribute = new FilePathAttribute { MustExist = true };
             var context = new ValidationContext(new object()) { MemberName = "TestProperty" };
 
             // Act
@@ -142,7 +144,7 @@ namespace S7.Core.Tests.Validation
         public void FilePathAttribute_WithNonExistentFile_ReturnsInvalid()
         {
             // Arrange
-            var attribute = new FilePathAttribute(checkExists: true);
+            var attribute = new FilePathAttribute { MustExist = true };
             var context = new ValidationContext(new object()) { MemberName = "TestProperty" };
             var nonExistentFile = Path.Combine(_tempDirectory, "nonexistent.txt");
 
@@ -151,7 +153,8 @@ namespace S7.Core.Tests.Validation
 
             // Assert
             Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, result);
-            Assert.Contains("does not exist", result.ErrorMessage);
+            Assert.NotNull(result);
+            Assert.Contains("must specify an existing", result.ErrorMessage);
         }
 
         [Theory]
@@ -164,7 +167,7 @@ namespace S7.Core.Tests.Validation
         public void FilePathAttribute_WithAllowedExtensions_ValidatesCorrectly(string allowedExtensions, string fileName, bool expectedValid)
         {
             // Arrange
-            var attribute = new FilePathAttribute(checkExists: false, allowedExtensions: allowedExtensions.Split(','));
+            var attribute = new FilePathAttribute { MustExist = false, AllowedExtensions = allowedExtensions.Split(',') };
             var context = new ValidationContext(new object()) { MemberName = "TestProperty" };
             var filePath = Path.Combine(_tempDirectory, fileName);
 
@@ -179,7 +182,8 @@ namespace S7.Core.Tests.Validation
             else
             {
                 Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, result);
-                Assert.Contains("allowed extensions", result.ErrorMessage);
+                Assert.NotNull(result);
+                Assert.Contains("following extensions", result.ErrorMessage);
             }
         }
 
@@ -260,7 +264,7 @@ namespace S7.Core.Tests.Validation
         public void NetworkEndpointAttribute_WithPortRange_ValidatesCorrectly()
         {
             // Arrange
-            var attribute = new NetworkEndpointAttribute(minPort: 8000, maxPort: 9000);
+            var attribute = new NetworkEndpointAttribute { MinPort = 8000, MaxPort = 9000 };
             var context = new ValidationContext(new object()) { MemberName = "TestProperty" };
 
             // Act & Assert - Valid port range
@@ -270,11 +274,13 @@ namespace S7.Core.Tests.Validation
             // Act & Assert - Below minimum port
             var belowMinResult = attribute.GetValidationResult("localhost:7000", context);
             Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, belowMinResult);
+            Assert.NotNull(belowMinResult);
             Assert.Contains("between 8000 and 9000", belowMinResult.ErrorMessage);
 
             // Act & Assert - Above maximum port
             var aboveMaxResult = attribute.GetValidationResult("localhost:10000", context);
             Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, aboveMaxResult);
+            Assert.NotNull(aboveMaxResult);
             Assert.Contains("between 8000 and 9000", aboveMaxResult.ErrorMessage);
         }
 
@@ -305,6 +311,7 @@ namespace S7.Core.Tests.Validation
             else
             {
                 Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, result);
+                Assert.NotNull(result);
                 Assert.Contains($"between {min} and {max}", result.ErrorMessage);
             }
         }
@@ -317,7 +324,7 @@ namespace S7.Core.Tests.Validation
         public void NumericRangeAttribute_WithAlignment_ValidatesCorrectly(int value, int alignment, bool expectedValid)
         {
             // Arrange
-            var attribute = new NumericRangeAttribute(0, 10000, alignment: alignment);
+            var attribute = new NumericRangeAttribute(0, 10000) { Alignment = alignment };
             var context = new ValidationContext(new object()) { MemberName = "TestProperty" };
 
             // Act
@@ -331,7 +338,8 @@ namespace S7.Core.Tests.Validation
             else
             {
                 Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, result);
-                Assert.Contains($"{alignment}-byte aligned", result.ErrorMessage);
+                Assert.NotNull(result);
+                Assert.Contains($"divisible by {alignment}", result.ErrorMessage);
             }
         }
 
@@ -377,7 +385,7 @@ namespace S7.Core.Tests.Validation
         public void TimeoutAttribute_WithVariousValues_ValidatesCorrectly(int timeoutMs, int minMs, int maxMs, bool expectedValid)
         {
             // Arrange
-            var attribute = new TimeoutAttribute(minMs, maxMs);
+            var attribute = new TimeoutAttribute { MinTimeoutMs = minMs, MaxTimeoutMs = maxMs };
             var context = new ValidationContext(new object()) { MemberName = "TestProperty" };
 
             // Act
@@ -391,6 +399,7 @@ namespace S7.Core.Tests.Validation
             else
             {
                 Assert.NotEqual(System.ComponentModel.DataAnnotations.ValidationResult.Success, result);
+                Assert.NotNull(result);
                 Assert.Contains("timeout", result.ErrorMessage);
             }
         }

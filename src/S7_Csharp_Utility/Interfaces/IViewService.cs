@@ -7,7 +7,7 @@ namespace S7_Csharp_Utility.Interfaces
     public interface IViewService
     {
         Window GetMainWindow();
-        void ShowProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile> onSetActiveProfile);
+        void ShowProfileManagementWindow(Action<DeviceProfile> onSetActiveProfile);
         void ShowFirmwareUnpackerWindow(string extractionPath);
                 void Exit();
     }

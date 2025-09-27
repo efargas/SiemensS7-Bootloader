@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../S7.Utils/S7.Utils.csproj" />
+    <ProjectReference Include="../S7.Net/S7.Net.csproj" />
   </ItemGroup>
 
 </Project>

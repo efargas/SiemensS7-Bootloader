@@ -10,93 +10,59 @@ namespace S7_Csharp_Utility.ViewModels
     /// <summary>
     /// The view model for the file comparison.
     /// </summary>
+using S7_Csharp_Utility.Interfaces;
+
     public class FileCompareViewModel : ViewModelBase
     {
-        private readonly Interfaces.IDialogService _dialogService;
+        private readonly IApplicationStateService _state;
+        private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
-        private readonly Interfaces.IViewService _viewService;
+        private readonly IViewService _viewService;
 
         private bool _isComparing;
         public bool IsComparing
         {
             get => _isComparing;
-            set => SetProperty(ref _isComparing, value);
-        }
-
-        private string _compareFolder = string.Empty;
-        /// <summary>
-        /// Gets or sets the folder to compare.
-        /// </summary>
-        public string CompareFolder
-        {
-            get => _compareFolder;
             set
             {
-                _compareFolder = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)CompareDumpsCommand).RaiseCanExecuteChanged();
+                if(SetProperty(ref _isComparing, value))
+                {
+                    ((AsyncRelayCommand)BrowseCompareFolderCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)BrowseCompareFile1Command).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)BrowseCompareFile2Command).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)CompareDumpsCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
+                }
             }
         }
 
-        private string _compareFile1 = string.Empty;
-        /// <summary>
-        /// Gets or sets the first file to compare.
-        /// </summary>
-        public string CompareFile1
-        {
-            get => _compareFile1;
-            set
-            {
-                _compareFile1 = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
-            }
-        }
+        public string CompareFolder { get => _state.CompareFolder; set => _state.CompareFolder = value; }
+        public string CompareFile1 { get => _state.CompareFile1; set => _state.CompareFile1 = value; }
+        public string CompareFile2 { get => _state.CompareFile2; set => _state.CompareFile2 = value; }
 
-        private string _compareFile2 = string.Empty;
-        /// <summary>
-        /// Gets or sets the second file to compare.
-        /// </summary>
-        public string CompareFile2
-        {
-            get => _compareFile2;
-            set
-            {
-                _compareFile2 = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
-            }
-        }
-
-        /// <summary>
-        /// Gets the command to browse for the folder to compare.
-        /// </summary>
         public ICommand BrowseCompareFolderCommand { get; }
-        /// <summary>
-        /// Gets the command to browse for the first file to compare.
-        /// </summary>
         public ICommand BrowseCompareFile1Command { get; }
-        /// <summary>
-        /// Gets the command to browse for the second file to compare.
-        /// </summary>
         public ICommand BrowseCompareFile2Command { get; }
-        /// <summary>
-        /// Gets the command to compare the dumps.
-        /// </summary>
         public ICommand CompareDumpsCommand { get; }
-        /// <summary>
-        /// Gets the command to compare two files.
-        /// </summary>
         public ICommand CompareTwoFilesCommand { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="FileCompareViewModel"/> class.
-        /// </summary>
-        public FileCompareViewModel(Interfaces.IDialogService dialogService, LoggingService loggingService, Interfaces.IViewService viewService)
+        public FileCompareViewModel(
+            IApplicationStateService applicationStateService,
+            IDialogService dialogService,
+            LoggingService loggingService,
+            IViewService viewService)
         {
+            _state = applicationStateService ?? throw new System.ArgumentNullException(nameof(applicationStateService));
             _dialogService = dialogService;
             _loggingService = loggingService;
             _viewService = viewService;
+
+            _state.PropertyChanged += (s, e) => {
+                OnPropertyChanged(e.PropertyName);
+                if (e.PropertyName == nameof(CompareFolder)) ((AsyncRelayCommand)CompareDumpsCommand).RaiseCanExecuteChanged();
+                if (e.PropertyName == nameof(CompareFile1)) ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
+                if (e.PropertyName == nameof(CompareFile2)) ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
+            };
 
             BrowseCompareFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if (result != null) CompareFolder = result; }, _ => CanExecute(), HandleException);
             BrowseCompareFile1Command = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if (result != null) CompareFile1 = result; }, _ => CanExecute(), HandleException);

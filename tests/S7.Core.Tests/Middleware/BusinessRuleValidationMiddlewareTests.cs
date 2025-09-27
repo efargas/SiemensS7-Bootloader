@@ -250,7 +250,7 @@ namespace S7.Core.Tests.Middleware
                 PayloadPath = _tempFile,
                 TargetAddress = 0x2000,
                 MaxPayloadSize = 1024 * 1024,
-                CreateBackup = false
+                BackupBeforeInstall = false
             };
 
             // Act
@@ -346,7 +346,7 @@ namespace S7.Core.Tests.Middleware
                 TimeoutMs = 30000,
                 PayloadPath = _tempFile,
                 TargetAddress = 0x2000,
-                CreateBackup = true,
+                BackupBeforeInstall = true,
                 BackupFilePath = null // Missing backup path
             };
 
@@ -355,7 +355,7 @@ namespace S7.Core.Tests.Middleware
 
             // Assert
             Assert.False(result.IsSuccess);
-            Assert.Contains("BackupFilePath is required when CreateBackup is enabled", result.Error.Message);
+            Assert.Contains("BackupFilePath is required when BackupBeforeInstall is enabled", result.Error.Message);
         }
 
         [Fact]

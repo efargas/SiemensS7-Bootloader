@@ -16,125 +16,42 @@ namespace S7_Csharp_Utility.ViewModels
     /// </summary>
     public class ConfigurationViewModel : ViewModelBase
     {
+        private readonly IApplicationStateService _state;
         private readonly IDialogService _dialogService;
-        private readonly ConfigurationService _configService;
 
-        private string _payloadsPath = ApplicationConfiguration.GetPayloadsPath();
-        /// <summary>
-        /// Gets or sets the path to the payloads.
-        /// </summary>
-        public string PayloadsPath
-        {
-            get => _payloadsPath;
-            set => SetProperty(ref _payloadsPath, value);
-        }
+        public string PayloadsPath { get => _state.PayloadsPath; set => _state.PayloadsPath = value; }
+        public string DumpsPath { get => _state.DumpsPath; set => _state.DumpsPath = value; }
+        public string LogsPath { get => _state.LogsPath; set => _state.LogsPath = value; }
+        public string ExtractionPath { get => _state.ExtractionPath; set => _state.ExtractionPath = value; }
 
-        private string _dumpsPath = ApplicationConfiguration.GetDefaultDumpsPath();
-        /// <summary>
-        /// Gets or sets the path to the dumps.
-        /// </summary>
-        public string DumpsPath
-        {
-            get => _dumpsPath;
-            set => SetProperty(ref _dumpsPath, value);
-        }
-
-        private string _logsPath = ApplicationConfiguration.GetDefaultLogsPath();
-        /// <summary>
-        /// Gets or sets the path to the logs.
-        /// </summary>
-        public string LogsPath
-        {
-            get => _logsPath;
-            set => SetProperty(ref _logsPath, value);
-        }
-
-        private string _extractionPath = ApplicationConfiguration.GetDefaultExtractionPath();
-        /// <summary>
-        /// Gets or sets the path to the extraction folder.
-        /// </summary>
-        public string ExtractionPath
-        {
-            get => _extractionPath;
-            set => SetProperty(ref _extractionPath, value);
-        }
-
-        /// <summary>
-        /// Gets the command to browse for the payloads folder.
-        /// </summary>
         public ICommand BrowsePayloadsFolderCommand { get; }
-        /// <summary>
-        /// Gets the command to browse for the dumps folder.
-        /// </summary>
         public ICommand BrowseDumpsFolderCommand { get; }
-        /// <summary>
-        /// Gets the command to browse for the logs folder.
-        /// </summary>
         public ICommand BrowseLogsFolderCommand { get; }
-        /// <summary>
-        /// Gets the command to browse for the extraction folder.
-        /// </summary>
         public ICommand BrowseExtractionFolderCommand { get; }
-        /// <summary>
-        /// Gets the command to load the default paths.
-        /// </summary>
         public ICommand LoadDefaultPathsCommand { get; }
-        /// <summary>
-        /// Gets the command to save the current paths configuration.
-        /// </summary>
         public ICommand SavePathsCommand { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ConfigurationViewModel"/> class.
-        /// </summary>
-        public ConfigurationViewModel(IDialogService dialogService, ConfigurationService configService)
+        public ConfigurationViewModel(IApplicationStateService applicationStateService, IDialogService dialogService)
         {
-            _dialogService = dialogService;
-            _configService = configService;
+            _state = applicationStateService ?? throw new ArgumentNullException(nameof(applicationStateService));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+
+            _state.PropertyChanged += (s, e) => OnPropertyChanged(e.PropertyName);
 
             BrowsePayloadsFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Payloads Folder"); if (result != null) PayloadsPath = result; });
             BrowseDumpsFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Dumps Folder"); if (result != null) DumpsPath = result; });
             BrowseLogsFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Logs Folder"); if (result != null) LogsPath = result; });
             BrowseExtractionFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Extraction Folder"); if (result != null) ExtractionPath = result; });
             LoadDefaultPathsCommand = new RelayCommand(_ => LoadDefaultPaths());
-            SavePathsCommand = new AsyncRelayCommand(SavePathsAsync);
+            SavePathsCommand = new AsyncRelayCommand(async _ => await _state.SaveConfigurationAsync());
         }
 
         private void LoadDefaultPaths()
         {
-            PayloadsPath = ApplicationConfiguration.GetPayloadsPath();
-            DumpsPath = ApplicationConfiguration.GetDefaultDumpsPath();
-            LogsPath = ApplicationConfiguration.GetDefaultLogsPath();
-            ExtractionPath = ApplicationConfiguration.GetDefaultExtractionPath();
-        }
-
-        private async Task SavePathsAsync(object? parameter = null)
-        {
-            try
-            {
-                // Create configuration object with current paths
-                var config = new ApplicationConfiguration
-                {
-                    PayloadsPath = PayloadsPath,
-                    DumpsPath = DumpsPath,
-                    LogsPath = LogsPath,
-                    ExtractionPath = ExtractionPath
-                };
-
-                // Save configuration using the configuration service
-                var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
-                await _configService.SaveConfigurationAsync(config, configPath);
-                
-                // Show success message
-                await _dialogService.ShowMessageAsync("Configuration Saved", 
-                    "Path configuration has been saved successfully.");
-            }
-            catch (Exception ex)
-            {
-                // Show error message
-                await _dialogService.ShowMessageAsync("Save Error", 
-                    $"Failed to save configuration: {ex.Message}");
-            }
+            _state.PayloadsPath = ApplicationConfiguration.GetPayloadsPath();
+            _state.DumpsPath = ApplicationConfiguration.GetDefaultDumpsPath();
+            _state.LogsPath = ApplicationConfiguration.GetDefaultLogsPath();
+            _state.ExtractionPath = ApplicationConfiguration.GetDefaultExtractionPath();
         }
     }
 }

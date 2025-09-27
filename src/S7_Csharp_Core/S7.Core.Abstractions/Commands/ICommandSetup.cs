@@ -42,10 +42,11 @@ namespace S7.Core.Abstractions.Commands
         /// </summary>
         /// <typeparam name="THandler">The type of command handler to register</typeparam>
         /// <typeparam name="TOptions">The type of options for the command handler</typeparam>
+        /// <typeparam name="TResult">The type of result from the command handler</typeparam>
         /// <param name="services">The service collection</param>
         /// <returns>The service collection for method chaining</returns>
-        public static IServiceCollection AddCommandHandler<THandler, TOptions>(this IServiceCollection services)
-            where THandler : CommandHandler<TOptions>
+        public static IServiceCollection AddCommandHandler<THandler, TOptions, TResult>(this IServiceCollection services)
+            where THandler : CommandHandler<TOptions, TResult>
             where TOptions : CommandHandlerOptions
         {
             // Register the command handler as a transient service
@@ -76,9 +77,9 @@ namespace S7.Core.Abstractions.Commands
                 if (handlerType.IsAbstract || handlerType.IsInterface)
                     continue;
 
-                // Find the base CommandHandler<TOptions> type
+                // Find the base CommandHandler<TOptions, TResult> type
                 var baseType = handlerType.BaseType;
-                while (baseType != null && (!baseType.IsGenericType || baseType.GetGenericTypeDefinition() != typeof(CommandHandler<>)))
+                while (baseType != null && (!baseType.IsGenericType || baseType.GetGenericTypeDefinition() != typeof(CommandHandler<,>)))
                 {
                     baseType = baseType.BaseType;
                 }
@@ -125,7 +126,7 @@ namespace S7.Core.Abstractions.Commands
             var baseType = type.BaseType;
             while (baseType != null)
             {
-                if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(CommandHandler<>))
+                if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(CommandHandler<,>))
                 {
                     return true;
                 }

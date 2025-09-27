@@ -21,6 +21,7 @@ namespace S7_Csharp_Utility.ViewModels
     /// </summary>
     public class PlcConnectionViewModel : ViewModelBase
     {
+        private readonly IApplicationStateService _state;
         private readonly ICommunicationChannelService _communicationChannelService;
         private readonly IDialogService _dialogService;
         private readonly LoggingService _loggingService;
@@ -31,246 +32,76 @@ namespace S7_Csharp_Utility.ViewModels
         /// </summary>
         public event Action<string>? SocatStatusChanged;
 
-        private string _plcHost = "localhost";
-        /// <summary>
-        /// Gets or sets the PLC host.
-        /// </summary>
         [Required]
-        public string PlcHost
-        {
-            get => _plcHost;
-            set
-            {
-                _plcHost = value;
-                OnPropertyChanged();
-            }
-        }
+        public string PlcHost { get => _state.PlcHost; set => _state.PlcHost = value; }
 
-        private int _plcPort = 102;
-        /// <summary>
-        /// Gets or sets the PLC port.
-        /// </summary>
         [Range(1, 65535)]
-        public int PlcPort
-        {
-            get => _plcPort;
-            set
-            {
-                _plcPort = value;
-                OnPropertyChanged();
-            }
-        }
+        public int PlcPort { get => _state.PlcPort; set => _state.PlcPort = value; }
 
-        /// <summary>
-        /// Gets the available communication modes.
-        /// </summary>
         public ObservableCollection<string> CommunicationModes { get; } = new ObservableCollection<string> { "TCP (socat)", "Serial" };
-        private string? _selectedCommunicationMode = "TCP (socat)";
-        /// <summary>
-        /// Gets or sets the selected communication mode.
-        /// </summary>
-        public string? SelectedCommunicationMode
+
+        public string? SelectedCommunicationMode { get => _state.SelectedCommunicationMode; set => _state.SelectedCommunicationMode = value; }
+
+        public ObservableCollection<string> AvailableSerialPorts { get; } = new ObservableCollection<string>();
+
+        public string? SelectedSerialPort { get => _state.SelectedSerialPort; set => _state.SelectedSerialPort = value; }
+
+        public int SocatTcpPort { get => _state.SocatTcpPort; set => _state.SocatTcpPort = value; }
+
+        public bool SocatVerbose { get => _state.SocatVerbose; set => _state.SocatVerbose = value; }
+
+        public bool SocatHexDump { get => _state.SocatHexDump; set => _state.SocatHexDump = value; }
+
+        public int SocatBlockSize { get => _state.SocatBlockSize; set => _state.SocatBlockSize = value; }
+
+        private string _socatStatus = "Stopped";
+        public string SocatStatus
         {
-            get => _selectedCommunicationMode;
+            get => _state.SocatStatus;
             set
             {
-                if (_selectedCommunicationMode != value)
+                if (_state.SocatStatus != value)
                 {
-                    _selectedCommunicationMode = value;
-                    OnPropertyChanged();
+                    _state.SocatStatus = value;
+                    OnPropertyChanged(); // Notify local listeners
+                    ((AsyncRelayCommand)StartSocatCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)StopSocatCommand).RaiseCanExecuteChanged();
+                    SocatStatusChanged?.Invoke(value);
                 }
             }
         }
 
-        /// <summary>
-        /// Gets the available serial ports.
-        /// </summary>
-        public ObservableCollection<string> AvailableSerialPorts { get; } = new ObservableCollection<string>();
-        private string? _selectedSerialPort = string.Empty;
-        /// <summary>
-        /// Gets or sets the selected serial port.
-        /// </summary>
-        public string? SelectedSerialPort
-        {
-            get => _selectedSerialPort;
-            set
-            {
-                _selectedSerialPort = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private int _socatTcpPort = 1238;
-        /// <summary>
-        /// Gets or sets the socat TCP port.
-        /// </summary>
-        public int SocatTcpPort
-        {
-            get => _socatTcpPort;
-            set
-            {
-                _socatTcpPort = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private bool _socatVerbose = true;
-        /// <summary>
-        /// Gets or sets a value indicating whether socat verbose logging is enabled.
-        /// </summary>
-        public bool SocatVerbose
-        {
-            get => _socatVerbose;
-            set { _socatVerbose = value; OnPropertyChanged(); }
-        }
-
-        private bool _socatHexDump = true;
-        /// <summary>
-        /// Gets or sets a value indicating whether socat hex dump is enabled.
-        /// </summary>
-        public bool SocatHexDump
-        {
-            get => _socatHexDump;
-            set { _socatHexDump = value; OnPropertyChanged(); }
-        }
-
-        private int _socatBlockSize = 4;
-        /// <summary>
-        /// Gets or sets the socat block size.
-        /// </summary>
-        public int SocatBlockSize
-        {
-            get => _socatBlockSize;
-            set
-            {
-                _socatBlockSize = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private string _socatStatus = "Stopped";
-        /// <summary>
-        /// Gets or sets the socat status.
-        /// </summary>
-        public string SocatStatus
-        {
-            get => _socatStatus;
-            set
-            {
-                _socatStatus = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)StartSocatCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)StopSocatCommand).RaiseCanExecuteChanged();
-                SocatStatusChanged?.Invoke(value);
-            }
-        }
-
-        /// <summary>
-        /// Gets the available baud rates.
-        /// </summary>
         public ObservableCollection<int> AvailableBaudRates { get; } = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
-        private int _selectedBaudRate = 38400;
-        /// <summary>
-        /// Gets or sets the selected baud rate.
-        /// </summary>
-        public int SelectedBaudRate
-        {
-            get => _selectedBaudRate;
-            set
-            {
-                _selectedBaudRate = value;
-                OnPropertyChanged();
-            }
-        }
 
-        /// <summary>
-        /// Gets the available parities.
-        /// </summary>
+        public int SelectedBaudRate { get => _state.SelectedBaudRate; set => _state.SelectedBaudRate = value; }
+
         public ObservableCollection<Parity> AvailableParities { get; } = new ObservableCollection<Parity>(Enum.GetValues(typeof(Parity)).Cast<Parity>());
-        private Parity _selectedParity = Parity.Even;
-        /// <summary>
-        /// Gets or sets the selected parity.
-        /// </summary>
-        public Parity SelectedParity
-        {
-            get => _selectedParity;
-            set
-            {
-                _selectedParity = value;
-                OnPropertyChanged();
-            }
-        }
 
-        /// <summary>
-        /// Gets the available stop bits.
-        /// </summary>
+        public Parity SelectedParity { get => _state.SelectedParity; set => _state.SelectedParity = value; }
+
         public ObservableCollection<StopBits> AvailableStopBits { get; } = new ObservableCollection<StopBits>(Enum.GetValues(typeof(StopBits)).Cast<StopBits>());
-        private StopBits _selectedStopBits = StopBits.One;
-        /// <summary>
-        /// Gets or sets the selected stop bits.
-        /// </summary>
-        public StopBits SelectedStopBits
-        {
-            get => _selectedStopBits;
-            set
-            {
-                _selectedStopBits = value;
-                OnPropertyChanged();
-            }
-        }
 
-        /// <summary>
-        /// Gets the available flow controls.
-        /// </summary>
+        public StopBits SelectedStopBits { get => _state.SelectedStopBits; set => _state.SelectedStopBits = value; }
+
         public ObservableCollection<Handshake> AvailableFlowControls { get; } = new ObservableCollection<Handshake>(Enum.GetValues(typeof(Handshake)).Cast<Handshake>());
-        private Handshake _selectedFlowControl = Handshake.None;
-        /// <summary>
-        /// Gets or sets the selected flow control.
-        /// </summary>
-        public Handshake SelectedFlowControl
-        {
-            get => _selectedFlowControl;
-            set
-            {
-                _selectedFlowControl = value;
-                OnPropertyChanged();
-            }
-        }
 
-        /// <summary>
-        /// Gets the command to start socat.
-        /// </summary>
+        public Handshake SelectedFlowControl { get => _state.SelectedFlowControl; set => _state.SelectedFlowControl = value; }
+
         public ICommand StartSocatCommand { get; }
-        /// <summary>
-        /// Gets the command to stop socat.
-        /// </summary>
         public ICommand StopSocatCommand { get; }
-        /// <summary>
-        /// Gets the command to refresh the serial ports.
-        /// </summary>
         public ICommand RefreshSerialPortsCommand { get; }
-        /// <summary>
-        /// Gets the command to show the socat log.
-        /// </summary>
         public ICommand ShowSocatLogCommand { get; }
-        /// <summary>
-        /// Gets the command to check the socat processes.
-        /// </summary>
         public ICommand CheckSocatProcessesCommand { get; }
-        /// <summary>
-        /// Gets the command to kill the socat processes.
-        /// </summary>
         public ICommand KillSocatProcessesCommand { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PlcConnectionViewModel"/> class.
-        /// </summary>
         public PlcConnectionViewModel(
+            IApplicationStateService applicationStateService,
             ICommunicationChannelService communicationChannelService,
             IDialogService dialogService,
             LoggingService loggingService,
             ILogger<PlcConnectionViewModel> logger)
         {
+            _state = applicationStateService ?? throw new ArgumentNullException(nameof(applicationStateService));
             _communicationChannelService = communicationChannelService ?? throw new ArgumentNullException(nameof(communicationChannelService));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
@@ -279,6 +110,7 @@ namespace S7_Csharp_Utility.ViewModels
             // Subscribe to service events
             _communicationChannelService.SocatStatusChanged += OnSocatStatusChanged;
             _communicationChannelService.SerialPortsChanged += OnSerialPortsChanged;
+            _state.PropertyChanged += (s, e) => OnPropertyChanged(e.PropertyName);
 
             // Initialize commands
             StartSocatCommand = new AsyncRelayCommand(_ => StartSocatAsync(), _ => CanStartSocat());

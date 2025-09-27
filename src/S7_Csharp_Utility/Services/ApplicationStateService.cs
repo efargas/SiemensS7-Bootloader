@@ -1,208 +1,344 @@
-﻿#nullable enable
-using Microsoft.Extensions.Logging;
 using S7_Csharp_Utility.Interfaces;
+using S7_Csharp_Utility.Models;
+using S7_Csharp_Utility.ViewModels;
+using System.IO.Ports;
+using System.Threading.Tasks;
 using System;
-using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace S7_Csharp_Utility.Services
 {
     /// <summary>
-    /// Implementation of IApplicationStateService that provides centralized state management
-    /// for coordinating operations across different features of the application.
-    /// This service is thread-safe and designed to be used as a singleton.
+    /// Manages the application's shared state and notifies the UI of any changes.
     /// </summary>
-    public class ApplicationStateService : IApplicationStateService
+    public class ApplicationStateService : ViewModelBase, IApplicationStateService
     {
+        private const string ConfigFileName = "config.json";
+        private readonly ConfigurationService _configService;
+        private readonly IDialogService _dialogService;
+        private readonly LoggingService _loggingService;
+        private readonly SocatLoggerService _socatLoggerService;
         private readonly ILogger<ApplicationStateService> _logger;
-        private readonly ConcurrentDictionary<string, bool> _activeOperations;
-        private readonly ConcurrentDictionary<string, Func<bool>> _stateProviders;
-        private readonly object _eventLock = new object();
+        private readonly List<string> _activeOperations = new List<string>();
 
-        /// <summary>
-        /// Initializes a new instance of the ApplicationStateService class.
-        /// </summary>
-        /// <param name="logger">The logger instance for this service.</param>
-        /// <exception cref="ArgumentNullException">Thrown when logger is null.</exception>
-        public ApplicationStateService(ILogger<ApplicationStateService> logger)
+        public ApplicationStateService(
+            ConfigurationService configService,
+            IDialogService dialogService,
+            LoggingService loggingService,
+            SocatLoggerService socatLoggerService,
+            ILogger<ApplicationStateService> logger)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _activeOperations = new ConcurrentDictionary<string, bool>();
-            _stateProviders = new ConcurrentDictionary<string, Func<bool>>();
-
-            _logger.LogDebug("ApplicationStateService initialized");
+            _configService = configService;
+            _dialogService = dialogService;
+            _loggingService = loggingService;
+            _socatLoggerService = socatLoggerService;
+            _logger = logger;
         }
 
-        /// <inheritdoc />
-        public bool IsAnyOperationInProgress => _activeOperations.Any(kvp => kvp.Value);
+        private string _selectedCommunicationMode = "TCP (socat)";
+        public string SelectedCommunicationMode { get => _selectedCommunicationMode; set => SetProperty(ref _selectedCommunicationMode, value); }
 
-        /// <inheritdoc />
-        public bool CanExecuteExploitSequence
+        private string _plcHost = "localhost";
+        public string PlcHost { get => _plcHost; set => SetProperty(ref _plcHost, value); }
+
+        private int _plcPort = 102;
+        public int PlcPort { get => _plcPort; set => SetProperty(ref _plcPort, value); }
+
+        private string _modbusHost = "localhost";
+        public string ModbusHost { get => _modbusHost; set => SetProperty(ref _modbusHost, value); }
+
+        private int _modbusPort = 502;
+        public int ModbusPort { get => _modbusPort; set => SetProperty(ref _modbusPort, value); }
+
+        private ushort _modbusCoil = 1;
+        public ushort ModbusCoil { get => _modbusCoil; set => SetProperty(ref _modbusCoil, value); }
+
+        private byte _modbusSlaveId = 1;
+        public byte ModbusSlaveId { get => _modbusSlaveId; set => SetProperty(ref _modbusSlaveId, value); }
+
+        private int _delaySeconds = 1;
+        public int DelaySeconds { get => _delaySeconds; set => SetProperty(ref _delaySeconds, value); }
+
+        private string _dumpAddress = "0x10000000";
+        public string DumpAddress { get => _dumpAddress; set => SetProperty(ref _dumpAddress, value); }
+
+        private uint _dumpLength = 4096;
+        public uint DumpLength { get => _dumpLength; set => SetProperty(ref _dumpLength, value); }
+
+        private string _compareFolder = string.Empty;
+        public string CompareFolder { get => _compareFolder; set => SetProperty(ref _compareFolder, value); }
+
+        private string _compareFile1 = string.Empty;
+        public string CompareFile1 { get => _compareFile1; set => SetProperty(ref _compareFile1, value); }
+
+        private string _compareFile2 = string.Empty;
+        public string CompareFile2 { get => _compareFile2; set => SetProperty(ref _compareFile2, value); }
+
+        private string? _selectedSerialPort = "/dev/ttyUSB0";
+        public string? SelectedSerialPort { get => _selectedSerialPort; set => SetProperty(ref _selectedSerialPort, value); }
+
+        private int _socatTcpPort = 1238;
+        public int SocatTcpPort { get => _socatTcpPort; set => SetProperty(ref _socatTcpPort, value); }
+
+        private int _selectedBaudRate = 38400;
+        public int SelectedBaudRate { get => _selectedBaudRate; set => SetProperty(ref _selectedBaudRate, value); }
+
+        private Parity _selectedParity = Parity.Even;
+        public Parity SelectedParity { get => _selectedParity; set => SetProperty(ref _selectedParity, value); }
+
+        private StopBits _selectedStopBits = StopBits.One;
+        public StopBits SelectedStopBits { get => _selectedStopBits; set => SetProperty(ref _selectedStopBits, value); }
+
+        private Handshake _selectedFlowControl = Handshake.None;
+        public Handshake SelectedFlowControl { get => _selectedFlowControl; set => SetProperty(ref _selectedFlowControl, value); }
+
+        private bool _socatVerbose = true;
+        public bool SocatVerbose { get => _socatVerbose; set => SetProperty(ref _socatVerbose, value); }
+
+        private bool _socatHexDump = true;
+        public bool SocatHexDump { get => _socatHexDump; set => SetProperty(ref _socatHexDump, value); }
+
+        private int _socatBlockSize = 4;
+        public int SocatBlockSize { get => _socatBlockSize; set => SetProperty(ref _socatBlockSize, value); }
+
+        private string _payloadsPath = ApplicationConfiguration.GetPayloadsPath();
+        public string PayloadsPath { get => _payloadsPath; set => SetProperty(ref _payloadsPath, value); }
+
+        private string _dumpsPath = ApplicationConfiguration.GetDefaultDumpsPath();
+        public string DumpsPath { get => _dumpsPath; set => SetProperty(ref _dumpsPath, value); }
+
+        private string _logsPath = ApplicationConfiguration.GetDefaultLogsPath();
+        public string LogsPath { get => _logsPath; set => SetProperty(ref _logsPath, value); }
+
+        private string _extractionPath = ApplicationConfiguration.GetDefaultExtractionPath();
+        public string ExtractionPath { get => _extractionPath; set => SetProperty(ref _extractionPath, value); }
+
+        private string _socatStatus = "Stopped";
+        public string SocatStatus { get => _socatStatus; set { if (SetProperty(ref _socatStatus, value)) OnPropertyChanged(nameof(IsSocatRunning)); } }
+
+        private string _modbusStatus = "Disconnected";
+        public string ModbusStatus { get => _modbusStatus; set { if (SetProperty(ref _modbusStatus, value)) OnPropertyChanged(nameof(IsModbusConnected)); } }
+
+        public bool IsSocatRunning => SocatStatus == "Running";
+        public bool IsModbusConnected => ModbusStatus == "Connected";
+
+        private DeviceProfile? _loadedProfile;
+        public DeviceProfile? LoadedProfile { get => _loadedProfile; set => SetProperty(ref _loadedProfile, value); }
+
+        public bool IsAnyOperationInProgress => _activeOperations.Any();
+
+        public bool CanExecuteMemoryDump => IsSocatRunning && !IsAnyOperationInProgress;
+
+        public S7.Core.Abstractions.Configuration.CommunicationChannelConfig CreateChannelConfig()
         {
-            get
+            if (SelectedCommunicationMode == "TCP (socat)")
             {
-                // Exploit sequence can execute if no operations are in progress
-                // and all registered state providers return true
-                if (IsAnyOperationInProgress)
+                return new S7.Core.Abstractions.Configuration.CommunicationChannelConfig
                 {
-                    _logger.LogDebug("Cannot execute exploit sequence: operations in progress");
-                    return false;
-                }
-
-                return EvaluateStateProviders("CanExecuteExploitSequence");
+                    Mode = "TCP",
+                    Host = PlcHost,
+                    Port = PlcPort,
+                    Timeout = TimeSpan.FromSeconds(30)
+                };
             }
-        }
-
-        /// <inheritdoc />
-        public bool CanExecuteMemoryDump
-        {
-            get
+            else if (SelectedCommunicationMode == "Serial" && !string.IsNullOrEmpty(SelectedSerialPort))
             {
-                // Memory dump can execute if no operations are in progress
-                // and all registered state providers return true
-                if (IsAnyOperationInProgress)
+                return new S7.Core.Abstractions.Configuration.CommunicationChannelConfig
                 {
-                    _logger.LogDebug("Cannot execute memory dump: operations in progress");
-                    return false;
-                }
-
-                return EvaluateStateProviders("CanExecuteMemoryDump");
-            }
-        }
-
-        /// <inheritdoc />
-        public event EventHandler<ApplicationStateChangedEventArgs>? StateChanged;
-
-        /// <inheritdoc />
-        public void NotifyOperationStarted(string operationName)
-        {
-            if (string.IsNullOrWhiteSpace(operationName))
-                throw new ArgumentException("Operation name cannot be null or whitespace.", nameof(operationName));
-
-            _logger.LogInformation("Operation started: {OperationName}", operationName);
-
-            _activeOperations.AddOrUpdate(operationName, true, (key, oldValue) => true);
-
-            RaiseStateChanged(operationName, isOperationStarted: true);
-        }
-
-        /// <inheritdoc />
-        public void NotifyOperationCompleted(string operationName)
-        {
-            if (string.IsNullOrWhiteSpace(operationName))
-                throw new ArgumentException("Operation name cannot be null or whitespace.", nameof(operationName));
-
-            _logger.LogInformation("Operation completed: {OperationName}", operationName);
-
-            _activeOperations.AddOrUpdate(operationName, false, (key, oldValue) => false);
-
-            RaiseStateChanged(operationName, isOperationStarted: false);
-        }
-
-        /// <inheritdoc />
-        public void RegisterStateProvider(string key, Func<bool> stateProvider)
-        {
-            if (string.IsNullOrWhiteSpace(key))
-                throw new ArgumentException("Key cannot be null or whitespace.", nameof(key));
-
-            if (stateProvider == null)
-                throw new ArgumentNullException(nameof(stateProvider));
-
-            _logger.LogDebug("Registering state provider: {Key}", key);
-
-            _stateProviders.AddOrUpdate(key, stateProvider, (existingKey, existingProvider) =>
-            {
-                _logger.LogWarning("Replacing existing state provider for key: {Key}", key);
-                return stateProvider;
-            });
-        }
-
-        /// <inheritdoc />
-        public void UnregisterStateProvider(string key)
-        {
-            if (string.IsNullOrWhiteSpace(key))
-                throw new ArgumentException("Key cannot be null or whitespace.", nameof(key));
-
-            _logger.LogDebug("Unregistering state provider: {Key}", key);
-
-            if (_stateProviders.TryRemove(key, out _))
-            {
-                _logger.LogDebug("Successfully unregistered state provider: {Key}", key);
-            }
-            else
-            {
-                _logger.LogWarning("Attempted to unregister non-existent state provider: {Key}", key);
-            }
-        }
-
-        /// <summary>
-        /// Evaluates all registered state providers and returns true if all return true.
-        /// </summary>
-        /// <param name="context">The context for logging purposes.</param>
-        /// <returns>True if all state providers return true; otherwise, false.</returns>
-        private bool EvaluateStateProviders(string context)
-        {
-            if (!_stateProviders.Any())
-            {
-                _logger.LogDebug("No state providers registered for {Context}", context);
-                return true;
+                    Mode = "Serial",
+                    SerialPort = SelectedSerialPort,
+                    BaudRate = SelectedBaudRate,
+                    Parity = SelectedParity.ToString(),
+                    StopBits = SelectedStopBits.ToString(),
+                    FlowControl = SelectedFlowControl.ToString(),
+                    Timeout = TimeSpan.FromSeconds(30)
+                };
             }
 
-            var failedProviders = new List<string>();
-
-            foreach (var kvp in _stateProviders)
-            {
-                try
-                {
-                    if (!kvp.Value())
-                    {
-                        failedProviders.Add(kvp.Key);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error evaluating state provider {Key} for {Context}", kvp.Key, context);
-                    failedProviders.Add(kvp.Key);
-                }
-            }
-
-            if (failedProviders.Any())
-            {
-                _logger.LogDebug("State providers failed for {Context}: {FailedProviders}", 
-                    context, string.Join(", ", failedProviders));
-                return false;
-            }
-
-            return true;
+            throw new InvalidOperationException("No valid communication channel configuration available");
         }
 
-        /// <summary>
-        /// Raises the StateChanged event in a thread-safe manner.
-        /// </summary>
-        /// <param name="operationName">The name of the operation that caused the state change.</param>
-        /// <param name="isOperationStarted">True if the operation started; false if it completed.</param>
-        private void RaiseStateChanged(string operationName, bool isOperationStarted)
+        public async Task LoadConfigurationOnStartup()
         {
             try
             {
-                lock (_eventLock)
+                var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
+                var config = await _configService.LoadConfigurationAsync(path);
+                if (config != null)
                 {
-                    var args = new ApplicationStateChangedEventArgs(
-                        operationName, 
-                        isOperationStarted, 
-                        IsAnyOperationInProgress);
-
-                    StateChanged?.Invoke(this, args);
-
-                    _logger.LogDebug("State changed event raised for operation: {OperationName}, Started: {IsStarted}, AnyInProgress: {AnyInProgress}",
-                        operationName, isOperationStarted, IsAnyOperationInProgress);
+                    ApplyConfiguration(config);
+                }
+                else
+                {
+                    await SaveConfigurationOnExit();
+                    _loggingService.Log($"No configuration found. Created default configuration at {path}.", LogCategory.Info);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error raising StateChanged event for operation: {OperationName}", operationName);
+                _loggingService.Log($"Could not load or create configuration: {ex.ToString()}", LogCategory.Warning);
             }
+            UpdateLogsPath();
+        }
+
+        public async Task LoadConfigurationAsync()
+        {
+            var path = await _dialogService.ShowOpenFileDialogAsync("Load Configuration", "json", "JSON Configuration Files").ConfigureAwait(false);
+            if (path != null)
+            {
+                try
+                {
+                    var config = await _configService.LoadConfigurationAsync(path);
+                    if (config != null)
+                    {
+                        ApplyConfiguration(config);
+                        UpdateLogsPath();
+                        _loggingService.Log($"Configuration loaded successfully from {path}.", LogCategory.Info);
+                        await _dialogService.ShowMessageAsync("Success", "Configuration loaded successfully!");
+                    }
+                    else
+                    {
+                        await _dialogService.ShowMessageAsync("Error", "Failed to load configuration file. The file may be corrupted or in an invalid format.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.Log($"Error loading configuration from {path}: {ex}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", $"Error loading configuration: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task SaveConfigurationAsync()
+        {
+            var path = await _dialogService.ShowSaveFileDialogAsync("Save Configuration", "json", "JSON Configuration Files").ConfigureAwait(false);
+            if (path != null)
+            {
+                try
+                {
+                    var config = CreateConfiguration();
+                    await _configService.SaveConfigurationAsync(config, path);
+                    _loggingService.Log($"Configuration saved successfully to {path}.", LogCategory.Info);
+                    await _dialogService.ShowMessageAsync("Success", "Configuration saved successfully!");
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.Log($"Error saving configuration to {path}: {ex}", LogCategory.Error);
+                    await _dialogService.ShowMessageAsync("Error", $"Error saving configuration: {ex.Message}");
+                }
+            }
+        }
+
+        public async Task SaveConfigurationOnExit()
+        {
+            try
+            {
+                var path = System.IO.Path.Combine(AppContext.BaseDirectory, ConfigFileName);
+                var config = CreateConfiguration();
+                await _configService.SaveConfigurationAsync(config, path);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Log($"Could not save configuration: {ex.ToString()}", LogCategory.Error);
+            }
+        }
+
+        public async Task LoadProfileAsync()
+        {
+            var path = await _dialogService.ShowOpenFileDialogAsync("Load Profile", "json", "JSON Profiles").ConfigureAwait(false);
+            if (path != null)
+            {
+                var profile = await _configService.LoadProfileAsync(path).ConfigureAwait(false);
+                if (profile != null)
+                {
+                    LoadedProfile = profile;
+                }
+            }
+        }
+
+        public void NotifyOperationStarted(string operationName)
+        {
+            if (!_activeOperations.Contains(operationName))
+            {
+                _activeOperations.Add(operationName);
+                OnPropertyChanged(nameof(IsAnyOperationInProgress));
+            }
+        }
+
+        public void NotifyOperationCompleted(string operationName)
+        {
+            if (_activeOperations.Remove(operationName))
+            {
+                OnPropertyChanged(nameof(IsAnyOperationInProgress));
+            }
+        }
+
+        private void ApplyConfiguration(ApplicationConfiguration config)
+        {
+            PlcHost = config.PlcHost ?? "localhost";
+            PlcPort = config.PlcPort;
+            ModbusHost = config.ModbusHost ?? "localhost";
+            ModbusPort = config.ModbusPort;
+            ModbusCoil = config.ModbusCoil;
+            DelaySeconds = config.DelaySeconds;
+            DumpAddress = config.DumpAddress ?? "0x691E28";
+            DumpLength = config.DumpLength;
+            CompareFolder = config.CompareFolder ?? string.Empty;
+            CompareFile1 = config.CompareFile1 ?? string.Empty;
+            CompareFile2 = config.CompareFile2 ?? string.Empty;
+            SelectedSerialPort = config.SelectedSerialPort ?? string.Empty;
+            SocatTcpPort = config.SocatTcpPort;
+            SelectedBaudRate = config.SelectedBaudRate;
+            SelectedParity = config.SelectedParity;
+            SelectedStopBits = config.SelectedStopBits;
+            SelectedFlowControl = config.SelectedFlowControl;
+            SocatVerbose = config.SocatVerbose;
+            SocatHexDump = config.SocatHexDump;
+            SocatBlockSize = config.SocatBlockSize;
+            PayloadsPath = config.PayloadsPath ?? ApplicationConfiguration.GetPayloadsPath();
+            DumpsPath = config.DumpsPath ?? ApplicationConfiguration.GetDefaultDumpsPath();
+            LogsPath = config.LogsPath ?? ApplicationConfiguration.GetDefaultLogsPath();
+            ExtractionPath = config.ExtractionPath ?? ApplicationConfiguration.GetDefaultExtractionPath();
+        }
+
+        private ApplicationConfiguration CreateConfiguration()
+        {
+            return new ApplicationConfiguration
+            {
+                PlcHost = PlcHost,
+                PlcPort = PlcPort,
+                ModbusHost = ModbusHost,
+                ModbusPort = ModbusPort,
+                ModbusCoil = ModbusCoil,
+                DelaySeconds = DelaySeconds,
+                DumpAddress = DumpAddress,
+                DumpLength = DumpLength,
+                CompareFolder = CompareFolder,
+                CompareFile1 = CompareFile1,
+                CompareFile2 = CompareFile2,
+                SelectedSerialPort = SelectedSerialPort,
+                SocatTcpPort = SocatTcpPort,
+                SelectedBaudRate = SelectedBaudRate,
+                SelectedParity = SelectedParity,
+                SelectedStopBits = SelectedStopBits,
+                SelectedFlowControl = SelectedFlowControl,
+                SocatVerbose = SocatVerbose,
+                SocatHexDump = SocatHexDump,
+                SocatBlockSize = SocatBlockSize,
+                PayloadsPath = PayloadsPath,
+                DumpsPath = DumpsPath,
+                LogsPath = LogsPath,
+                ExtractionPath = ExtractionPath
+            };
+        }
+
+        private void UpdateLogsPath()
+        {
+            string resolvedLogsPath = ApplicationConfiguration.ResolvePath(LogsPath, ApplicationConfiguration.GetDefaultLogsPath());
+            _loggingService.UpdateLogsPath(resolvedLogsPath);
+            _socatLoggerService.UpdateLogsPath(resolvedLogsPath);
         }
     }
 }
