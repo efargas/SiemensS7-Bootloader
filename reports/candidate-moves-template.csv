@@ -1,3 +1,0 @@
-# candidate-moves-template.csv
-# Columns: current_path,target_project,reason,move_risk,notes
-src/S7_Csharp_Utility/Models/Profile.cs,S7.Core,DTO - pure model; no UI deps,Low,"Move to S7.Core; update references in UI project to S7.Core.Models"
