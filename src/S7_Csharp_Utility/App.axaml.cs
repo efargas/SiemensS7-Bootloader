@@ -1,17 +1,14 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using S7.Net;
-using S7.Net.Interfaces;
-using S7_Csharp_Utility.Core.Commands;
-using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
+using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.ViewModels;
+using S7.Net;
 using System;
-using System.IO;
 using System.Linq;
+using Avalonia.Threading;
 
 namespace S7_Csharp_Utility
 {
@@ -20,12 +17,14 @@ namespace S7_Csharp_Utility
     /// </summary>
     public partial class App : Application
     {
+
         /// <summary>
         /// Gets the service provider.
         /// </summary>
-        public IServiceProvider Services { get; private set; } = null!;
+        public IServiceProvider? Services { get; private set; }
 
         public string[] HexHeader { get; } = Enumerable.Range(0, 16).Select(i => $"{i:X2}").ToArray();
+
 
         /// <summary>
         /// Initializes the application by loading XAML resources.
@@ -47,12 +46,13 @@ namespace S7_Csharp_Utility
                 ConfigureServices(services);
                 Services = services.BuildServiceProvider();
 
+                // This resolves the MainWindow, which in turn resolves its dependencies like the ViewModel.
                 desktop.MainWindow = Services.GetRequiredService<MainWindow>();
                 var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();
 
-                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartupAsync();
-                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExitAsync();
-                desktop.Exit += (sender, e) => OnApplicationExit(sender, e, Services);
+                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartup();
+                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExit();
+                desktop.Exit += OnApplicationExit;
             }
 
             base.OnFrameworkInitializationCompleted();
@@ -64,63 +64,44 @@ namespace S7_Csharp_Utility
         /// <param name="services">The service collection to configure.</param>
         private void ConfigureServices(IServiceCollection services)
         {
-            // --- Logging ---
-            services.AddLogging(configure =>
+            // Register Services
+            services.AddSingleton<LoggingService>(_ => new LoggingService(Dispatcher.UIThread));
+            services.AddSingleton<SocatLoggerService>(_ => new SocatLoggerService(Dispatcher.UIThread));
+            services.AddSingleton<ConfigurationService>();
+            services.AddSingleton<PayloadManager>(_ => new PayloadManager(AppContext.BaseDirectory));
+            services.AddSingleton<SocatService>();
+            services.AddSingleton<PowerController>(sp =>
             {
-                configure.AddDebug(); // Add other providers as needed
+                var loggingService = sp.GetRequiredService<LoggingService>();
+                return new PowerController((message, isError) =>
+                    loggingService.Log(message, isError ? LogCategory.Error : LogCategory.Info));
             });
 
-            // --- Core Services from S7.Net ---
-            services.AddSingleton<PayloadManager>(sp =>
-                new PayloadManager(AppContext.BaseDirectory, sp.GetRequiredService<ILogger<PayloadManager>>()));
-            services.AddSingleton<ICommunicationChannelFactory, S7.Net.Channels.CommunicationChannelFactory>();
-            services.AddSingleton<IPlcClientFactory, PlcClientFactory>();
-
-            // --- Utility Project Services ---
-            services.AddSingleton<ConfigurationService>();
-            services.AddSingleton<SocatService>();
-            services.AddSingleton<IPowerController, PowerControllerAdapter>();
-            services.AddSingleton<IFirmwareUnpackingService, FirmwareUnpackingService>();
-            services.AddSingleton<IFileComparisonService, FileComparisonService>();
-            services.AddSingleton<IProfileManagerService, ProfileManagerService>();
-            services.AddSingleton<ISerialPortService, SerialPortService>();
-            services.AddSingleton<IApplicationStateService, ApplicationStateService>();
-            services.AddSingleton<IDialogService, DialogService>();
-            services.AddSingleton<IViewService, ViewService>();
-
-            // --- Command Handlers ---
-            services.AddTransient<MemoryDumpCommandHandler>();
-            services.AddTransient<StagerInstallCommandHandler>();
-
-            // --- ViewModels ---
+            // Register ViewModels
             services.AddSingleton<MainWindowViewModel>();
-            services.AddSingleton<LogViewModel>();
-            services.AddSingleton<SocatLogViewModel>();
             services.AddTransient<PlcConnectionViewModel>();
             services.AddTransient<ModbusPowerSupplyViewModel>();
             services.AddTransient<ConfigurationViewModel>();
             services.AddTransient<FileCompareViewModel>();
-            services.AddTransient<ProfileManagementViewModel>();
-            services.AddTransient<FirmwareUnpackerViewModel>(sp =>
-                new FirmwareUnpackerViewModel(
-                    sp.GetRequiredService<IDialogService>(),
-                    sp.GetRequiredService<IFirmwareUnpackingService>(),
-                    // This could be sourced from a config service in a real app
-                    Path.Combine(AppContext.BaseDirectory, "unpacked_firmware")));
 
-            // --- Views (MainWindow is the root) ---
+            // Register the MainWindow itself. It will act as the root view.
             services.AddSingleton<MainWindow>();
+
+            // Register services
+            services.AddSingleton<IDialogService, DialogService>();
+            services.AddSingleton<IViewService, ViewService>();
         }
 
         /// <summary>
         /// Handles application exit by cleaning up resources and killing socat processes.
         /// </summary>
-        private static void OnApplicationExit(object? sender, EventArgs e, IServiceProvider services)
+        /// <param name="sender">The event sender.</param>
+        /// <param name="e">The event arguments.</param>
+        private static void OnApplicationExit(object? sender, EventArgs e)
         {
             try
             {
-                var socatService = services.GetRequiredService<SocatService>();
-                socatService.KillAllSocatProcesses();
+                SocatService.KillAllSocatProcesses();
             }
             catch (Exception ex)
             {

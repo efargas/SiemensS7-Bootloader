@@ -1,34 +1,29 @@
-using Avalonia;
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Microsoft.Extensions.DependencyInjection;
 using S7_Csharp_Utility.Interfaces;
+using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.Models;
-using S7_Csharp_Utility.ViewModels;
 using S7_Csharp_Utility.Views;
 using System;
-using System.Threading.Tasks;
+using Avalonia;
 
 namespace S7_Csharp_Utility.Services
 {
-    /// <summary>
-    /// A service for managing view creation and interaction.
-    /// </summary>
     public class ViewService : IViewService
     {
         private Window? _mainWindow;
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IDialogService _dialogService;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ViewService"/> class.
-        /// </summary>
-        /// <param name="serviceProvider">The service provider for resolving dependencies.</param>
-        public ViewService(IServiceProvider serviceProvider)
+        public ViewService(IDialogService dialogService)
         {
-            _serviceProvider = serviceProvider;
+            _dialogService = dialogService;
         }
 
-        /// <inheritdoc />
+        public void SetMainWindow(Window mainWindow)
+        {
+            _mainWindow = mainWindow;
+        }
+
         public Window GetMainWindow()
         {
             if (_mainWindow != null)
@@ -43,74 +38,23 @@ namespace S7_Csharp_Utility.Services
             throw new InvalidOperationException("Unable to get main window");
         }
 
-        /// <inheritdoc />
-        public async Task<DeviceProfile?> ShowProfileManagementWindowAsync()
+        public void ShowProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile> onSetActiveProfile)
         {
             var mainWindow = GetMainWindow();
-            var viewModel = _serviceProvider.GetRequiredService<ProfileManagementViewModel>();
-            var window = new ProfileManagementWindow
-            {
-                DataContext = viewModel
-            };
-            return await window.ShowDialog<DeviceProfile?>(mainWindow);
+            new ProfileManagementWindow(configService, onSetActiveProfile).Show(mainWindow);
         }
 
-        /// <inheritdoc />
-        public void ShowFirmwareUnpackerWindow(string? defaultExtractionPath)
+        public void ShowFirmwareUnpackerWindow(string extractionPath)
         {
             var mainWindow = GetMainWindow();
-            var viewModel = _serviceProvider.GetRequiredService<FirmwareUnpackerViewModel>();
-            viewModel.ExtractionPath = defaultExtractionPath ?? string.Empty;
-
-            var window = new FirmwareUnpackerWindow
-            {
-                DataContext = viewModel
-            };
-            window.Show(mainWindow);
+            new FirmwareUnpackerWindow(extractionPath, _dialogService).Show(mainWindow);
         }
 
-        /// <inheritdoc />
         public void ShowHexViewerWindow()
         {
-            // This view is simple and does not require a complex ViewModel from DI.
             new HexViewerWindow().Show();
         }
 
-        /// <inheritdoc />
-        public void ShowSocatLogWindow()
-        {
-            var mainWindow = GetMainWindow();
-            var viewModel = _serviceProvider.GetRequiredService<SocatLogViewModel>();
-            var window = new SocatLogWindow
-            {
-                DataContext = viewModel
-            };
-            window.Show(mainWindow);
-        }
-
-        /// <inheritdoc />
-        public async Task ShowComparisonResultAsync(string report)
-        {
-            var mainWindow = GetMainWindow();
-            var window = new ComparisonResultWindow(report);
-            await window.ShowDialog(mainWindow);
-        }
-
-        /// <inheritdoc />
-        public async Task ShowDiffViewAsync(string file1, string file2)
-        {
-            var mainWindow = GetMainWindow();
-            // DiffViewModel is transient and takes parameters, so we create it directly.
-            var viewModel = new DiffViewModel(file1, file2);
-            var window = new DiffView
-            {
-                DataContext = viewModel
-            };
-            await window.ShowDialog(mainWindow);
-            viewModel.Dispose();
-        }
-
-        /// <inheritdoc />
         public void Exit()
         {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)

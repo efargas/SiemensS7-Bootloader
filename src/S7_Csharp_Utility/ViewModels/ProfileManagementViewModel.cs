@@ -1,22 +1,19 @@
-using S7_Csharp_Utility.Commands;
-using S7_Csharp_Utility.Interfaces;
-using S7_Csharp_Utility.Models;
+﻿using S7_Csharp_Utility.Commands;
+using S7_Csharp_Utility.Extensions;
+using S7_Csharp_Utility.Services;
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Microsoft.Extensions.Logging;
 
 namespace S7_Csharp_Utility.ViewModels
 {
-    /// <summary>
-    /// The view model for managing device profiles.
-    /// </summary>
     public class ProfileManagementViewModel : ViewModelBase
     {
-        private readonly IProfileManagerService _profileManager;
-        private readonly IDialogService _dialogService;
-        private readonly ILogger<ProfileManagementViewModel> _logger;
+        private readonly ConfigurationService _configService;
+        private readonly Interfaces.IDialogService _dialogService;
+        private Action<DeviceProfile> _onSetActiveProfile;
 
         public ObservableCollection<DeviceProfile> Profiles { get; } = new ObservableCollection<DeviceProfile>();
 
@@ -26,13 +23,13 @@ namespace S7_Csharp_Utility.ViewModels
             get => _selectedProfile;
             set
             {
-                if (SetProperty(ref _selectedProfile, value))
-                {
-                    (SaveProfileCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-                    (DeleteProfileCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-                    (AddRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                    (RemoveRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                }
+                _selectedProfile = value;
+                OnPropertyChanged();
+                (SaveProfileCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (DeleteProfileCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (AddRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (RemoveRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                (SetActiveProfileCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -42,10 +39,9 @@ namespace S7_Csharp_Utility.ViewModels
             get => _selectedRegion;
             set
             {
-                if (SetProperty(ref _selectedRegion, value))
-                {
-                    (RemoveRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                }
+                _selectedRegion = value;
+                OnPropertyChanged();
+                (RemoveRegionCommand as RelayCommand)?.RaiseCanExecuteChanged();
             }
         }
 
@@ -54,73 +50,73 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand SaveProfileCommand { get; }
         public ICommand AddRegionCommand { get; }
         public ICommand RemoveRegionCommand { get; }
+        public ICommand SetActiveProfileCommand { get; }
 
-        public ProfileManagementViewModel(
-            IProfileManagerService profileManager,
-            IDialogService dialogService,
-            ILogger<ProfileManagementViewModel> logger)
+        public ProfileManagementViewModel(ConfigurationService configService, Interfaces.IDialogService dialogService, Action<DeviceProfile> onSetActiveProfile)
         {
-            _profileManager = profileManager;
+            _configService = configService;
             _dialogService = dialogService;
-            _logger = logger;
+            _onSetActiveProfile = onSetActiveProfile;
 
-            AddProfileCommand = new RelayCommand(AddProfile);
-            DeleteProfileCommand = new AsyncRelayCommand(DeleteProfileAsync, () => SelectedProfile != null, HandleException);
-            SaveProfileCommand = new AsyncRelayCommand(SaveProfileAsync, () => SelectedProfile != null, HandleException);
-            AddRegionCommand = new RelayCommand(AddRegion, () => SelectedProfile != null);
-            RemoveRegionCommand = new RelayCommand(RemoveRegion, () => SelectedRegion != null);
+            AddProfileCommand = new RelayCommand(_ => AddProfile());
+            DeleteProfileCommand = new RelayCommand(async _ => await DeleteProfile(), _ => SelectedProfile != null);
+            SaveProfileCommand = new RelayCommand(async _ => await SaveProfile(), _ => SelectedProfile != null);
+            AddRegionCommand = new RelayCommand(_ => AddRegion(), _ => SelectedProfile != null);
+            RemoveRegionCommand = new RelayCommand(_ => RemoveRegion(), _ => SelectedRegion != null);
+            SetActiveProfileCommand = new RelayCommand(_ => SetActiveProfile(), _ => SelectedProfile != null);
 
-            _ = LoadProfilesAsync();
+            LoadProfilesAsync().FireAndForget(ex => _dialogService.ShowMessageAsync("Error Loading Profiles", $"An error occurred while loading device profiles: {ex.Message}"));
         }
 
         private async Task LoadProfilesAsync()
         {
-            try
+            var profiles = await _configService.LoadAllProfilesAsync();
+            Profiles.Clear();
+            foreach (var profile in profiles)
             {
-                var profiles = await _profileManager.GetAllProfilesAsync();
-                Profiles.Clear();
-                foreach (var profile in profiles)
-                {
-                    Profiles.Add(profile);
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                Profiles.Add(profile);
             }
         }
 
         private void AddProfile()
         {
-            var newProfile = _profileManager.CreateNewProfile();
+            var newProfile = new DeviceProfile { ModelName = "New Profile" };
             Profiles.Add(newProfile);
             SelectedProfile = newProfile;
         }
 
-        private async Task DeleteProfileAsync()
+        private async Task DeleteProfile()
         {
             if (SelectedProfile == null) return;
 
-            await _profileManager.DeleteProfileAsync(SelectedProfile);
+            if (!string.IsNullOrEmpty(SelectedProfile.FilePath))
+            {
+                await _configService.DeleteProfileAsync(SelectedProfile.FilePath);
+            }
             Profiles.Remove(SelectedProfile);
             SelectedProfile = null;
-            _logger.LogInformation("Profile deleted.");
         }
 
-        private async Task SaveProfileAsync()
+        private async Task SaveProfile()
         {
             if (SelectedProfile == null) return;
 
-            await _profileManager.SaveProfileAsync(SelectedProfile);
+            if (string.IsNullOrEmpty(SelectedProfile.FilePath))
+            {
+                var profilesDir = _configService.GetProfilesDirectory();
+                // Sanitize ModelName to create a valid file name
+                var fileName = string.Join("_", SelectedProfile.ModelName.Split(Path.GetInvalidFileNameChars()));
+                SelectedProfile.FilePath = Path.Combine(profilesDir, $"{fileName}.json");
+            }
+
+            await _configService.SaveProfileAsync(SelectedProfile, SelectedProfile.FilePath);
             await _dialogService.ShowMessageAsync("Profile Saved", "The profile has been saved successfully.");
-            _logger.LogInformation("Profile '{ProfileName}' saved to {FilePath}", SelectedProfile.ModelName, SelectedProfile.FilePath);
         }
 
         private void AddRegion()
         {
             if (SelectedProfile == null) return;
-            // The creation of a new region is simple view-state manipulation, so it can remain here.
-            SelectedProfile.Regions.Add(new MemoryRegion { Name = "New Region", Address = "0x0", Size = 16 });
+            SelectedProfile.Regions.Add(new MemoryRegion { Name = "New Region" });
         }
 
         private void RemoveRegion()
@@ -129,10 +125,10 @@ namespace S7_Csharp_Utility.ViewModels
             SelectedProfile.Regions.Remove(SelectedRegion);
         }
 
-        private void HandleException(Exception ex)
+        private void SetActiveProfile()
         {
-            _logger.LogError(ex, "An error occurred in the Profile Management view.");
-            _dialogService.ShowMessageAsync("Error", $"An unexpected error occurred: {ex.Message}");
+            if (SelectedProfile == null) return;
+            _onSetActiveProfile?.Invoke(SelectedProfile);
         }
     }
 }

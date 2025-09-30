@@ -1,9 +1,7 @@
-#nullable enable
-using Microsoft.Extensions.Logging;
+﻿#nullable enable
 using S7_Csharp_Utility.Commands;
-using S7_Csharp_Utility.Interfaces;
-using System;
-using System.IO;
+using S7_Csharp_Utility.Services;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -14,121 +12,113 @@ namespace S7_Csharp_Utility.ViewModels
     /// </summary>
     public class FileCompareViewModel : ViewModelBase
     {
-        private readonly IDialogService _dialogService;
-        private readonly ILogger<FileCompareViewModel> _logger;
-        private readonly IViewService _viewService;
-        private readonly IFileComparisonService _fileComparisonService;
+        private readonly Interfaces.IDialogService _dialogService;
+        private readonly LoggingService _loggingService;
+        private readonly Interfaces.IViewService _viewService;
 
         private bool _isComparing;
         public bool IsComparing
         {
             get => _isComparing;
-            set
-            {
-                if (SetProperty(ref _isComparing, value))
-                {
-                    ((AsyncRelayCommand)BrowseCompareFolderCommand).RaiseCanExecuteChanged();
-                    ((AsyncRelayCommand)BrowseCompareFile1Command).RaiseCanExecuteChanged();
-                    ((AsyncRelayCommand)BrowseCompareFile2Command).RaiseCanExecuteChanged();
-                    ((AsyncRelayCommand)CompareDumpsCommand).RaiseCanExecuteChanged();
-                    ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
-                }
-            }
+            set => SetProperty(ref _isComparing, value);
         }
 
         private string _compareFolder = string.Empty;
+        /// <summary>
+        /// Gets or sets the folder to compare.
+        /// </summary>
         public string CompareFolder
         {
             get => _compareFolder;
             set
             {
-                if (SetProperty(ref _compareFolder, value))
-                {
-                    ((AsyncRelayCommand)CompareDumpsCommand).RaiseCanExecuteChanged();
-                }
+                _compareFolder = value;
+                OnPropertyChanged();
+                ((AsyncRelayCommand)CompareDumpsCommand).RaiseCanExecuteChanged();
             }
         }
 
         private string _compareFile1 = string.Empty;
+        /// <summary>
+        /// Gets or sets the first file to compare.
+        /// </summary>
         public string CompareFile1
         {
             get => _compareFile1;
             set
             {
-                if (SetProperty(ref _compareFile1, value))
-                {
-                    ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
-                }
+                _compareFile1 = value;
+                OnPropertyChanged();
+                ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
             }
         }
 
         private string _compareFile2 = string.Empty;
+        /// <summary>
+        /// Gets or sets the second file to compare.
+        /// </summary>
         public string CompareFile2
         {
             get => _compareFile2;
             set
             {
-                if (SetProperty(ref _compareFile2, value))
-                {
-                    ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
-                }
+                _compareFile2 = value;
+                OnPropertyChanged();
+                ((AsyncRelayCommand)CompareTwoFilesCommand).RaiseCanExecuteChanged();
             }
         }
 
+        /// <summary>
+        /// Gets the command to browse for the folder to compare.
+        /// </summary>
         public ICommand BrowseCompareFolderCommand { get; }
+        /// <summary>
+        /// Gets the command to browse for the first file to compare.
+        /// </summary>
         public ICommand BrowseCompareFile1Command { get; }
+        /// <summary>
+        /// Gets the command to browse for the second file to compare.
+        /// </summary>
         public ICommand BrowseCompareFile2Command { get; }
+        /// <summary>
+        /// Gets the command to compare the dumps.
+        /// </summary>
         public ICommand CompareDumpsCommand { get; }
+        /// <summary>
+        /// Gets the command to compare two files.
+        /// </summary>
         public ICommand CompareTwoFilesCommand { get; }
 
-        public FileCompareViewModel(
-            IDialogService dialogService,
-            ILogger<FileCompareViewModel> logger,
-            IViewService viewService,
-            IFileComparisonService fileComparisonService)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FileCompareViewModel"/> class.
+        /// </summary>
+        public FileCompareViewModel(Interfaces.IDialogService dialogService, LoggingService loggingService, Interfaces.IViewService viewService)
         {
-            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _viewService = viewService ?? throw new ArgumentNullException(nameof(viewService));
-            _fileComparisonService = fileComparisonService ?? throw new ArgumentNullException(nameof(fileComparisonService));
+            _dialogService = dialogService;
+            _loggingService = loggingService;
+            _viewService = viewService;
 
-            BrowseCompareFolderCommand = new AsyncRelayCommand(BrowseForFolderAsync, _ => !IsComparing, HandleException);
-            BrowseCompareFile1Command = new AsyncRelayCommand(BrowseForFile1Async, _ => !IsComparing, HandleException);
-            BrowseCompareFile2Command = new AsyncRelayCommand(BrowseForFile2Async, _ => !IsComparing, HandleException);
-            CompareDumpsCommand = new AsyncRelayCommand(CompareDumpsAsync, _ => !IsComparing && !string.IsNullOrWhiteSpace(CompareFolder), HandleException);
-            CompareTwoFilesCommand = new AsyncRelayCommand(CompareTwoFilesAsync, _ => !IsComparing && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2), HandleException);
+            BrowseCompareFolderCommand = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare"); if (result != null) CompareFolder = result; }, _ => CanExecute(), HandleException);
+            BrowseCompareFile1Command = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 1"); if (result != null) CompareFile1 = result; }, _ => CanExecute(), HandleException);
+            BrowseCompareFile2Command = new AsyncRelayCommand(async _ => { var result = await _dialogService.OpenFilePickerAsync("Select File 2"); if (result != null) CompareFile2 = result; }, _ => CanExecute(), HandleException);
+            CompareDumpsCommand = new AsyncRelayCommand(_ => CompareDumpsAsync(), _ => CanExecute() && !string.IsNullOrWhiteSpace(CompareFolder), HandleException);
+            CompareTwoFilesCommand = new AsyncRelayCommand(_ => CompareTwoFilesAsync(), _ => CanExecute() && !string.IsNullOrWhiteSpace(CompareFile1) && !string.IsNullOrWhiteSpace(CompareFile2), HandleException);
         }
 
-        private async Task BrowseForFolderAsync()
+        private void HandleException(System.Exception ex)
         {
-            var result = await _dialogService.OpenFolderPickerAsync("Select Folder to Compare");
-            if (result != null)
-            {
-                CompareFolder = result;
-            }
+            _loggingService.Log($"An unexpected error occurred: {ex.ToString()}", LogCategory.Error);
+            _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
         }
 
-        private async Task BrowseForFile1Async()
+        private bool CanExecute()
         {
-            var result = await _dialogService.OpenFilePickerAsync("Select File 1");
-            if (result != null)
-            {
-                CompareFile1 = result;
-            }
-        }
-
-        private async Task BrowseForFile2Async()
-        {
-            var result = await _dialogService.OpenFilePickerAsync("Select File 2");
-            if (result != null)
-            {
-                CompareFile2 = result;
-            }
+            return !IsComparing;
         }
 
         private async Task CompareDumpsAsync()
         {
-            if (string.IsNullOrWhiteSpace(CompareFolder) || !Directory.Exists(CompareFolder))
+            if (string.IsNullOrWhiteSpace(CompareFolder) || !System.IO.Directory.Exists(CompareFolder))
             {
                 await _dialogService.ShowMessageAsync("Error", "Please select a valid folder.");
                 return;
@@ -137,14 +127,18 @@ namespace S7_Csharp_Utility.ViewModels
             IsComparing = true;
             try
             {
-                _logger.LogInformation("Starting folder comparison for {Folder}", CompareFolder);
-                var progress = new Progress<string>(message => _logger.LogInformation(message));
-                var report = await _fileComparisonService.CompareFolderAsync(CompareFolder, progress);
+                var comparer = new S7.Utils.DumpComparer(message => _loggingService.Log(message, LogCategory.Info));
+                var fileHashes = await comparer.ComputeFileHashesAsync(CompareFolder);
+                var report = comparer.GenerateFolderCompareReport(fileHashes, CompareFolder);
 
-                // The ViewModel is now unaware of the specific View.
-                // It asks the IViewService to show the result.
-                await _viewService.ShowComparisonResultAsync(report);
-                _logger.LogInformation("Folder comparison complete. Results shown.");
+                var resultWindow = new Views.ComparisonResultWindow(report);
+                await resultWindow.ShowDialog(_viewService.GetMainWindow());
+                _loggingService.Log("Comparison complete. Results shown in dialog.");
+            }
+            catch (System.Exception ex)
+            {
+                await _dialogService.ShowMessageAsync("Error", $"Error during folder compare: {ex.Message}");
+                _loggingService.Log($"Error during folder compare: {ex.ToString()}", LogCategory.Error);
             }
             finally
             {
@@ -154,7 +148,7 @@ namespace S7_Csharp_Utility.ViewModels
 
         private async Task CompareTwoFilesAsync()
         {
-            if (!File.Exists(CompareFile1) || !File.Exists(CompareFile2))
+            if (!System.IO.File.Exists(CompareFile1) || !System.IO.File.Exists(CompareFile2))
             {
                 await _dialogService.ShowMessageAsync("Error", "Please select valid files.");
                 return;
@@ -163,22 +157,29 @@ namespace S7_Csharp_Utility.ViewModels
             IsComparing = true;
             try
             {
-                _logger.LogInformation("Requesting to show diff view for files: {File1} and {File2}", CompareFile1, CompareFile2);
+                _loggingService.Log($"Starting optimized comparison of files:", LogCategory.Info);
+                _loggingService.Log($"  File 1: {CompareFile1}", LogCategory.Info);
+                _loggingService.Log($"  File 2: {CompareFile2}", LogCategory.Info);
 
-                // The ViewModel no longer has a reference to any View.
-                // It asks the IViewService to show the diff view.
-                await _viewService.ShowDiffViewAsync(CompareFile1, CompareFile2);
+                var diffViewModel = new DiffViewModel(CompareFile1, CompareFile2);
+                var diffView = new Views.DiffView
+                {
+                    DataContext = diffViewModel
+                };
+                await diffView.ShowDialog(_viewService.GetMainWindow());
+
+                // Clean up the ViewModel when dialog closes
+                diffViewModel.Dispose();
+            }
+            catch (System.Exception ex)
+            {
+                await _dialogService.ShowMessageAsync("Error", $"Error during file compare: {ex.Message}");
+                _loggingService.Log($"Error during file compare: {ex.ToString()}", LogCategory.Error);
             }
             finally
             {
                 IsComparing = false;
             }
-        }
-
-        private void HandleException(Exception ex)
-        {
-            _logger.LogError(ex, "An unexpected error occurred in the File Compare view.");
-            _dialogService.ShowMessageAsync("Unexpected Error", $"An unexpected error occurred: {ex.Message}");
         }
     }
 }

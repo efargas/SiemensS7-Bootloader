@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using NModbus;
 
 namespace S7_Csharp_Utility.Services
@@ -12,7 +11,7 @@ namespace S7_Csharp_Utility.Services
     /// </summary>
     public class PowerController : IDisposable
     {
-        private readonly ILogger<PowerController> _logger;
+        private readonly Action<string, bool> _log;
         private TcpClient? _client;
         private IModbusMaster? _master;
 
@@ -21,10 +20,10 @@ namespace S7_Csharp_Utility.Services
         /// <summary>
         /// Initializes a new instance of the <see cref="PowerController"/> class.
         /// </summary>
-        /// <param name="logger">The logger instance.</param>
-        public PowerController(ILogger<PowerController> logger)
+        /// <param name="logger">The logging action.</param>
+        public PowerController(Action<string, bool> logger)
         {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _log = logger;
         }
 
         public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default)
@@ -32,7 +31,7 @@ namespace S7_Csharp_Utility.Services
             if (IsConnected) return;
             try
             {
-                _logger.LogInformation("Connecting to Modbus host {Host}:{Port}...", host, port);
+                _log($"Connecting to Modbus host {host}:{port}...", false);
                 _client = new TcpClient();
                 await _client.ConnectAsync(host, port, cancellationToken);
 
@@ -40,18 +39,18 @@ namespace S7_Csharp_Utility.Services
                 {
                     var factory = new ModbusFactory();
                     _master = factory.CreateMaster(_client);
-                    _logger.LogInformation("Successfully connected to Modbus host.");
+                    _log("Successfully connected to Modbus host.", false);
                 }
                 else
                 {
                     Dispose();
-                    _logger.LogError("Could not connect to Modbus host {Host}:{Port}.", host, port);
+                    _log($"Error: Could not connect to Modbus host {host}:{port}.", true);
                 }
             }
             catch (Exception ex)
             {
                 Dispose();
-                _logger.LogError(ex, "Error connecting to Modbus host.");
+                _log($"Error connecting to Modbus host: {ex.Message}", true);
                 throw;
             }
         }
@@ -59,9 +58,9 @@ namespace S7_Csharp_Utility.Services
         public void Disconnect()
         {
             if (!IsConnected) return;
-            _logger.LogInformation("Disconnecting from Modbus host...");
+            _log("Disconnecting from Modbus host...", false);
             Dispose();
-            _logger.LogInformation("Successfully disconnected.");
+            _log("Successfully disconnected.", false);
         }
 
         /// <summary>
@@ -74,8 +73,8 @@ namespace S7_Csharp_Utility.Services
         {
             if (!IsConnected || _master == null)
             {
-                _logger.LogError("Not connected to Modbus host. Please connect first.");
-                throw new InvalidOperationException("Not connected to Modbus host.");
+                _log("Error: Not connected to Modbus host. Please connect first.", true);
+                return;
             }
 
             string state = on ? "ON" : "OFF";
@@ -83,13 +82,12 @@ namespace S7_Csharp_Utility.Services
             {
                 ushort zeroBasedCoilAddress = (ushort)(coilAddress - 1);
                 await _master.WriteSingleCoilAsync(slaveId, zeroBasedCoilAddress, on);
-                _logger.LogInformation("Successfully turned power {State} for coil {CoilAddress}.", state, coilAddress);
+                _log($"Successfully turned power {state}.", false);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error controlling power for coil {CoilAddress}.", coilAddress);
+                _log($"Error controlling power: {ex.Message}", true);
                 Disconnect(); // Disconnect on error
-                throw;
             }
         }
 

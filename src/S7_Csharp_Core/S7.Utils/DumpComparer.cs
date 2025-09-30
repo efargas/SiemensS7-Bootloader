@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,32 +25,24 @@ namespace S7.Utils
         }
 
         /// <summary>
-        /// Computes the SHA-256 hashes of all files in a folder.
+        /// Computes the MD5 hashes of all files in a folder.
         /// </summary>
         /// <param name="folderPath">The path to the folder.</param>
         /// <returns>A dictionary mapping hashes to a list of file paths.</returns>
         public async Task<Dictionary<string, List<string>>> ComputeFileHashesAsync(string folderPath)
         {
+            var hashes = new Dictionary<string, List<string>>();
             var files = Directory.GetFiles(folderPath, "*");
-            var hashTasks = files.Select(async file =>
+            foreach (var file in files)
             {
                 _progressReporter?.Invoke($"Hashing {Path.GetFileName(file)}...");
-                var hash = await ComputeFileHashAsync(file);
-                return new { File = file, Hash = hash };
-            });
-
-            var results = await Task.WhenAll(hashTasks);
-
-            var hashes = new Dictionary<string, List<string>>();
-            foreach (var result in results)
-            {
-                if (!hashes.ContainsKey(result.Hash))
+                string hashString = await ComputeFileHashAsync(file);
+                if (!hashes.ContainsKey(hashString))
                 {
-                    hashes[result.Hash] = new List<string>();
+                    hashes[hashString] = new List<string>();
                 }
-                hashes[result.Hash].Add(result.File);
+                hashes[hashString].Add(file);
             }
-
             return hashes;
         }
 
@@ -92,9 +84,9 @@ namespace S7.Utils
             sb.AppendLine($"📅 Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine();
 
-            sb.AppendLine("📋 FILES AND THEIR SHA-256 HASHES:");
+            sb.AppendLine("📋 FILES AND THEIR MD5 HASHES:");
             sb.AppendLine("-" + new string('-', 80));
-            sb.AppendLine($"{"File Name",-30} {"Size",-12} {"SHA-256 Hash",-64}");
+            sb.AppendLine($"{"File Name",-30} {"Size",-12} {"MD5 Hash",-32}");
             sb.AppendLine("-" + new string('-', 80));
 
             foreach (var filePath in allFiles.OrderBy(f => Path.GetFileName(f)))
@@ -107,12 +99,12 @@ namespace S7.Utils
                 }
                 else
                 {
-                    sb.AppendLine($"{fileName,-30} {"Error",-12} {"[ERROR COMPUTING HASH]",-64}");
+                    sb.AppendLine($"{fileName,-30} {"Error",-12} {"[ERROR COMPUTING HASH]",-32}");
                 }
             }
 
             sb.AppendLine();
-            sb.AppendLine("🔗 DUPLICATE GROUPS (Files with identical SHA-256 hashes):");
+            sb.AppendLine("🔗 DUPLICATE GROUPS (Files with identical MD5 hashes):");
             sb.AppendLine("-" + new string('-', 60));
 
             int groupNum = 1;
@@ -125,7 +117,7 @@ namespace S7.Utils
                 duplicateFiles += flist.Count;
 
                 sb.AppendLine($"Group {groupNum++} - {flist.Count} identical files:");
-                sb.AppendLine($"  �� SHA-256: {hash.ToUpperInvariant()}");
+                sb.AppendLine($"  �� MD5: {hash.ToUpperInvariant()}");
 
                 foreach (var filePath in flist.OrderBy(f => Path.GetFileName(f)))
                 {
@@ -159,6 +151,8 @@ namespace S7.Utils
         /// <summary>
         /// Formats a file size in bytes to a human-readable string.
         /// </summary>
+        /// <param name="bytes">The file size in bytes.</param>
+        /// <returns>A formatted file size string.</returns>
         private static string FormatFileSize(long bytes)
         {
             if (bytes == 0) return "0 B";
@@ -179,6 +173,9 @@ namespace S7.Utils
         /// <summary>
         /// Calculates potential space savings from removing duplicate files.
         /// </summary>
+        /// <param name="hashes">The dictionary of hashes and file paths.</param>
+        /// <param name="fileToSize">The dictionary mapping file names to sizes.</param>
+        /// <returns>A formatted string showing potential space savings.</returns>
         private static string CalculateSpaceSavings(Dictionary<string, List<string>> hashes, Dictionary<string, long> fileToSize)
         {
             long totalSavings = 0;
@@ -191,6 +188,7 @@ namespace S7.Utils
                     var fileName = Path.GetFileName(duplicateFiles[0]);
                     if (fileToSize.TryGetValue(fileName, out var fileSize))
                     {
+                        // Savings = (number of duplicates - 1) * file size
                         totalSavings += (duplicateFiles.Count - 1) * fileSize;
                     }
                 }
@@ -200,16 +198,16 @@ namespace S7.Utils
         }
 
         /// <summary>
-        /// Computes the SHA-256 hash of a file.
+        /// Computes the MD5 hash of a file.
         /// </summary>
         /// <param name="path">The path to the file.</param>
-        /// <returns>The SHA-256 hash of the file.</returns>
+        /// <returns>The MD5 hash of the file.</returns>
         public async Task<string> ComputeFileHashAsync(string path)
         {
-            using (var sha256 = SHA256.Create())
+            using (var md5 = MD5.Create())
             using (var stream = File.OpenRead(path))
             {
-                var hashBytes = await sha256.ComputeHashAsync(stream);
+                var hashBytes = await md5.ComputeHashAsync(stream);
                 return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
             }
         }

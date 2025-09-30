@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using S7.Net;
+using S7.Net.Channels;
 using S7.Net.Interfaces;
 using System;
 using System.IO;
@@ -14,46 +15,33 @@ namespace S7.Core.Commands
     public class MemoryDumpCommandHandler : CommandHandler<MemoryDumpOptions>
     {
         private readonly PayloadManager _payloadManager;
-        private readonly ICommunicationChannelFactory _channelFactory;
-        private readonly IPlcClientFactory _plcClientFactory;
-        private readonly IPlcMemoryAccessor? _testPlcClient; // Use the most specific interface needed for testing
-        private readonly ICommunicationChannel? _testChannel;
+        private readonly PlcClient? _plcClient;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MemoryDumpCommandHandler"/> class.
+        /// Initializes a new instance of the MemoryDumpCommandHandler class.
         /// </summary>
-        public MemoryDumpCommandHandler(
-            ILogger<MemoryDumpCommandHandler> logger,
-            PayloadManager payloadManager,
-            ICommunicationChannelFactory channelFactory,
-            IPlcClientFactory plcClientFactory)
+        /// <param name="logger">The logger instance</param>
+        /// <param name="payloadManager">The payload manager for loading dumper payload</param>
+        public MemoryDumpCommandHandler(ILogger<MemoryDumpCommandHandler> logger, PayloadManager payloadManager)
             : base(logger)
         {
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
-            _channelFactory = channelFactory ?? throw new ArgumentNullException(nameof(channelFactory));
-            _plcClientFactory = plcClientFactory ?? throw new ArgumentNullException(nameof(plcClientFactory));
         }
 
-        /// <summary>
-        /// Internal constructor for testing purposes.
-        /// </summary>
-        internal MemoryDumpCommandHandler(
-            ILogger<MemoryDumpCommandHandler> logger,
-            PayloadManager payloadManager,
-            ICommunicationChannel testChannel,
-            IPlcMemoryAccessor testPlcClient) // Depend on the interface
+        private readonly ICommunicationChannel? _testChannel;
+
+        internal MemoryDumpCommandHandler(ILogger<MemoryDumpCommandHandler> logger, PayloadManager payloadManager, ICommunicationChannel testChannel)
             : base(logger)
         {
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
             _testChannel = testChannel;
-            _testPlcClient = testPlcClient;
-            _channelFactory = null!; // Not used when a test channel is provided
-            _plcClientFactory = null!; // Not used when a test client is provided
         }
 
         /// <summary>
         /// Validates the memory dump options.
         /// </summary>
+        /// <param name="options">The options to validate</param>
+        /// <returns>A validation result</returns>
         protected override ValidationResult ValidateOptions(MemoryDumpOptions options)
         {
             var baseValidation = base.ValidateOptions(options);
@@ -62,6 +50,7 @@ namespace S7.Core.Commands
 
             var errors = new System.Collections.Generic.List<string>();
 
+            // Validate output directory exists or can be created
             try
             {
                 var outputDir = Path.GetDirectoryName(options.OutputPath);
@@ -75,12 +64,39 @@ namespace S7.Core.Commands
                 errors.Add($"Cannot create output directory: {ex.Message}");
             }
 
+            // Validate payload path exists
             if (!Directory.Exists(options.PayloadPath))
             {
                 errors.Add($"Payload directory does not exist: {options.PayloadPath}");
             }
 
-            // ... (rest of validation is unchanged)
+            // Validate communication channel configuration
+            if (options.ChannelConfig.Mode.Equals("TCP", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(options.ChannelConfig.Host))
+                {
+                    errors.Add("TCP host is required when using TCP communication mode");
+                }
+            }
+            else if (options.ChannelConfig.Mode.Equals("Serial", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(options.ChannelConfig.SerialPort))
+                {
+                    errors.Add("Serial port is required when using Serial communication mode");
+                }
+            }
+            else
+            {
+                errors.Add($"Unsupported communication mode: {options.ChannelConfig.Mode}");
+            }
+
+            // Check if output file already exists and overwrite is not allowed
+            var outputFilename = GenerateOutputFilename(options);
+            var fullOutputPath = Path.Combine(options.OutputPath, outputFilename);
+            if (File.Exists(fullOutputPath) && !options.OverwriteExisting)
+            {
+                errors.Add($"Output file already exists and overwrite is not allowed: {fullOutputPath}");
+            }
 
             return errors.Count > 0 ? ValidationResult.Failure(errors) : ValidationResult.Success();
         }
@@ -88,14 +104,17 @@ namespace S7.Core.Commands
         /// <summary>
         /// Executes the memory dump command.
         /// </summary>
+        /// <param name="options">The command options</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>A command result with the output file path</returns>
         public override async Task<CommandResult> ExecuteAsync(MemoryDumpOptions options, CancellationToken cancellationToken)
         {
-            var channel = _testChannel ?? _channelFactory.Create(options.ChannelConfig);
-            // The factory now handles client creation and its dependencies.
-            var plcClient = _testPlcClient ?? _plcClientFactory.Create(channel);
-
+            ICommunicationChannel? channel = null;
             try
             {
+                LogProgress("Creating communication channel", options.CorrelationId);
+                channel = _testChannel ?? CreateCommunicationChannel(options.ChannelConfig);
+
                 LogProgress("Connecting to PLC", options.CorrelationId);
                 await channel.ConnectAsync().ConfigureAwait(false);
 
@@ -106,8 +125,11 @@ namespace S7.Core.Commands
 
                 LogProgress("Connection established successfully", options.CorrelationId);
 
+                var plcClient = _plcClient ?? new PlcClient(channel, message =>
+                    Logger.LogInformation("PLC: {Message} [CorrelationId: {CorrelationId}]", message, options.CorrelationId));
+
                 LogProgress("Loading memory dumper payload", options.CorrelationId);
-                var dumperPayload = await _payloadManager.GetMemoryDumperPayloadAsync().ConfigureAwait(false);
+                var dumperPayload = await _payloadManager.GetMemoryDumperPayloadAsync(options.PayloadPath).ConfigureAwait(false);
                 Logger.LogDebug("Loaded dumper payload: {PayloadSize} bytes [CorrelationId: {CorrelationId}]",
                     dumperPayload.Length, options.CorrelationId);
 
@@ -138,6 +160,7 @@ namespace S7.Core.Commands
                 await File.WriteAllBytesAsync(partialFilePath, dumpedData, cancellationToken).ConfigureAwait(false);
                 File.Move(partialFilePath, fullOutputPath, true);
 
+
                 Logger.LogInformation("Memory dump saved successfully: {FilePath} ({FileSize} bytes) in {Duration:F1}s [CorrelationId: {CorrelationId}]",
                     fullOutputPath, dumpedData.Length, stopwatch.Elapsed.TotalSeconds, options.CorrelationId);
 
@@ -157,21 +180,39 @@ namespace S7.Core.Commands
             }
             finally
             {
-                // Dispose the concrete client if we created it. The test client's lifecycle is managed by the test.
-                if (plcClient is IDisposable disposableClient && plcClient != _testPlcClient)
+                if (channel != null)
                 {
-                    disposableClient.Dispose();
-                }
-                if (channel != _testChannel)
-                {
-                    channel.Dispose();
+                    LogProgress("Disconnecting from PLC", options.CorrelationId);
+                    channel.Disconnect();
                 }
             }
         }
 
         /// <summary>
+        /// Creates a communication channel based on the configuration.
+        /// </summary>
+        /// <param name="config">The channel configuration</param>
+        /// <returns>A communication channel instance</returns>
+        private static ICommunicationChannel CreateCommunicationChannel(CommunicationChannelConfig config)
+        {
+            return config.Mode.ToUpperInvariant() switch
+            {
+                "TCP" => new TcpChannel(config.Host ?? "localhost", config.Port),
+                "SERIAL" => new SerialChannel(
+                    config.SerialPort ?? throw new ArgumentException("Serial port is required for serial communication"),
+                    config.BaudRate,
+                    config.Parity,
+                    config.StopBits,
+                    config.FlowControl),
+                _ => throw new ArgumentException($"Unsupported communication mode: {config.Mode}")
+            };
+        }
+
+        /// <summary>
         /// Generates the output filename for the memory dump.
         /// </summary>
+        /// <param name="options">The command options</param>
+        /// <returns>The generated filename</returns>
         private static string GenerateOutputFilename(MemoryDumpOptions options)
         {
             if (!string.IsNullOrWhiteSpace(options.CustomFilename))
@@ -189,10 +230,29 @@ namespace S7.Core.Commands
     /// </summary>
     public class MemoryDumpResult
     {
+        /// <summary>
+        /// Gets or sets the path to the output file.
+        /// </summary>
         public string OutputFilePath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the number of bytes that were dumped.
+        /// </summary>
         public uint BytesDumped { get; set; }
+
+        /// <summary>
+        /// Gets or sets the duration of the operation in seconds.
+        /// </summary>
         public double DurationSeconds { get; set; }
+
+        /// <summary>
+        /// Gets or sets the starting address that was dumped.
+        /// </summary>
         public uint Address { get; set; }
+
+        /// <summary>
+        /// Gets or sets the length that was requested to be dumped.
+        /// </summary>
         public uint Length { get; set; }
     }
 }
