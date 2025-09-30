@@ -1,7 +1,5 @@
-﻿using S7_Csharp_Utility.Commands;
-using S7_Csharp_Utility.Extensions;
+using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Interfaces;
-using S7.Utils;
 using System;
 using System.IO;
 using System.Text;
@@ -11,10 +9,13 @@ using System.Windows.Input;
 
 namespace S7_Csharp_Utility.ViewModels
 {
+    /// <summary>
+    /// The view model for the firmware unpacking functionality.
+    /// </summary>
     public class FirmwareUnpackerViewModel : ViewModelBase, IDisposable
     {
-        private readonly S7UpdateUnpacker _unpacker = new S7UpdateUnpacker();
         private readonly IDialogService _dialogService;
+        private readonly IFirmwareUnpackingService _unpackingService;
         private CancellationTokenSource? _cancellationTokenSource;
 
         private string _firmwarePath = "";
@@ -42,13 +43,7 @@ namespace S7_Csharp_Utility.ViewModels
         public bool IsUnpackButtonEnabled
         {
             get => _isUnpackButtonEnabled;
-            set
-            {
-                if (SetProperty(ref _isUnpackButtonEnabled, value))
-                {
-                    (UnpackFirmwareCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                }
-            }
+            set => SetProperty(ref _isUnpackButtonEnabled, value);
         }
 
         private bool _isBusy = false;
@@ -59,8 +54,8 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 if (SetProperty(ref _isBusy, value))
                 {
-                    (SelectFirmwareCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                    (UnpackFirmwareCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)SelectFirmwareCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)UnpackFirmwareCommand).RaiseCanExecuteChanged();
                     (CancelCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
@@ -77,24 +72,15 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand UnpackFirmwareCommand { get; }
         public ICommand CancelCommand { get; }
 
-        public FirmwareUnpackerViewModel(IDialogService? dialogService, string? extractionPath)
+        public FirmwareUnpackerViewModel(IDialogService dialogService, IFirmwareUnpackingService unpackingService, string? extractionPath)
         {
-            _dialogService = dialogService ?? new Services.DialogService(); // Fallback
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+            _unpackingService = unpackingService ?? throw new ArgumentNullException(nameof(unpackingService));
             ExtractionPath = extractionPath ?? "";
 
-            SelectFirmwareCommand = new RelayCommand(_ => SelectFirmware(), _ => !IsBusy);
-            UnpackFirmwareCommand = new RelayCommand(_ => UnpackFirmware(), _ => IsUnpackButtonEnabled && !IsBusy);
+            SelectFirmwareCommand = new AsyncRelayCommand(SelectFirmwareAsync, _ => !IsBusy, HandleException);
+            UnpackFirmwareCommand = new AsyncRelayCommand(UnpackFirmwareAsync, _ => IsUnpackButtonEnabled && !IsBusy, HandleException);
             CancelCommand = new RelayCommand(_ => CancelOperation(), _ => IsBusy);
-        }
-
-        private void SelectFirmware()
-        {
-            StartOperation(DoSelectFirmwareAsync).FireAndForget(ex => FirmwareMetadataText = $"Error: {ex.Message}");
-        }
-
-        private void UnpackFirmware()
-        {
-            StartOperation(DoUnpackFirmwareAsync).FireAndForget(ex => _dialogService.ShowMessageAsync("Error", $"Error: {ex.Message}"));
         }
 
         private void CancelOperation()
@@ -102,25 +88,34 @@ namespace S7_Csharp_Utility.ViewModels
             _cancellationTokenSource?.Cancel();
         }
 
-        private async Task StartOperation(Func<CancellationToken, Task> operation)
+        private async Task SelectFirmwareAsync()
         {
+            IsBusy = true;
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
 
-            IsBusy = true;
             try
             {
-                await operation(_cancellationTokenSource.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // Operation was cancelled, this is expected.
-                FirmwareMetadataText = "Operation cancelled.";
-            }
-            catch (Exception ex)
-            {
-                // Handle or re-throw other exceptions
-                FirmwareMetadataText = $"An unexpected error occurred: {ex.Message}";
+                var filePath = await _dialogService.ShowOpenFileDialogAsync("Select Firmware File", "upd", "UPD Files");
+                if (filePath == null) return;
+                token.ThrowIfCancellationRequested();
+
+                FirmwarePath = filePath;
+                FirmwareMetadataText = "Parsing...";
+                IsUnpackButtonEnabled = false;
+
+                var metadata = await _unpackingService.ParseMetadataAsync(FirmwarePath, token);
+                token.ThrowIfCancellationRequested();
+
+                var sb = new StringBuilder();
+                sb.AppendLine($"Found {metadata.Count} components:");
+                foreach (var entry in metadata)
+                {
+                    sb.AppendLine($" - Name: {entry.Name}, Size: {entry.Size}, CRC: {entry.Crc:X8}");
+                }
+                FirmwareMetadataText = sb.ToString();
+                IsUnpackButtonEnabled = true;
             }
             finally
             {
@@ -128,51 +123,56 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private async Task DoSelectFirmwareAsync(CancellationToken cancellationToken)
-        {
-            var filePath = await _dialogService.ShowOpenFileDialogAsync("Select Firmware File", "upd", "UPD Files");
-            if (filePath == null) return;
-
-            FirmwarePath = filePath;
-            FirmwareMetadataText = "Parsing...";
-            IsUnpackButtonEnabled = false;
-
-            var metadata = await _unpacker.ParseMetadataAsync(FirmwarePath, cancellationToken);
-
-            var sb = new StringBuilder();
-            sb.AppendLine($"Found {metadata.Count} components:");
-            foreach (var entry in metadata)
-            {
-                sb.AppendLine($" - Name: {entry.Name}, Size: {entry.Size}, CRC: {entry.Crc:X8}");
-            }
-            FirmwareMetadataText = sb.ToString();
-            IsUnpackButtonEnabled = true;
-        }
-
-        private async Task DoUnpackFirmwareAsync(CancellationToken cancellationToken)
+        private async Task UnpackFirmwareAsync()
         {
             if (string.IsNullOrWhiteSpace(FirmwarePath)) return;
 
-            string destinationFolder;
-            if (!string.IsNullOrWhiteSpace(ExtractionPath))
+            IsBusy = true;
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            var token = _cancellationTokenSource.Token;
+
+            try
             {
-                Directory.CreateDirectory(ExtractionPath);
-                destinationFolder = ExtractionPath;
+                string destinationFolder;
+                if (!string.IsNullOrWhiteSpace(ExtractionPath))
+                {
+                    Directory.CreateDirectory(ExtractionPath);
+                    destinationFolder = ExtractionPath;
+                }
+                else
+                {
+                    var folderPath = await _dialogService.OpenFolderPickerAsync("Select Destination Folder");
+                    if (folderPath == null) return;
+                    destinationFolder = folderPath;
+                }
+                token.ThrowIfCancellationRequested();
+
+                string output = Path.Combine(destinationFolder, Path.GetFileName(FirmwarePath) + ".unpacked.bin");
+
+                UnpackProgress = 0;
+                var progress = new Progress<double>(p => UnpackProgress = p);
+
+                await _unpackingService.UnpackAsync(FirmwarePath, output, progress, token);
+                await _dialogService.ShowMessageAsync("Success", $"Unpacked to: {output}");
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private void HandleException(Exception ex)
+        {
+            if (ex is OperationCanceledException)
+            {
+                FirmwareMetadataText = "Operation cancelled.";
             }
             else
             {
-                var folderPath = await _dialogService.OpenFolderPickerAsync("Select Destination Folder");
-                if (folderPath == null) return;
-                destinationFolder = folderPath;
+                FirmwareMetadataText = $"An error occurred: {ex.Message}";
+                _dialogService.ShowMessageAsync("Error", $"An unexpected error occurred: {ex.Message}");
             }
-
-            string output = Path.Combine(destinationFolder, Path.GetFileName(FirmwarePath) + ".unpacked.bin");
-
-            UnpackProgress = 0;
-            var progress = new Progress<double>(p => UnpackProgress = p);
-
-            await _unpacker.UnpackAsync(FirmwarePath, output, progress, cancellationToken);
-            await _dialogService.ShowMessageAsync("Success", $"Unpacked to: {output}");
         }
 
         public void Dispose()

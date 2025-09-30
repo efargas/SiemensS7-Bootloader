@@ -1,6 +1,6 @@
-﻿#nullable enable
+#nullable enable
+using Microsoft.Extensions.Logging;
 using S7_Csharp_Utility.Commands;
-using S7_Csharp_Utility.Extensions;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
 using System;
@@ -21,7 +21,7 @@ namespace S7_Csharp_Utility.ViewModels
     {
         private readonly SocatService _socatService;
         private readonly IDialogService _dialogService;
-        private readonly LoggingService _loggingService;
+        private readonly ILogger<PlcConnectionViewModel> _logger;
 
         /// <summary>
         /// Occurs when the socat status changes.
@@ -29,293 +29,166 @@ namespace S7_Csharp_Utility.ViewModels
         public event Action<string>? SocatStatusChanged;
 
         private string _plcHost = "localhost";
-        /// <summary>
-        /// Gets or sets the PLC host.
-        /// </summary>
         [Required]
         public string PlcHost
         {
             get => _plcHost;
-            set
-            {
-                _plcHost = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _plcHost, value);
         }
 
         private int _plcPort = 102;
-        /// <summary>
-        /// Gets or sets the PLC port.
-        /// </summary>
         [Range(1, 65535)]
         public int PlcPort
         {
             get => _plcPort;
-            set
-            {
-                _plcPort = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _plcPort, value);
         }
 
-        /// <summary>
-        /// Gets the available communication modes.
-        /// </summary>
         public ObservableCollection<string> CommunicationModes { get; } = new ObservableCollection<string> { "TCP (socat)", "Serial" };
         private string? _selectedCommunicationMode = "TCP (socat)";
-        /// <summary>
-        /// Gets or sets the selected communication mode.
-        /// </summary>
         public string? SelectedCommunicationMode
         {
             get => _selectedCommunicationMode;
-            set
-            {
-                if (_selectedCommunicationMode != value)
-                {
-                    _selectedCommunicationMode = value;
-                    OnPropertyChanged();
-                }
-            }
+            set => SetProperty(ref _selectedCommunicationMode, value);
         }
 
-        /// <summary>
-        /// Gets the available serial ports.
-        /// </summary>
         public ObservableCollection<string> AvailableSerialPorts { get; } = new ObservableCollection<string>();
         private string? _selectedSerialPort = string.Empty;
-        /// <summary>
-        /// Gets or sets the selected serial port.
-        /// </summary>
         public string? SelectedSerialPort
         {
             get => _selectedSerialPort;
-            set
-            {
-                _selectedSerialPort = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _selectedSerialPort, value);
         }
 
         private int _socatTcpPort = 1238;
-        /// <summary>
-        /// Gets or sets the socat TCP port.
-        /// </summary>
         public int SocatTcpPort
         {
             get => _socatTcpPort;
-            set
-            {
-                _socatTcpPort = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _socatTcpPort, value);
         }
 
         private bool _socatVerbose = true;
-        /// <summary>
-        /// Gets or sets a value indicating whether socat verbose logging is enabled.
-        /// </summary>
         public bool SocatVerbose
         {
             get => _socatVerbose;
-            set { _socatVerbose = value; OnPropertyChanged(); }
+            set => SetProperty(ref _socatVerbose, value);
         }
 
         private bool _socatHexDump = true;
-        /// <summary>
-        /// Gets or sets a value indicating whether socat hex dump is enabled.
-        /// </summary>
         public bool SocatHexDump
         {
             get => _socatHexDump;
-            set { _socatHexDump = value; OnPropertyChanged(); }
+            set => SetProperty(ref _socatHexDump, value);
         }
 
         private int _socatBlockSize = 4;
-        /// <summary>
-        /// Gets or sets the socat block size.
-        /// </summary>
         public int SocatBlockSize
         {
             get => _socatBlockSize;
-            set
-            {
-                _socatBlockSize = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _socatBlockSize, value);
         }
 
         private string _socatStatus = "Stopped";
-        /// <summary>
-        /// Gets or sets the socat status.
-        /// </summary>
         public string SocatStatus
         {
             get => _socatStatus;
             set
             {
-                _socatStatus = value;
-                OnPropertyChanged();
-                ((AsyncRelayCommand)StartSocatCommand).RaiseCanExecuteChanged();
-                ((AsyncRelayCommand)StopSocatCommand).RaiseCanExecuteChanged();
-                SocatStatusChanged?.Invoke(value);
+                if (SetProperty(ref _socatStatus, value))
+                {
+                    ((AsyncRelayCommand)StartSocatCommand).RaiseCanExecuteChanged();
+                    ((AsyncRelayCommand)StopSocatCommand).RaiseCanExecuteChanged();
+                    SocatStatusChanged?.Invoke(value);
+                }
             }
         }
 
-        /// <summary>
-        /// Gets the available baud rates.
-        /// </summary>
         public ObservableCollection<int> AvailableBaudRates { get; } = new ObservableCollection<int> { 9600, 19200, 38400, 57600, 115200 };
         private int _selectedBaudRate = 38400;
-        /// <summary>
-        /// Gets or sets the selected baud rate.
-        /// </summary>
         public int SelectedBaudRate
         {
             get => _selectedBaudRate;
-            set
-            {
-                _selectedBaudRate = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _selectedBaudRate, value);
         }
 
-        /// <summary>
-        /// Gets the available parities.
-        /// </summary>
         public ObservableCollection<Parity> AvailableParities { get; } = new ObservableCollection<Parity>(Enum.GetValues(typeof(Parity)).Cast<Parity>());
         private Parity _selectedParity = Parity.Even;
-        /// <summary>
-        /// Gets or sets the selected parity.
-        /// </summary>
         public Parity SelectedParity
         {
             get => _selectedParity;
-            set
-            {
-                _selectedParity = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _selectedParity, value);
         }
 
-        /// <summary>
-        /// Gets the available stop bits.
-        /// </summary>
         public ObservableCollection<StopBits> AvailableStopBits { get; } = new ObservableCollection<StopBits>(Enum.GetValues(typeof(StopBits)).Cast<StopBits>());
         private StopBits _selectedStopBits = StopBits.One;
-        /// <summary>
-        /// Gets or sets the selected stop bits.
-        /// </summary>
         public StopBits SelectedStopBits
         {
             get => _selectedStopBits;
-            set
-            {
-                _selectedStopBits = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _selectedStopBits, value);
         }
 
-        /// <summary>
-        /// Gets the available flow controls.
-        /// </summary>
         public ObservableCollection<Handshake> AvailableFlowControls { get; } = new ObservableCollection<Handshake>(Enum.GetValues(typeof(Handshake)).Cast<Handshake>());
         private Handshake _selectedFlowControl = Handshake.None;
-        /// <summary>
-        /// Gets or sets the selected flow control.
-        /// </summary>
         public Handshake SelectedFlowControl
         {
             get => _selectedFlowControl;
-            set
-            {
-                _selectedFlowControl = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _selectedFlowControl, value);
         }
 
-        /// <summary>
-        /// Gets the command to start socat.
-        /// </summary>
         public ICommand StartSocatCommand { get; }
-        /// <summary>
-        /// Gets the command to stop socat.
-        /// </summary>
         public ICommand StopSocatCommand { get; }
-        /// <summary>
-        /// Gets the command to refresh the serial ports.
-        /// </summary>
         public ICommand RefreshSerialPortsCommand { get; }
-        /// <summary>
-        /// Gets the command to show the socat log.
-        /// </summary>
         public ICommand ShowSocatLogCommand { get; }
-        /// <summary>
-        /// Gets the command to check the socat processes.
-        /// </summary>
         public ICommand CheckSocatProcessesCommand { get; }
-        /// <summary>
-        /// Gets the command to kill the socat processes.
-        /// </summary>
         public ICommand KillSocatProcessesCommand { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PlcConnectionViewModel"/> class.
-        /// </summary>
-        public PlcConnectionViewModel(SocatService socatService, IDialogService dialogService, LoggingService loggingService)
+        public PlcConnectionViewModel(SocatService socatService, IDialogService dialogService, ILogger<PlcConnectionViewModel> logger)
         {
-            _socatService = socatService;
-            _dialogService = dialogService;
-            _loggingService = loggingService;
+            _socatService = socatService ?? throw new ArgumentNullException(nameof(socatService));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            StartSocatCommand = new AsyncRelayCommand(_ => StartSocatAsync(), _ => SocatStatus != "Running");
-            StopSocatCommand = new AsyncRelayCommand(_ => StopSocatAsync(), _ => SocatStatus == "Running");
-            RefreshSerialPortsCommand = new RelayCommand(_ => RefreshSerialPorts());
-            ShowSocatLogCommand = new RelayCommand(_ => _dialogService.ShowSocatLogWindow());
-            CheckSocatProcessesCommand = new RelayCommand(_ => CheckSocatProcesses(), _ => true);
-            KillSocatProcessesCommand = new RelayCommand(_ => KillSocatProcesses(), _ => true);
+            StartSocatCommand = new AsyncRelayCommand(StartSocatAsync, _ => SocatStatus != "Running", HandleException);
+            StopSocatCommand = new AsyncRelayCommand(StopSocatAsync, _ => SocatStatus == "Running", HandleException);
+            RefreshSerialPortsCommand = new AsyncRelayCommand(RefreshSerialPortsAsync, _ => true, HandleException);
+            ShowSocatLogCommand = new RelayCommand(() => _dialogService.ShowSocatLogWindow());
+            CheckSocatProcessesCommand = new AsyncRelayCommand(CheckSocatProcessesAsync, _ => true, HandleException);
+            KillSocatProcessesCommand = new AsyncRelayCommand(KillSocatProcessesAsync, _ => true, HandleException);
 
-            RefreshSerialPorts();
+            // Initial load
+            _ = RefreshSerialPortsAsync();
         }
 
-        private void CheckSocatProcesses()
+        private async Task CheckSocatProcessesAsync()
         {
-            Task.Run(() =>
-            {
-                var pids = SocatService.GetSocatProcessIds();
-                if (pids.Length == 0)
-                    _loggingService.Log("No running socat instances detected.", LogCategory.Info);
-                else
-                    _loggingService.Log($"Socat running instances: {string.Join(", ", pids)}", LogCategory.Info);
-            }).FireAndForget(ex => _loggingService.Log($"Error checking socat processes: {ex.Message}", LogCategory.Error));
+            var pids = await Task.Run(() => SocatService.GetSocatProcessIds());
+            if (pids.Length == 0)
+                _logger.LogInformation("No running socat instances detected.");
+            else
+                _logger.LogInformation("Socat running instances: {Pids}", string.Join(", ", pids));
         }
 
-        private void KillSocatProcesses()
+        private async Task KillSocatProcessesAsync()
         {
-            Task.Run(() =>
-            {
-                SocatService.KillAllSocatProcesses(s => _loggingService.Log(s, LogCategory.Info));
-            }).FireAndForget(ex => _loggingService.Log($"Error killing socat processes: {ex.Message}", LogCategory.Error));
+            await Task.Run(() => SocatService.KillAllSocatProcesses(message => _logger.LogInformation(message)));
+            _logger.LogInformation("All socat processes terminated.");
         }
 
-        private void RefreshSerialPorts()
+        private async Task RefreshSerialPortsAsync()
         {
-            Task.Run(() =>
+            var ports = await Task.Run(() => SerialPort.GetPortNames());
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                var ports = System.IO.Ports.SerialPort.GetPortNames();
-                Dispatcher.UIThread.Post(() =>
+                AvailableSerialPorts.Clear();
+                foreach (var port in ports)
                 {
-                    AvailableSerialPorts.Clear();
-                    foreach (var port in ports)
-                    {
-                        AvailableSerialPorts.Add(port);
-                    }
-                    if (AvailableSerialPorts.Any())
-                    {
-                        SelectedSerialPort = AvailableSerialPorts[0];
-                    }
-                });
-            }).FireAndForget(ex => _loggingService.Log($"Error refreshing serial ports: {ex.Message}", LogCategory.Error));
+                    AvailableSerialPorts.Add(port);
+                }
+                if (AvailableSerialPorts.Any() && string.IsNullOrEmpty(SelectedSerialPort))
+                {
+                    SelectedSerialPort = AvailableSerialPorts[0];
+                }
+            });
         }
 
         private async Task StartSocatAsync()
@@ -325,38 +198,26 @@ namespace S7_Csharp_Utility.ViewModels
                 await _dialogService.ShowMessageAsync("Error", "Please select a serial port.");
                 return;
             }
-
-            try
-            {
-                await Task.Run(() => _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize));
-                SocatStatus = "Running";
-            }
-            catch (Exception ex)
-            {
-                _loggingService.Log($"Error starting socat: {ex.ToString()}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"Error starting socat: {ex.Message}");
-                SocatStatus = "Error";
-            }
+            SocatStatus = "Starting...";
+            await Task.Run(() => _socatService.Start(SelectedSerialPort, SocatTcpPort, SocatVerbose, SocatHexDump, SocatBlockSize));
+            SocatStatus = "Running";
         }
 
-        private Task StopSocatAsync()
+        private async Task StopSocatAsync()
         {
-            return Task.Run(async () =>
+            SocatStatus = "Stopping...";
+            await Task.Run(() => _socatService.Stop());
+            SocatStatus = "Stopped";
+        }
+
+        private void HandleException(Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred in the PLC Connection view.");
+            _dialogService.ShowMessageAsync("Error", ex.Message);
+            if (SocatStatus != "Running")
             {
-                try
-                {
-                    _socatService.Stop();
-                    Dispatcher.UIThread.Post(() => SocatStatus = "Stopped");
-                }
-                catch (Exception ex)
-                {
-                    _loggingService.Log($"Error stopping socat: {ex.ToString()}", LogCategory.Error);
-                    await Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        await _dialogService.ShowMessageAsync("Error", $"Error stopping socat: {ex.Message}");
-                    });
-                }
-            });
+                SocatStatus = "Error";
+            }
         }
     }
 }
