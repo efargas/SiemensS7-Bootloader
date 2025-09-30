@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using S7_Csharp_Utility.Commands;
 using S7_Csharp_Utility.Interfaces;
+using S7_Csharp_Utility.Models;
 using S7_Csharp_Utility.Services;
 using System;
 using System.Collections.ObjectModel;
@@ -22,6 +23,7 @@ namespace S7_Csharp_Utility.ViewModels
         private readonly SocatService _socatService;
         private readonly IDialogService _dialogService;
         private readonly ILogger<PlcConnectionViewModel> _logger;
+        private readonly ISerialPortService _serialPortService;
 
         /// <summary>
         /// Occurs when the socat status changes.
@@ -142,11 +144,16 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand CheckSocatProcessesCommand { get; }
         public ICommand KillSocatProcessesCommand { get; }
 
-        public PlcConnectionViewModel(SocatService socatService, IDialogService dialogService, ILogger<PlcConnectionViewModel> logger)
+        public PlcConnectionViewModel(
+            SocatService socatService,
+            IDialogService dialogService,
+            ILogger<PlcConnectionViewModel> logger,
+            ISerialPortService serialPortService)
         {
             _socatService = socatService ?? throw new ArgumentNullException(nameof(socatService));
             _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _serialPortService = serialPortService ?? throw new ArgumentNullException(nameof(serialPortService));
 
             StartSocatCommand = new AsyncRelayCommand(StartSocatAsync, _ => SocatStatus != "Running", HandleException);
             StopSocatCommand = new AsyncRelayCommand(StopSocatAsync, _ => SocatStatus == "Running", HandleException);
@@ -155,7 +162,6 @@ namespace S7_Csharp_Utility.ViewModels
             CheckSocatProcessesCommand = new AsyncRelayCommand(CheckSocatProcessesAsync, _ => true, HandleException);
             KillSocatProcessesCommand = new AsyncRelayCommand(KillSocatProcessesAsync, _ => true, HandleException);
 
-            // Initial load
             _ = RefreshSerialPortsAsync();
         }
 
@@ -176,7 +182,7 @@ namespace S7_Csharp_Utility.ViewModels
 
         private async Task RefreshSerialPortsAsync()
         {
-            var ports = await Task.Run(() => SerialPort.GetPortNames());
+            var ports = await _serialPortService.GetAvailablePortNamesAsync();
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 AvailableSerialPorts.Clear();
@@ -218,6 +224,36 @@ namespace S7_Csharp_Utility.ViewModels
             {
                 SocatStatus = "Error";
             }
+        }
+
+        public void LoadFromAppConfig(ApplicationConfiguration config)
+        {
+            PlcHost = config.PlcHost ?? "localhost";
+            PlcPort = config.PlcPort;
+            SelectedSerialPort = config.SelectedSerialPort ?? string.Empty;
+            SocatTcpPort = config.SocatTcpPort;
+            SelectedBaudRate = config.SelectedBaudRate;
+            SelectedParity = config.SelectedParity;
+            SelectedStopBits = config.SelectedStopBits;
+            SelectedFlowControl = config.SelectedFlowControl;
+            SocatVerbose = config.SocatVerbose;
+            SocatHexDump = config.SocatHexDump;
+            SocatBlockSize = config.SocatBlockSize;
+        }
+
+        public void SaveToAppConfig(ApplicationConfiguration config)
+        {
+            config.PlcHost = PlcHost;
+            config.PlcPort = PlcPort;
+            config.SelectedSerialPort = SelectedSerialPort;
+            config.SocatTcpPort = SocatTcpPort;
+            config.SelectedBaudRate = SelectedBaudRate;
+            config.SelectedParity = SelectedParity;
+            config.SelectedStopBits = SelectedStopBits;
+            config.SelectedFlowControl = SelectedFlowControl;
+            config.SocatVerbose = SocatVerbose;
+            config.SocatHexDump = SocatHexDump;
+            config.SocatBlockSize = SocatBlockSize;
         }
     }
 }

@@ -1,7 +1,5 @@
 using Avalonia.Controls;
 using S7_Csharp_Utility.Models;
-using S7_Csharp_Utility.Services;
-using System;
 using System.Threading.Tasks;
 
 namespace S7_Csharp_Utility.Interfaces
@@ -18,11 +16,10 @@ namespace S7_Csharp_Utility.Interfaces
         Window GetMainWindow();
 
         /// <summary>
-        /// Shows the profile management window.
+        /// Shows the profile management window as a dialog and returns the selected profile.
         /// </summary>
-        /// <param name="configService">The configuration service.</param>
-        /// <param name="onProfileSelected">The action to execute when a profile is selected.</param>
-        void ShowProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile?> onProfileSelected);
+        /// <returns>The selected device profile, or null if no profile was selected.</returns>
+        Task<DeviceProfile?> ShowProfileManagementWindowAsync();
 
         /// <summary>
         /// Shows the firmware unpacker window.

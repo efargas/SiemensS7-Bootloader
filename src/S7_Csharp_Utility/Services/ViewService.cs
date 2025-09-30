@@ -44,12 +44,15 @@ namespace S7_Csharp_Utility.Services
         }
 
         /// <inheritdoc />
-        public void ShowProfileManagementWindow(ConfigurationService configService, Action<DeviceProfile?> onProfileSelected)
+        public async Task<DeviceProfile?> ShowProfileManagementWindowAsync()
         {
             var mainWindow = GetMainWindow();
-            // This is not ideal as it depends on a concrete service, but we'll leave it for now
-            // to avoid refactoring the profile management logic, which is out of scope.
-            new ProfileManagementWindow(configService, onProfileSelected).Show(mainWindow);
+            var viewModel = _serviceProvider.GetRequiredService<ProfileManagementViewModel>();
+            var window = new ProfileManagementWindow
+            {
+                DataContext = viewModel
+            };
+            return await window.ShowDialog<DeviceProfile?>(mainWindow);
         }
 
         /// <inheritdoc />
