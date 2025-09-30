@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,11 +26,11 @@ namespace S7.Utils
         }
 
         /// <summary>
-        /// Unpacks the specified input data.
+        /// Unpacks the specified input data segment.
         /// </summary>
-        /// <param name="inputData">The input data.</param>
+        /// <param name="inputData">The input data segment.</param>
         /// <returns>The unpacked data.</returns>
-        public static byte[] Unpack(byte[] inputData)
+        public static byte[] Unpack(ArraySegment<byte> inputData)
         {
             try
             {
@@ -43,10 +43,11 @@ namespace S7.Utils
                 using (var outputStream = new MemoryStream())
                 {
                     int read = 0;
-                    if (inputData.Length < LzpOrder)
-                        throw new Exception($"Compressed chunk too short for initial LZPOrder ({inputData.Length} bytes)");
+                    if (inputData.Count < LzpOrder)
+                        throw new Exception($"Compressed chunk too short for initial LZPOrder ({inputData.Count} bytes)");
+
                     // First 4 bytes are literals
-                    outputStream.Write(inputData, 0, LzpOrder);
+                    outputStream.Write(inputData.Array, inputData.Offset, LzpOrder);
                     read += LzpOrder;
 
                     var cBytes = new byte[4];
@@ -57,14 +58,14 @@ namespace S7.Utils
                     hashTable[h] = (uint)outputStream.Position;
                     outputStream.Seek(0, SeekOrigin.End);
 
-                    while (read < inputData.Length)
+                    while (read < inputData.Count)
                     {
-                        byte mask = inputData[read++];
+                        byte mask = inputData.Array[inputData.Offset + read++];
                         for (int i = 0; i < 8; i++)
                         {
-                            if (read >= inputData.Length) break;
+                            if (read >= inputData.Count) break;
 
-                            byte b = inputData[read++];
+                            byte b = inputData.Array[inputData.Offset + read++];
 
                             if ((mask & 0x80u) == 0)
                             {
@@ -90,11 +91,8 @@ namespace S7.Utils
                                 h = HashIndex(c);
                                 int pos = (int)hashTable[h];
                                 hashTable[h] = (uint)outputStream.Position;
-                                // C code: if match pointer is bad, skip match (produce output as-is)
                                 if (pos < 0 || pos + b > buffer.Length || pos > (int)outputStream.Position - LzpOrder)
                                 {
-                                    // Optionally, warn or log debug (but don't throw)
-                                    // Skipping invalid match block, copying nothing
                                     continue;
                                 }
                                 for (int j = 0; j < b; j++)
@@ -121,23 +119,10 @@ namespace S7.Utils
     [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 10)]
     public struct FwRawEntry
     {
-        /// <summary>
-        /// The size of the entry.
-        /// </summary>
         public uint Size;
-        /// <summary>
-        /// The CRC of the entry.
-        /// </summary>
         public uint Crc;
-        /// <summary>
-        /// The name of the entry as a byte array.
-        /// </summary>
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
         public byte[] NameBytes;
-
-        /// <summary>
-        /// The name of the entry.
-        /// </summary>
         public string Name => Encoding.ASCII.GetString(NameBytes).TrimEnd('\0');
     }
 
@@ -146,21 +131,9 @@ namespace S7.Utils
     /// </summary>
     public class FwEntry
     {
-        /// <summary>
-        /// The offset of the entry.
-        /// </summary>
         public long Offset { get; set; }
-        /// <summary>
-        /// The size of the entry.
-        /// </summary>
         public uint Size { get; set; }
-        /// <summary>
-        /// The CRC of the entry.
-        /// </summary>
         public uint Crc { get; set; }
-        /// <summary>
-        /// The name of the entry.
-        /// </summary>
         public string Name { get; set; } = string.Empty;
     }
 
@@ -173,12 +146,6 @@ namespace S7.Utils
         private const int FwNumEntries = 4;
         private const int FwEntryNameSize = 6;
 
-        /// <summary>
-        /// Parses the metadata of a firmware file asynchronously.
-        /// </summary>
-        /// <param name="filePath">The path to the firmware file.</param>
-        /// <param name="cancellationToken">A token to cancel the operation.</param>
-        /// <returns>A list of raw firmware entries.</returns>
         public async Task<List<FwRawEntry>> ParseMetadataAsync(string filePath, CancellationToken cancellationToken = default)
         {
             var entries = new List<FwRawEntry>();
@@ -215,13 +182,6 @@ namespace S7.Utils
             return entries;
         }
 
-        /// <summary>
-        /// Unpacks a firmware file asynchronously.
-        /// </summary>
-        /// <param name="inputPath">The path to the firmware file.</param>
-        /// <param name="outputPath">The path to write the unpacked file to.</param>
-        /// <param name="progress">An optional progress reporter.</param>
-        /// <param name="cancellationToken">A token to cancel the operation.</param>
         public async Task UnpackAsync(string inputPath, string outputPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
         {
             var metadata = await ParseMetadataAsync(inputPath, cancellationToken).ConfigureAwait(false);
@@ -230,7 +190,7 @@ namespace S7.Utils
 
             foreach (var rawEntry in metadata)
             {
-                if (rawEntry.Name == "A00000")
+                if (rawEntry.Name == S7UtilsConstants.FIRMWARE_CODE_SECTION_NAME)
                 {
                     targetEntry = new FwEntry
                     {
@@ -246,7 +206,7 @@ namespace S7.Utils
 
             if (targetEntry == null)
             {
-                throw new Exception("Could not find firmware code section 'A00000'.");
+                throw new Exception($"Could not find firmware code section '{S7UtilsConstants.FIRMWARE_CODE_SECTION_NAME}'.");
             }
 
             using (var fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous))
@@ -256,7 +216,7 @@ namespace S7.Utils
 
                 var sectionNameBuffer = new byte[FwEntryNameSize];
                 await fs.ReadAsync(sectionNameBuffer, 0, sectionNameBuffer.Length, cancellationToken).ConfigureAwait(false);
-                if (Encoding.ASCII.GetString(sectionNameBuffer) != "A00000")
+                if (Encoding.ASCII.GetString(sectionNameBuffer) != S7UtilsConstants.FIRMWARE_CODE_SECTION_NAME)
                 {
                     throw new Exception("Invalid section header.");
                 }
@@ -279,7 +239,7 @@ namespace S7.Utils
                     if (compressedChunk.Length < 2)
                         throw new Exception($"Compressed chunk is too short ({compressedChunk.Length} bytes) at offset {fs.Position - compressedSize}.");
 
-                    var decompressed = LzpDecompressor.Unpack(compressedChunk.Skip(2).ToArray());
+                    var decompressed = LzpDecompressor.Unpack(new ArraySegment<byte>(compressedChunk, 2, compressedChunk.Length - 2));
 
                     await outFile.WriteAsync(decompressed, 0, decompressed.Length, cancellationToken).ConfigureAwait(false);
                     readBytes += compressedSize + sizeof(uint);

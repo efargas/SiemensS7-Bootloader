@@ -6,7 +6,14 @@ namespace S7.Net.Interfaces
     /// <summary>
     /// Defines a communication channel for the PLC.
     /// </summary>
-    public interface ICommunicationChannel
+using System;
+
+namespace S7.Net.Interfaces
+    {
+        /// <summary>
+    /// Defines a communication channel for the PLC.
+    /// </summary>
+    public interface ICommunicationChannel : IDisposable
     {
         /// <summary>
         /// Indicates whether the channel is connected.

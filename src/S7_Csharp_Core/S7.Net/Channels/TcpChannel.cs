@@ -14,6 +14,7 @@ namespace S7.Net.Channels
         private readonly int _port;
         private TcpClient? _client;
         private NetworkStream? _stream;
+    private bool _disposed;
 
         /// <summary>
         /// Indicates whether the channel is connected.
@@ -51,10 +52,43 @@ namespace S7.Net.Channels
         /// </summary>
         public void Disconnect()
         {
-            _stream?.Close();
-            _client?.Close();
+        if (_stream != null)
+        {
+            _stream.Close();
+            _stream.Dispose();
             _stream = null;
+        }
+        if (_client != null)
+        {
+            _client.Close();
+            _client.Dispose();
             _client = null;
+        }
+    }
+
+    /// <summary>
+    /// Disposes the channel resources.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        System.GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Disposes the channel resources.
+    /// </summary>
+    /// <param name="disposing">True if called from Dispose(), false if called from a finalizer.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            Disconnect();
+        }
+
+        _disposed = true;
         }
 
         /// <summary>
