@@ -4,13 +4,13 @@ version: '1.0'
 date_created: '2025-09-30'
 last_updated: '2025-09-30'
 owner: 'Jules'
-status: 'Planned'
+status: 'Completed'
 tags: ['refactor', 'chore', 'architecture', 'performance', 'bug']
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
 
 This implementation plan outlines the steps required to address the findings from the `dotnet_best_practices_review.md` report. The goal is to refactor the existing codebase to improve resource management, error handling, performance, and overall code quality by adhering to modern .NET best practices.
 
@@ -32,10 +32,10 @@ This implementation plan outlines the steps required to address the findings fro
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Implement `IDisposable` in `S7.Net/PlcClient.cs` to properly dispose of the underlying `ICommunicationChannel`. | | |
-| TASK-002 | Implement `IDisposable` in `S7.Net/PlcProtocol.cs` to ensure its resources are managed correctly. | | |
-| TASK-003 | Update `S7.Core.Commands/MemoryDumpCommandHandler.cs` to wrap the `ICommunicationChannel` instance in a `using` block. | | |
-| TASK-004 | Refactor `S7.Net/PlcClient.cs` to handle `ChecksumMismatchException` consistently, re-throwing it instead of returning null or logging-and-continuing. | | |
+| TASK-001 | Implement `IDisposable` in `S7.Net/PlcClient.cs` to properly dispose of the underlying `ICommunicationChannel`. | ✅ | 2025-09-30 |
+| TASK-002 | Implement `IDisposable` in `S7.Net/PlcProtocol.cs` to ensure its resources are managed correctly. | ✅ | 2025-09-30 |
+| TASK-003 | Update `S7.Core.Commands/MemoryDumpCommandHandler.cs` to wrap the `ICommunicationChannel` instance in a `using` block. | ✅ | 2025-09-30 |
+| TASK-004 | Refactor `S7.Net/PlcClient.cs` to handle `ChecksumMismatchException` consistently, re-throwing it instead of returning null or logging-and-continuing. | ✅ | 2025-09-30 |
 
 ### Implementation Phase 2: Code Quality and Constants
 
@@ -43,8 +43,8 @@ This implementation plan outlines the steps required to address the findings fro
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-005 | Move all magic values (e.g., "MFGT1", subprotocol constants) from `S7.Net/PlcClient.cs` to `S7.Net/PlcConstants.cs`. | | |
-| TASK-006 | Create a new constants class within `S7.Utils` and move the magic string `"A00000"` from `S7.Utils/S7UpdateUnpacker.cs` into it. | | |
+| TASK-005 | Move all magic values (e.g., "MFGT1", subprotocol constants) from `S7.Net/PlcClient.cs` to `S7.Net/PlcConstants.cs`. | ✅ | 2025-09-30 |
+| TASK-006 | Create a new constants class within `S7.Utils` and move the magic string `"A00000"` from `S7.Utils/S7UpdateUnpacker.cs` into it. | ✅ | 2025-09-30 |
 
 ### Implementation Phase 3: Utility Layer Improvements
 
@@ -52,9 +52,9 @@ This implementation plan outlines the steps required to address the findings fro
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-007 | In `S7.Utils/DumpComparer.cs`, replace the `MD5.Create()` implementation with `SHA256.Create()`. | | |
-| TASK-008 | Modify `S7.Utils/DumpComparer.cs` to process files in parallel using `Task.WhenAll` to speed up hashing. | | |
-| TASK-009 | Modify `S7.Utils/S7UpdateUnpacker.cs` and `LzpDecompressor` to accept an array segment or offset, avoiding the `.Skip(2).ToArray()` allocation in the unpack loop. | | |
+| TASK-007 | In `S7.Utils/DumpComparer.cs`, replace the `MD5.Create()` implementation with `SHA256.Create()`. | ✅ | 2025-09-30 |
+| TASK-008 | Modify `S7.Utils/DumpComparer.cs` to process files in parallel using `Task.WhenAll` to speed up hashing. | ✅ | 2025-09-30 |
+| TASK-009 | Modify `S7.Utils/S7UpdateUnpacker.cs` and `LzpDecompressor` to accept an array segment or offset, avoiding the `.Skip(2).ToArray()` allocation in the unpack loop. | ✅ | 2025-09-30 |
 
 ### Implementation Phase 4: Dependency Injection Refactoring
 
@@ -62,8 +62,18 @@ This implementation plan outlines the steps required to address the findings fro
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-010 | Refactor `S7.Core.Commands/MemoryDumpCommandHandler.cs` to accept an `ICommunicationChannelFactory` via DI instead of creating channels directly. | | |
-| TASK-011 | Convert the static `S7.Services/VirtualFileReaderFactory.cs` into an instance-based service (`IVirtualFileReaderFactory`) that can be registered in a DI container. | | |
+| TASK-010 | Refactor `S7.Core.Commands/MemoryDumpCommandHandler.cs` to accept an `ICommunicationChannelFactory` via DI instead of creating channels directly. | ✅ | 2025-09-30 |
+| TASK-011 | Convert the static `S7.Services/VirtualFileReaderFactory.cs` into an instance-based service (`IVirtualFileReaderFactory`) that can be registered in a DI container. | ✅ | 2025-09-30 |
+
+### Implementation Phase 5: Advanced Refinements
+
+- GOAL-005: Further improve logging, error handling, and performance based on a secondary review.
+
+| Task | Description | Completed | Date |
+|------|-------------|-----------|------|
+| TASK-012 | Refactor `PlcClient` and `PlcProtocol` to use `ILogger` instead of `Action<string>` for structured logging. | ✅ | 2025-09-30 |
+| TASK-013 | Create custom exception types (e.g., `PlcHandshakeFailedException`, `PlcCommunicationException`) and replace generic `Exception` throws in `PlcClient`. | ✅ | 2025-09-30 |
+| TASK-014 | Optimize `LzpDecompressor` by allowing the hash table to be passed in as a parameter, avoiding repeated allocations. | ✅ | 2025-09-30 |
 
 ## 3. Alternatives
 
@@ -100,13 +110,3 @@ This implementation plan outlines the steps required to address the findings fro
 ## 8. Related Specifications / Further Reading
 
 - [dotnet_best_practices_review.md](file://dotnet_best_practices_review.md)
-
-### Implementation Phase 5: Advanced Refinements
-
-- GOAL-005: Further improve logging, error handling, and performance based on a secondary review.
-
-| Task | Description | Completed | Date |
-|------|-------------|-----------|------|
-| TASK-012 | Refactor `PlcClient` and `PlcProtocol` to use `ILogger` instead of `Action<string>` for structured logging. | | |
-| TASK-013 | Create custom exception types (e.g., `PlcHandshakeFailedException`, `PlcCommunicationException`) and replace generic `Exception` throws in `PlcClient`. | | |
-| TASK-014 | Optimize `LzpDecompressor` by allowing the hash table to be passed in as a parameter, avoiding repeated allocations. | | |
