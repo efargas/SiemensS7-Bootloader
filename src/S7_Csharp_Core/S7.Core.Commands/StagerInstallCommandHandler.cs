@@ -16,39 +16,28 @@ namespace S7.Core.Commands
         private readonly PayloadManager _payloadManager;
         private readonly IPowerController _powerController;
         private readonly ICommunicationChannelFactory _channelFactory;
-        private readonly ILogger<PlcClient> _plcClientLogger;
-        private readonly ILogger<PlcProtocol> _plcProtocolLogger;
+        private readonly IPlcClientFactory _plcClientFactory;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StagerInstallCommandHandler"/> class.
         /// </summary>
-        /// <param name="logger">The logger for this command handler.</param>
-        /// <param name="payloadManager">The payload manager for loading stager payloads.</param>
-        /// <param name="powerController">The power controller for power cycling operations.</param>
-        /// <param name="channelFactory">The factory for creating communication channels.</param>
-        /// <param name="plcClientLogger">The logger for the PLC client.</param>
-        /// <param name="plcProtocolLogger">The logger for the PLC protocol.</param>
         public StagerInstallCommandHandler(
             ILogger<StagerInstallCommandHandler> logger,
             PayloadManager payloadManager,
             IPowerController powerController,
             ICommunicationChannelFactory channelFactory,
-            ILogger<PlcClient> plcClientLogger,
-            ILogger<PlcProtocol> plcProtocolLogger)
+            IPlcClientFactory plcClientFactory)
             : base(logger)
         {
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
             _powerController = powerController ?? throw new ArgumentNullException(nameof(powerController));
             _channelFactory = channelFactory ?? throw new ArgumentNullException(nameof(channelFactory));
-            _plcClientLogger = plcClientLogger ?? throw new ArgumentNullException(nameof(plcClientLogger));
-            _plcProtocolLogger = plcProtocolLogger ?? throw new ArgumentNullException(nameof(plcProtocolLogger));
+            _plcClientFactory = plcClientFactory ?? throw new ArgumentNullException(nameof(plcClientFactory));
         }
 
         /// <summary>
         /// Validates the stager installation options.
         /// </summary>
-        /// <param name="options">The options to validate.</param>
-        /// <returns>A validation result.</returns>
         protected override ValidationResult ValidateOptions(StagerInstallOptions options)
         {
             var baseValidation = base.ValidateOptions(options);
@@ -92,9 +81,6 @@ namespace S7.Core.Commands
         /// <summary>
         /// Executes the stager installation command.
         /// </summary>
-        /// <param name="options">The command options.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>A command result with installation details.</returns>
         protected override async Task<CommandResult> ExecuteAsync(StagerInstallOptions options, CancellationToken cancellationToken)
         {
             ICommunicationChannel? channel = null;
@@ -119,7 +105,7 @@ namespace S7.Core.Commands
                 channel = _channelFactory.Create(options.ChannelConfig);
 
                 LogProgress($"Connecting to PLC at {options.ChannelConfig.Host}:{options.ChannelConfig.Port}", options.CorrelationId);
-                await channel.ConnectAsync().ConfigureAwait(false);
+                await channel.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
                 if (!channel.IsConnected)
                 {
@@ -128,18 +114,12 @@ namespace S7.Core.Commands
 
                 LogProgress("Connection established successfully", options.CorrelationId);
 
-                plcClient = new PlcClient(channel, _plcClientLogger, _plcProtocolLogger);
+                plcClient = _plcClientFactory.Create(channel);
 
                 if (options.PerformHandshake)
                 {
                     LogProgress("Performing handshake", options.CorrelationId);
-                    var handshakeSuccess = await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
-                    
-                    if (!handshakeSuccess)
-                    {
-                        return CommandResult.Failure("Handshake with PLC failed");
-                    }
-
+                    await plcClient.PerformHandshakeAsync(cancellationToken).ConfigureAwait(false);
                     LogProgress("Handshake completed successfully", options.CorrelationId);
                 }
 
@@ -153,7 +133,7 @@ namespace S7.Core.Commands
 
                 LogProgress("Loading stager payload", options.CorrelationId);
                 var stagerPayload = await _payloadManager.GetStagerPayloadAsync().ConfigureAwait(false);
-                Logger.LogDebug("Loaded stager payload: {PayloadSize} bytes [CorrelationId: {CorrelationId}]", 
+                Logger.LogDebug("Loaded stager payload: {PayloadSize} bytes [CorrelationId: {CorrelationId}]",
                     stagerPayload.Length, options.CorrelationId);
 
                 LogProgress("Installing stager payload", options.CorrelationId);
@@ -189,28 +169,5 @@ namespace S7.Core.Commands
                 channel?.Dispose();
             }
         }
-    }
-
-    /// <summary>
-    /// Interface for power controller operations.
-    /// </summary>
-    public interface IPowerController
-    {
-        /// <summary>
-        /// Performs a power cycle operation.
-        /// </summary>
-        Task PowerCycleAsync(string host, int port, int coil, int delaySeconds, CancellationToken cancellationToken = default);
-    }
-
-    /// <summary>
-    /// Result data for stager installation operations.
-    /// </summary>
-    public class StagerInstallResult
-    {
-        public bool IsInstalled { get; set; }
-        public uint PayloadSize { get; set; }
-        public double DurationSeconds { get; set; }
-        public string? VersionInfo { get; set; }
-        public bool HandshakePerformed { get; set; }
     }
 }

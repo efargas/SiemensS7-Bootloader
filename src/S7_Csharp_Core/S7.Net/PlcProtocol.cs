@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -30,21 +31,31 @@ namespace S7.Net
         /// </summary>
         public async Task SendPacketAsync(byte[] contents, int step = 2, int sleepMs = 10, CancellationToken cancellationToken = default)
         {
-            await Task.Delay(10, cancellationToken);
+            await Task.Delay(PlcConstants.SEND_PACKET_DELAY_MS, cancellationToken);
 
-            var packet = ProtocolUtils.EncodePacket(contents);
-
-            _logger.LogTrace("-> SEND: {Packet}", BitConverter.ToString(packet).Replace("-", ""));
-
-            for (int i = 0; i < packet.Length; i += step)
+            var packetBuffer = ArrayPool<byte>.Shared.Rent(contents.Length + 2);
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                int bytesToSend = Math.Min(step, packet.Length - i);
-                await _channel.WriteAsync(packet, i, bytesToSend, cancellationToken);
-                if (sleepMs > 0)
+                var packetSpan = new Span<byte>(packetBuffer);
+                var packetLength = ProtocolUtils.EncodePacket(contents, packetSpan);
+                var packetToSend = packetSpan.Slice(0, packetLength);
+
+                _logger.LogTrace("-> SEND: {Packet}", Convert.ToHexString(packetToSend));
+
+                for (int i = 0; i < packetToSend.Length; i += step)
                 {
-                    await Task.Delay(sleepMs, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    int bytesToSend = Math.Min(step, packetToSend.Length - i);
+                    await _channel.WriteAsync(packetBuffer, i, bytesToSend, cancellationToken);
+                    if (sleepMs > 0)
+                    {
+                        await Task.Delay(sleepMs, cancellationToken);
+                    }
                 }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(packetBuffer);
             }
         }
 
@@ -74,25 +85,42 @@ namespace S7.Net
         /// </summary>
         public async Task<byte[]?> ReceivePacketAsync(CancellationToken cancellationToken = default)
         {
-            var lengthByte = new byte[1];
-            await _channel.ReadAsync(lengthByte, 0, 1, cancellationToken);
-            int bytesToRead = lengthByte[0];
-
-            if (bytesToRead == 0) return Array.Empty<byte>();
-
-            var fullPacket = new byte[bytesToRead + 1];
-            fullPacket[0] = lengthByte[0];
-
-            int bytesRead = 0;
-            while (bytesRead < bytesToRead)
+            var lengthBuffer = ArrayPool<byte>.Shared.Rent(1);
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                bytesRead += await _channel.ReadAsync(fullPacket, 1 + bytesRead, bytesToRead - bytesRead, cancellationToken);
+                await _channel.ReadAsync(lengthBuffer, 0, 1, cancellationToken);
+                int bytesToRead = lengthBuffer[0];
+
+                if (bytesToRead == 0) return Array.Empty<byte>();
+
+                var fullPacketBuffer = ArrayPool<byte>.Shared.Rent(bytesToRead + 1);
+                try
+                {
+                    fullPacketBuffer[0] = (byte)bytesToRead;
+
+                    int bytesRead = 0;
+                    while (bytesRead < bytesToRead)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        bytesRead += await _channel.ReadAsync(fullPacketBuffer, 1 + bytesRead, bytesToRead - bytesRead, cancellationToken);
+                    }
+
+                    var fullPacketSpan = new ReadOnlySpan<byte>(fullPacketBuffer, 0, bytesToRead + 1);
+                    _logger.LogTrace("<- RECV: {Packet}", Convert.ToHexString(fullPacketSpan));
+
+                    // The DecodePacket method will allocate the final byte[] for the caller.
+                    // The large intermediate buffer is pooled.
+                    return ProtocolUtils.DecodePacket(fullPacketSpan.ToArray());
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(fullPacketBuffer);
+                }
             }
-
-            _logger.LogTrace("<- RECV: {Packet}", BitConverter.ToString(fullPacket).Replace("-", ""));
-
-            return ProtocolUtils.DecodePacket(fullPacket);
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(lengthBuffer);
+            }
         }
     }
 }

@@ -4,6 +4,8 @@ using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using S7.Net;
+using S7.Net.Interfaces;
+using S7_Csharp_Utility.Core.Commands;
 using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.ViewModels;
@@ -66,16 +68,16 @@ namespace S7_Csharp_Utility
             services.AddLogging(configure =>
             {
                 configure.AddDebug(); // Add other providers as needed
-                // In a real app, you would add a provider that writes to the LogViewModel
             });
 
             // --- Core Services from S7.Net ---
             services.AddSingleton<PayloadManager>(sp =>
                 new PayloadManager(AppContext.BaseDirectory, sp.GetRequiredService<ILogger<PayloadManager>>()));
             services.AddSingleton<ICommunicationChannelFactory, S7.Net.Channels.CommunicationChannelFactory>();
+            services.AddSingleton<IPlcClientFactory, PlcClientFactory>();
 
             // --- Utility Project Services ---
-            services.AddSingleton<ConfigurationService>(); // Used by other services
+            services.AddSingleton<ConfigurationService>();
             services.AddSingleton<SocatService>();
             services.AddSingleton<IPowerController, PowerControllerAdapter>();
             services.AddSingleton<IFirmwareUnpackingService, FirmwareUnpackingService>();
@@ -85,6 +87,10 @@ namespace S7_Csharp_Utility
             services.AddSingleton<IApplicationStateService, ApplicationStateService>();
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<IViewService, ViewService>();
+
+            // --- Command Handlers ---
+            services.AddTransient<MemoryDumpCommandHandler>();
+            services.AddTransient<StagerInstallCommandHandler>();
 
             // --- ViewModels ---
             services.AddSingleton<MainWindowViewModel>();

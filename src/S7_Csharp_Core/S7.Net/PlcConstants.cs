@@ -16,6 +16,11 @@
         public const int MAX_PACKET_SIZE = 254;
 
         /// <summary>
+        /// The safety delay to wait before sending a packet.
+        /// </summary>
+        public const int SEND_PACKET_DELAY_MS = 10;
+
+        /// <summary>
         /// The starting address of the stager in IRAM.
         /// </summary>
         public const uint IRAM_STAGER_START = 0x10030100;
