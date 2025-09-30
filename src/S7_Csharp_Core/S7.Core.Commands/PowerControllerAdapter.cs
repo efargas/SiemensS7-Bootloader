@@ -7,30 +7,36 @@ namespace S7.Core.Commands
 {
     /// <summary>
     /// Adapter for the existing PowerController to implement IPowerController interface.
+    /// Manages a persistent connection to the power controller.
     /// </summary>
     public class PowerControllerAdapter : IPowerController, IDisposable
     {
         private readonly ILogger<PowerControllerAdapter> _logger;
-        private S7_Csharp_Utility.Services.PowerController? _powerController;
+        private readonly S7_Csharp_Utility.Services.PowerController _powerController;
+        private string? _currentHost;
+        private int _currentPort;
+        private bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the PowerControllerAdapter class.
         /// </summary>
-        /// <param name="logger">The logger instance</param>
-        public PowerControllerAdapter(ILogger<PowerControllerAdapter> logger)
+        /// <param name="logger">The logger for the adapter.</param>
+        /// <param name="powerControllerLogger">The logger for the underlying power controller.</param>
+        public PowerControllerAdapter(ILogger<PowerControllerAdapter> logger, ILogger<S7_Csharp_Utility.Services.PowerController> powerControllerLogger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _powerController = new S7_Csharp_Utility.Services.PowerController(powerControllerLogger ?? throw new ArgumentNullException(nameof(powerControllerLogger)));
         }
 
         /// <summary>
         /// Performs a power cycle operation.
         /// </summary>
-        /// <param name="host">The Modbus host</param>
-        /// <param name="port">The Modbus port</param>
-        /// <param name="coil">The coil address</param>
-        /// <param name="delaySeconds">The delay after power cycle</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>A task representing the operation</returns>
+        /// <param name="host">The Modbus host.</param>
+        /// <param name="port">The Modbus port.</param>
+        /// <param name="coil">The coil address.</param>
+        /// <param name="delaySeconds">The delay after power cycle.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task representing the operation.</returns>
         public async Task PowerCycleAsync(string host, int port, int coil, int delaySeconds, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(host);
@@ -44,29 +50,21 @@ namespace S7.Core.Commands
             if (delaySeconds < 0)
                 throw new ArgumentOutOfRangeException(nameof(delaySeconds), "Delay must be non-negative");
 
-            _logger.LogInformation("Starting power cycle operation: Host={Host}, Port={Port}, Coil={Coil}, Delay={DelaySeconds}s", 
+            _logger.LogInformation("Starting power cycle operation: Host={Host}, Port={Port}, Coil={Coil}, Delay={DelaySeconds}s",
                 host, port, coil, delaySeconds);
 
             try
             {
-                // Create a new power controller instance for this operation
-                _powerController = new S7_Csharp_Utility.Services.PowerController(
-                    (message, isError) =>
-                    {
-                        if (isError)
-                            _logger.LogError("PowerController: {Message}", message);
-                        else
-                            _logger.LogInformation("PowerController: {Message}", message);
-                    });
-
-                // Connect to the Modbus host
-                await _powerController.ConnectAsync(host, port).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (!_powerController.IsConnected)
+                // Connect or reconnect if the host/port has changed or if we are not connected.
+                if (!_powerController.IsConnected || _currentHost != host || _currentPort != port)
                 {
-                    throw new InvalidOperationException($"Failed to connect to Modbus host {host}:{port}");
+                    _powerController.Disconnect();
+                    await _powerController.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
+                    _currentHost = host;
+                    _currentPort = port;
                 }
+
+                cancellationToken.ThrowIfCancellationRequested();
 
                 // Turn power OFF
                 _logger.LogInformation("Turning power OFF (coil {Coil})", coil);
@@ -95,27 +93,10 @@ namespace S7.Core.Commands
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Power cycle operation failed");
+                // Disconnect on failure to ensure a clean state for the next attempt.
+                _powerController.Disconnect();
+                _currentHost = null;
                 throw;
-            }
-            finally
-            {
-                // Clean up the power controller
-                if (_powerController != null)
-                {
-                    try
-                    {
-                        _powerController.Disconnect();
-                        _powerController.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Error during power controller cleanup");
-                    }
-                    finally
-                    {
-                        _powerController = null;
-                    }
-                }
             }
         }
 
@@ -124,22 +105,20 @@ namespace S7.Core.Commands
         /// </summary>
         public void Dispose()
         {
-            if (_powerController != null)
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
             {
-                try
-                {
-                    _powerController.Disconnect();
-                    _powerController.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Error during disposal");
-                }
-                finally
-                {
-                    _powerController = null;
-                }
+                _powerController.Dispose();
             }
+
+            _disposed = true;
         }
     }
 }

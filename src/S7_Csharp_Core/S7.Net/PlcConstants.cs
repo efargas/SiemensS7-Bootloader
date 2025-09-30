@@ -6,9 +6,14 @@
     public static class PlcConstants
     {
         /// <summary>
-        /// The maximum length of a message that can be sent to the PLC.
+        /// The maximum length of a message that can be sent to the PLC via the stager.
         /// </summary>
-        public const int MAX_MSG_LEN = 192 - 2;
+        public const int MAX_STAGER_MSG_LEN = 192 - 2;
+
+        /// <summary>
+        /// The maximum size of the data field in a standard protocol packet.
+        /// </summary>
+        public const int MAX_PACKET_SIZE = 254;
 
         /// <summary>
         /// The starting address of the stager in IRAM.

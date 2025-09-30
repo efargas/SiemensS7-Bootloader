@@ -1,9 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using S7.Net.Exceptions;
 
 namespace S7.Net
 {
@@ -25,57 +27,50 @@ namespace S7.Net
     public class PayloadManager
     {
         private readonly string _baseDirectory;
+        private readonly ILogger<PayloadManager> _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PayloadManager"/> class.
         /// </summary>
         /// <param name="baseDirectory">The base directory where payloads are stored.</param>
-        public PayloadManager(string baseDirectory)
+        /// <param name="logger">The logger instance.</param>
+        public PayloadManager(string baseDirectory, ILogger<PayloadManager> logger)
         {
-            _baseDirectory = baseDirectory;
+            _baseDirectory = baseDirectory ?? throw new ArgumentNullException(nameof(baseDirectory));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <summary>
         /// Asynchronously scans the payloads directory and returns information about all discovered payloads.
         /// </summary>
-        /// <param name="payloadsBase">The base directory to scan for payloads.</param>
         /// <param name="cancellationToken">A token to cancel the operation.</param>
         /// <returns>A list of discovered payload information.</returns>
-        public Task<List<PayloadInfo>> ScanPayloadsAsync(string payloadsBase, CancellationToken cancellationToken = default)
+        public Task<List<PayloadInfo>> ScanPayloadsAsync(CancellationToken cancellationToken = default)
         {
             return Task.Run(() =>
             {
                 var payloads = new List<PayloadInfo>();
 
-                if (!Directory.Exists(payloadsBase))
+                if (!Directory.Exists(_baseDirectory))
                 {
-                    return payloads; // Return empty list if directory doesn't exist
+                    _logger.LogWarning("Payloads directory {Directory} does not exist.", _baseDirectory);
+                    return payloads;
                 }
 
                 try
                 {
-                    // Look for common payload file patterns
-                    var payloadPatterns = new[]
-                    {
-                        "*.bin",
-                        "stager*",
-                        "dump_mem*",
-                        "hello_*",
-                        "tic_tac_toe*"
-                    };
-
                     var foundFiles = new HashSet<string>();
 
-                    foreach (var pattern in payloadPatterns)
+                    foreach (var pattern in PayloadConstants.PAYLOAD_PATTERNS)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        foreach (var file in Directory.GetFiles(payloadsBase, pattern, SearchOption.AllDirectories))
+                        foreach (var file in Directory.GetFiles(_baseDirectory, pattern, SearchOption.AllDirectories))
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            if (foundFiles.Add(file)) // Only add if not already found
+                            if (foundFiles.Add(file))
                             {
                                 var fileInfo = new FileInfo(file);
-                                var relativePath = Path.GetRelativePath(payloadsBase, file);
+                                var relativePath = Path.GetRelativePath(_baseDirectory, file);
 
                                 payloads.Add(new PayloadInfo
                                 {
@@ -89,7 +84,6 @@ namespace S7.Net
                         }
                     }
 
-                    // Sort by type and then by name
                     payloads.Sort((a, b) =>
                     {
                         var typeComparison = a.Type.CompareTo(b.Type);
@@ -98,13 +92,13 @@ namespace S7.Net
                 }
                 catch (OperationCanceledException)
                 {
-                    // Propagate cancellation
+                    _logger.LogInformation("Payload scan was canceled.");
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    // Log error but don't throw - return what we found so far
-                    System.Diagnostics.Debug.WriteLine($"Error scanning payloads: {ex.Message}");
+                    _logger.LogError(ex, "An unexpected error occurred while scanning for payloads in {Directory}.", _baseDirectory);
+                    throw new PayloadScanException($"An error occurred while scanning for payloads in {_baseDirectory}.", ex);
                 }
 
                 return payloads;
@@ -115,9 +109,9 @@ namespace S7.Net
         /// Asynchronously gets the stager payload.
         /// </summary>
         /// <returns>The stager payload as a byte array.</returns>
-        public async Task<byte[]> GetStagerPayloadAsync(string payloadsBase)
+        public async Task<byte[]> GetStagerPayloadAsync()
         {
-            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "stager.bin", "stager" });
+            var filePath = await FindPayloadFileAsync(PayloadConstants.STAGER_NAMES);
             return await File.ReadAllBytesAsync(filePath);
         }
 
@@ -125,9 +119,9 @@ namespace S7.Net
         /// Asynchronously gets the memory dumper payload.
         /// </summary>
         /// <returns>The memory dumper payload as a byte array.</returns>
-        public async Task<byte[]> GetMemoryDumperPayloadAsync(string payloadsBase)
+        public async Task<byte[]> GetMemoryDumperPayloadAsync()
         {
-            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "dump_mem.bin", "dump_mem" });
+            var filePath = await FindPayloadFileAsync(PayloadConstants.DUMP_MEM_NAMES);
             return await File.ReadAllBytesAsync(filePath);
         }
 
@@ -140,59 +134,52 @@ namespace S7.Net
             var directory = Path.GetFileName(Path.GetDirectoryName(filePath))?.ToLowerInvariant() ?? "";
 
             if (fileName.Contains("stager") || directory.Contains("stager"))
-                return "Stager";
+                return PayloadConstants.TYPE_STAGER;
             if (fileName.Contains("dump_mem") || directory.Contains("dump_mem"))
-                return "Memory Dumper";
+                return PayloadConstants.TYPE_DUMP_MEM;
             if (fileName.Contains("hello") || directory.Contains("hello"))
-                return "Hello World";
+                return PayloadConstants.TYPE_HELLO;
             if (fileName.Contains("tic_tac_toe") || directory.Contains("tic_tac_toe"))
-                return "Tic Tac Toe";
+                return PayloadConstants.TYPE_TIC_TAC_TOE;
             if (fileName.EndsWith(".bin"))
-                return "Binary";
+                return PayloadConstants.TYPE_BINARY;
 
-            return "Unknown";
+            return PayloadConstants.TYPE_UNKNOWN;
         }
 
         /// <summary>
         /// Asynchronously and recursively searches for the payload file in the base directory.
-        /// Tries multiple possible file names in order of preference.
         /// </summary>
-        private static Task<string> FindPayloadFileAsync(string payloadsBase, string[] possibleNames)
+        private Task<string> FindPayloadFileAsync(string[] possibleNames)
         {
             return Task.Run(() =>
             {
-                if (!Directory.Exists(payloadsBase))
+                if (!Directory.Exists(_baseDirectory))
                 {
-                    throw new DirectoryNotFoundException($"Payloads directory not found: {payloadsBase}. Please check the path configuration.");
+                    throw new DirectoryNotFoundException($"Payloads directory not found: {_baseDirectory}. Please check the path configuration.");
                 }
 
                 try
                 {
-                    // Try each possible name in order
                     foreach (var fileName in possibleNames)
                     {
-                        var firstFile = Directory.EnumerateFiles(payloadsBase, fileName, SearchOption.AllDirectories).FirstOrDefault();
+                        var firstFile = Directory.EnumerateFiles(_baseDirectory, fileName, SearchOption.AllDirectories).FirstOrDefault();
                         if (firstFile != null)
                         {
-                            return firstFile; // Return first match
+                            return firstFile;
                         }
                     }
                 }
-                catch (UnauthorizedAccessException ex)
+                catch (Exception ex) when (ex is UnauthorizedAccessException || ex is DirectoryNotFoundException)
                 {
-                    throw new UnauthorizedAccessException($"Access denied to payloads directory: {payloadsBase}. {ex.Message}");
-                }
-                catch (DirectoryNotFoundException ex)
-                {
-                    throw new DirectoryNotFoundException($"Payloads directory not found: {payloadsBase}. {ex.Message}");
+                    throw new PayloadScanException($"A file system error occurred while searching for payloads in {_baseDirectory}.", ex);
                 }
 
-                // If we get here, none of the files were found
-                var allFiles = Directory.EnumerateFiles(payloadsBase, "*", SearchOption.AllDirectories)
+                var allFiles = Directory.EnumerateFiles(_baseDirectory, "*", SearchOption.AllDirectories)
                     .Select(Path.GetFileName)
                     .ToArray();
 
-                throw new FileNotFoundException($"None of the expected payload files ({string.Join(", ", possibleNames)}) found under {payloadsBase}. Available files: {string.Join(", ", allFiles)}");
+                throw new FileNotFoundException($"None of the expected payload files ({string.Join(", ", possibleNames)}) found under {_baseDirectory}. Available files: {string.Join(", ", allFiles)}");
             });
         }
     }
