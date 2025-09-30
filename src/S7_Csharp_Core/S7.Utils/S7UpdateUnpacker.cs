@@ -15,7 +15,7 @@ namespace S7.Utils
     internal static class LzpDecompressor
     {
         private const int LzpOrder = 4;
-        private const int LzpChunkSize = 0x10000; // 65536
+        public const int LzpChunkSize = 0x10000; // 65536
 
         private static uint HashIndex(uint c)
         {
@@ -29,17 +29,20 @@ namespace S7.Utils
         /// Unpacks the specified input data segment.
         /// </summary>
         /// <param name="inputData">The input data segment.</param>
+        /// <param name="hashTable">A reusable hash table to avoid allocations.</param>
         /// <returns>The unpacked data.</returns>
-        public static byte[] Unpack(ArraySegment<byte> inputData)
+        public static byte[] Unpack(ArraySegment<byte> inputData, uint[] hashTable)
         {
+            if (hashTable.Length != LzpChunkSize)
+            {
+                throw new ArgumentException($"Hash table must have a size of {LzpChunkSize}", nameof(hashTable));
+            }
+
+            // Clear the hash table for the new chunk
+            Array.Fill(hashTable, ~0u);
+
             try
             {
-                var hashTable = new uint[LzpChunkSize];
-                for (int i = 0; i < hashTable.Length; i++)
-                {
-                    hashTable[i] = ~0u;
-                }
-
                 using (var outputStream = new MemoryStream())
                 {
                     int read = 0;
@@ -209,6 +212,9 @@ namespace S7.Utils
                 throw new Exception($"Could not find firmware code section '{S7UtilsConstants.FIRMWARE_CODE_SECTION_NAME}'.");
             }
 
+            // Create the hash table once to be reused for all chunks
+            var lzpHashTable = new uint[LzpDecompressor.LzpChunkSize];
+
             using (var fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous))
             using (var outFile = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous))
             {
@@ -239,7 +245,7 @@ namespace S7.Utils
                     if (compressedChunk.Length < 2)
                         throw new Exception($"Compressed chunk is too short ({compressedChunk.Length} bytes) at offset {fs.Position - compressedSize}.");
 
-                    var decompressed = LzpDecompressor.Unpack(new ArraySegment<byte>(compressedChunk, 2, compressedChunk.Length - 2));
+                    var decompressed = LzpDecompressor.Unpack(new ArraySegment<byte>(compressedChunk, 2, compressedChunk.Length - 2), lzpHashTable);
 
                     await outFile.WriteAsync(decompressed, 0, decompressed.Length, cancellationToken).ConfigureAwait(false);
                     readBytes += compressedSize + sizeof(uint);

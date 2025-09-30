@@ -100,3 +100,13 @@ This implementation plan outlines the steps required to address the findings fro
 ## 8. Related Specifications / Further Reading
 
 - [dotnet_best_practices_review.md](file://dotnet_best_practices_review.md)
+
+### Implementation Phase 5: Advanced Refinements
+
+- GOAL-005: Further improve logging, error handling, and performance based on a secondary review.
+
+| Task | Description | Completed | Date |
+|------|-------------|-----------|------|
+| TASK-012 | Refactor `PlcClient` and `PlcProtocol` to use `ILogger` instead of `Action<string>` for structured logging. | | |
+| TASK-013 | Create custom exception types (e.g., `PlcHandshakeFailedException`, `PlcCommunicationException`) and replace generic `Exception` throws in `PlcClient`. | | |
+| TASK-014 | Optimize `LzpDecompressor` by allowing the hash table to be passed in as a parameter, avoiding repeated allocations. | | |
