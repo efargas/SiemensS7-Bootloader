@@ -8,6 +8,7 @@ using S7_Csharp_Utility.Interfaces;
 using S7_Csharp_Utility.Services;
 using S7_Csharp_Utility.ViewModels;
 using System;
+using System.IO;
 using System.Linq;
 
 namespace S7_Csharp_Utility
@@ -47,9 +48,9 @@ namespace S7_Csharp_Utility
                 desktop.MainWindow = Services.GetRequiredService<MainWindow>();
                 var mainViewModel = Services.GetRequiredService<MainWindowViewModel>();
 
-                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartup();
-                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExit();
-                desktop.Exit += OnApplicationExit;
+                desktop.MainWindow.Loaded += async (s, e) => await mainViewModel.LoadConfigurationOnStartupAsync();
+                desktop.MainWindow.Closing += async (s, e) => await mainViewModel.SaveConfigurationOnExitAsync();
+                desktop.Exit += (sender, e) => OnApplicationExit(sender, e, Services);
             }
 
             base.OnFrameworkInitializationCompleted();
@@ -65,6 +66,7 @@ namespace S7_Csharp_Utility
             services.AddLogging(configure =>
             {
                 configure.AddDebug(); // Add other providers as needed
+                // In a real app, you would add a provider that writes to the LogViewModel
             });
 
             // --- Core Services from S7.Net ---
@@ -73,20 +75,26 @@ namespace S7_Csharp_Utility
             services.AddSingleton<ICommunicationChannelFactory, S7.Net.Channels.CommunicationChannelFactory>();
 
             // --- Utility Project Services ---
-            services.AddSingleton<ConfigurationService>();
+            services.AddSingleton<ConfigurationService>(); // Used by other services
             services.AddSingleton<SocatService>();
             services.AddSingleton<IPowerController, PowerControllerAdapter>();
             services.AddSingleton<IFirmwareUnpackingService, FirmwareUnpackingService>();
             services.AddSingleton<IFileComparisonService, FileComparisonService>();
+            services.AddSingleton<IProfileManagerService, ProfileManagerService>();
+            services.AddSingleton<ISerialPortService, SerialPortService>();
+            services.AddSingleton<IApplicationStateService, ApplicationStateService>();
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<IViewService, ViewService>();
 
             // --- ViewModels ---
             services.AddSingleton<MainWindowViewModel>();
+            services.AddSingleton<LogViewModel>();
+            services.AddSingleton<SocatLogViewModel>();
             services.AddTransient<PlcConnectionViewModel>();
             services.AddTransient<ModbusPowerSupplyViewModel>();
             services.AddTransient<ConfigurationViewModel>();
             services.AddTransient<FileCompareViewModel>();
+            services.AddTransient<ProfileManagementViewModel>();
             services.AddTransient<FirmwareUnpackerViewModel>(sp =>
                 new FirmwareUnpackerViewModel(
                     sp.GetRequiredService<IDialogService>(),
@@ -101,13 +109,12 @@ namespace S7_Csharp_Utility
         /// <summary>
         /// Handles application exit by cleaning up resources and killing socat processes.
         /// </summary>
-        /// <param name="sender">The event sender.</param>
-        /// <param name="e">The event arguments.</param>
-        private static void OnApplicationExit(object? sender, EventArgs e)
+        private static void OnApplicationExit(object? sender, EventArgs e, IServiceProvider services)
         {
             try
             {
-                SocatService.KillAllSocatProcesses();
+                var socatService = services.GetRequiredService<SocatService>();
+                socatService.KillAllSocatProcesses();
             }
             catch (Exception ex)
             {
