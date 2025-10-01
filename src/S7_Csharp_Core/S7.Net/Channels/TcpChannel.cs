@@ -76,6 +76,8 @@ namespace S7.Net.Channels
         {
             if (_disposed) throw new ObjectDisposedException(GetType().FullName);
             if (_stream == null) throw new System.IO.IOException("Channel is not connected.");
+            if (count == 0) return Task.CompletedTask;
+            cancellationToken.ThrowIfCancellationRequested();
             return _stream.WriteAsync(buffer, offset, count, cancellationToken);
         }
 
