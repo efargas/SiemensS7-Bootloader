@@ -4,13 +4,13 @@ version: '1.0'
 date_created: '2025-09-30'
 last_updated: '2025-09-30'
 owner: 'Jules'
-status: 'Planned'
+status: 'In Progress'
 tags: ['refactor', 'architecture', 'performance', 'ui', 'mvvm']
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: In Progress](https://img.shields.io/badge/status-In%20Progress-yellow)
 
 This implementation plan outlines a comprehensive refactoring of the application based on the findings in the `dotnet_best_practices_review.md` document. The goal is to modernize the codebase by addressing critical issues in resource management, standardizing on architectural patterns like MVVM and Dependency Injection, improving performance, and enhancing overall code quality and maintainability.
 
@@ -33,9 +33,9 @@ This implementation plan outlines a comprehensive refactoring of the application
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Update `ICommunicationChannel` to inherit from `IDisposable`. | | |
-| TASK-002 | Implement the full `IDisposable` pattern in `TcpChannel` and `SerialChannel` to ensure underlying resources are properly disposed. | | |
-| TASK-003 | Refactor `PlcClient` to consistently re-throw critical exceptions like `ChecksumMismatchException` instead of swallowing them. | | |
+| TASK-001 | Update `ICommunicationChannel` to inherit from `IDisposable`. | ✅ | 2025-09-30 |
+| TASK-002 | Implement the full `IDisposable` pattern in `TcpChannel` and `SerialChannel` to ensure underlying resources are properly disposed. | ✅ | 2025-09-30 |
+| TASK-003 | Refactor `PlcClient` to consistently re-throw critical exceptions like `ChecksumMismatchException` instead of swallowing them. | ✅ | 2025-09-30 |
 
 ### Implementation Phase 2: Architectural Refactoring (DI & MVVM)
 
@@ -56,9 +56,9 @@ This implementation plan outlines a comprehensive refactoring of the application
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-010 | Create dedicated constants classes (`PlcConstants`, `PayloadConstants`, etc.) and move all magic strings and numbers into them. | | |
-| TASK-011 | Refactor `ApplicationConfiguration` to be a pure POCO model by moving all path resolution and default creation logic into `ConfigurationService`. | | |
-| TASK-012 | Update all consumers of `ApplicationConfiguration` to use the refactored `ConfigurationService` for path and default logic. | | |
+| TASK-010 | Create dedicated constants classes (`PlcConstants`, `PayloadConstants`, etc.) and move all magic strings and numbers into them. | ✅ | 2025-09-30 |
+| TASK-011 | Refactor `ApplicationConfiguration` to be a pure POCO model by moving all path resolution and default creation logic into `ConfigurationService`. | ✅ | 2025-09-30 |
+| TASK-012 | Update all consumers of `ApplicationConfiguration` to use the refactored `ConfigurationService` for path and default logic. | ✅ | 2025-09-30 |
 
 ### Implementation Phase 4: Utility Layer and Performance Improvements
 
@@ -66,8 +66,8 @@ This implementation plan outlines a comprehensive refactoring of the application
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-013 | In `DumpComparer.cs`, replace the MD5 hashing algorithm with SHA-256. | | |
-| TASK-014 | Refactor `DumpComparer.cs` to parallelize file hashing using `Task.WhenAll`. | | |
+| TASK-013 | In `DumpComparer.cs`, replace the MD5 hashing algorithm with SHA-256. | ✅ | 2025-09-30 |
+| TASK-014 | Refactor `DumpComparer.cs` to parallelize file hashing using `Task.WhenAll`. | ✅ | 2025-09-30 |
 | TASK-015 | Refactor `PlcProtocol` to use `ArrayPool<byte>` for its send/receive buffers to reduce memory allocations. | | |
 
 ### Implementation Phase 5: Logging Standardization

@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace S7.Net.Interfaces
@@ -6,7 +7,7 @@ namespace S7.Net.Interfaces
     /// <summary>
     /// Defines a communication channel for the PLC.
     /// </summary>
-    public interface ICommunicationChannel
+    public interface ICommunicationChannel : IDisposable
     {
         /// <summary>
         /// Indicates whether the channel is connected.
