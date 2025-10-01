@@ -72,6 +72,8 @@ namespace S7.Net.Channels
         {
             if (_disposed) throw new ObjectDisposedException(GetType().FullName);
             if (_serialPort == null) throw new System.IO.IOException("Channel is not connected.");
+            if (count == 0) return Task.FromResult(0);
+            cancellationToken.ThrowIfCancellationRequested();
             return _serialPort.BaseStream.ReadAsync(buffer, offset, count, cancellationToken);
         }
 
