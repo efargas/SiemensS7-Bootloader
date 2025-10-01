@@ -95,23 +95,38 @@ namespace S7_Csharp_Utility.Services
 
         public async Task PowerCycleAsync(string host, int port, int coil, int delaySeconds, CancellationToken cancellationToken = default)
         {
+            if (delaySeconds < 0) throw new ArgumentOutOfRangeException(nameof(delaySeconds), "Delay must be non-negative.");
+            if (delaySeconds > int.MaxValue / 1000) throw new ArgumentOutOfRangeException(nameof(delaySeconds), "Delay is too large.");
+
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!IsConnected)
             {
-                await ConnectAsync(host, port, cancellationToken);
+                await ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             _logger.LogInformation("[POWER] Turning PLC power OFF...");
-            await SetPowerAsync((ushort)coil, false);
+            await SetPowerAsync((ushort)coil, false).ConfigureAwait(false);
 
             try
             {
                 _logger.LogInformation("[POWER] Waiting {DelaySeconds} seconds before powering on...", delaySeconds);
-                await Task.Delay(delaySeconds * 1000, cancellationToken);
+                await Task.Delay(delaySeconds * 1000, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Power cycle canceled during delay; leaving power state unchanged.");
+                throw;
             }
             finally
             {
-                _logger.LogInformation("[POWER] Turning PLC power ON...");
-                await SetPowerAsync((ushort)coil, true);
+                // Only attempt to turn on if not canceled
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation("[POWER] Turning PLC power ON...");
+                    await SetPowerAsync((ushort)coil, true).ConfigureAwait(false);
+                }
             }
         }
 
