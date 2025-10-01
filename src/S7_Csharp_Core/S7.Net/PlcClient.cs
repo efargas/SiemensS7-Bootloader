@@ -478,8 +478,13 @@ namespace S7.Net
         public void Dispose()
         {
             if (_disposed) return;
-            // The creator of the PlcClient is responsible for disposing the channel.
-            // The channel is injected, so we don't dispose it here.
+
+            // The PlcClient takes ownership of the injected channel and is responsible for its disposal.
+            if (_channel is IDisposable disposableChannel)
+            {
+                disposableChannel.Dispose();
+            }
+
             _disposed = true;
         }
     }
