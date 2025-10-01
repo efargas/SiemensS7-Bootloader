@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <!-- We don't need to platform-specific builds any more -->
+    <AssemblyName>S7_CS_Utility</AssemblyName>
+    <!-- Avalonia does require this to be null -->
+    <ApplicationIcon />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.2" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.2" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.3.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.2" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.2" />
+    <PackageReference Include="DiffPlex" Version="1.9.0" />
+    <PackageReference Include="NModbus" Version="3.0.81" />
+    <PackageReference Include="System.IO.Ports" Version="9.0.9" />
+    <PackageReference Include="AvaloniaHex" Version="0.1.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="../Resources/**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Resources/%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+  <!-- Ensure all required directories exist in output -->
+  <Target Name="CreateResourceDirectories" AfterTargets="Build">
+    <MakeDir Directories="$(OutputPath)Resources\payloads" />
+    <MakeDir Directories="$(OutputPath)Resources\dumps" />
+    <MakeDir Directories="$(OutputPath)Resources\logs" />
+    <MakeDir Directories="$(OutputPath)Resources\extracted" />
+  </Target>
+
+  <ItemGroup>
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Net\S7.Net.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Utils\S7.Utils.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Services\S7.Services.csproj" />
+    <ProjectReference Include="..\S7_Csharp_Core\S7.Infrastructure\S7.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

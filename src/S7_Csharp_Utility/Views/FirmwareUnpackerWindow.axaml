@@ -1,0 +1,13 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="S7_Csharp_Utility.FirmwareUnpackerWindow"
+        Title="Firmware Unpacker"
+        Width="520" Height="350"
+        CanResize="True">
+  <StackPanel Margin="14" Spacing="10">
+    <Button Name="SelectFirmwareButton" Content="Select Firmware (.upd) File" Command="{Binding SelectFirmwareCommand}" />
+    <TextBlock Name="FirmwareMetadataTextBlock" Text="{Binding FirmwareMetadataText}" />
+    <Button Name="UnpackFirmwareButton" Content="Unpack to..." IsEnabled="{Binding IsUnpackButtonEnabled}" Command="{Binding UnpackFirmwareCommand}" />
+    <ProgressBar Value="{Binding UnpackProgress}" IsVisible="{Binding IsUnpacking}" Minimum="0" Maximum="100" />
+  </StackPanel>
+</Window>

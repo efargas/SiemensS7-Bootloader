@@ -1,0 +1,482 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:S7_Csharp_Utility.ViewModels"
+        xmlns:converters="using:S7_Csharp_Utility.Converters"
+        xmlns:controls="using:S7_Csharp_Utility.Controls"
+        x:Class="S7_Csharp_Utility.HexViewerWindow"
+        Title="Optimized Hex Viewer"
+        Width="1400"
+        Height="900"
+        MinWidth="1000"
+        MinHeight="600"
+        Background="#1A1A1A">
+    
+    <Window.Resources>
+    </Window.Resources>
+    
+    <Window.Styles>
+        <!-- Dark Theme Text Styles -->
+        <Style Selector="TextBlock.HeaderText">
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBlock.StatusText">
+            <Setter Property="Foreground" Value="#A0AEC0"/>
+        </Style>
+        <Style Selector="TextBlock.LabelText">
+            <Setter Property="Foreground" Value="#CBD5E0"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        
+        <!-- Dark Theme Panel Styles -->
+        <Style Selector="Border.InfoPanel">
+            <Setter Property="Background" Value="#2D3748"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+        <Style Selector="Border.ContentPanel">
+            <Setter Property="Background" Value="#1A202C"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="Border.ToolbarPanel">
+            <Setter Property="Background" Value="#2D3748"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+        </Style>
+        <Style Selector="Border.StatusPanel">
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+        </Style>
+        <Style Selector="Border.InspectorPanel">
+            <Setter Property="Background" Value="#252525"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+        </Style>
+        
+        <!-- Dark Theme DataGrid Styles -->
+        <Style Selector="DataGrid">
+            <Setter Property="Background" Value="#1A202C"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="GridLinesVisibility" Value="All"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#374151"/>
+            <Setter Property="VerticalGridLinesBrush" Value="#374151"/>
+        </Style>
+        <Style Selector="DataGrid DataGridColumnHeader">
+            <Setter Property="Background" Value="#374151"/>
+            <Setter Property="Foreground" Value="#F7FAFC"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        </Style>
+        <Style Selector="DataGrid DataGridRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+        </Style>
+        <Style Selector="DataGrid DataGridRow:selected">
+            <Setter Property="Background" Value="#4C51BF"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="DataGrid DataGridRow:pointerover">
+            <Setter Property="Background" Value="#2D3748"/>
+        </Style>
+        <Style Selector="DataGrid DataGridCell">
+            <Setter Property="BorderBrush" Value="#374151"/>
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+            <Setter Property="Padding" Value="8,4"/>
+        </Style>
+        
+        <!-- Dark Theme Button Styles -->
+        <Style Selector="Button.DarkButton">
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.DarkButton:pointerover">
+            <Setter Property="Opacity" Value="0.9"/>
+        </Style>
+        <Style Selector="Button.DarkButton:pressed">
+            <Setter Property="Opacity" Value="0.8"/>
+        </Style>
+        <Style Selector="Button.PrimaryButton">
+            <Setter Property="Background" Value="#4C51BF"/>
+        </Style>
+        <Style Selector="Button.SuccessButton">
+            <Setter Property="Background" Value="#38A169"/>
+        </Style>
+        <Style Selector="Button.InfoButton">
+            <Setter Property="Background" Value="#3182CE"/>
+        </Style>
+        <Style Selector="Button.SecondaryButton">
+            <Setter Property="Background" Value="#718096"/>
+        </Style>
+        <Style Selector="Button.WarningButton">
+            <Setter Property="Background" Value="#D69E2E"/>
+        </Style>
+        <Style Selector="Button.DangerButton">
+            <Setter Property="Background" Value="#E53E3E"/>
+        </Style>
+        
+        <!-- Hex Cell Button Styles -->
+        <Style Selector="Button.HexCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="FontFamily" Value="Consolas,Monaco,monospace"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="MinWidth" Value="28"/>
+            <Setter Property="MinHeight" Value="20"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.HexCell:pointerover">
+            <Setter Property="Background" Value="#374151"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+        </Style>
+        <Style Selector="Button.HexCell:pressed">
+            <Setter Property="Background" Value="#2D3748"/>
+        </Style>
+        <Style Selector="Button.HexCell.Selected">
+            <Setter Property="Background" Value="#4C51BF"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+        
+        <!-- Dark Theme Input Styles -->
+        <Style Selector="TextBox.DarkInput">
+            <Setter Property="Background" Value="#2D3748"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontFamily" Value="Consolas,Monaco,monospace"/>
+        </Style>
+        <Style Selector="TextBox.DarkInput:focus">
+            <Setter Property="BorderBrush" Value="#4C51BF"/>
+            <Setter Property="Background" Value="#374151"/>
+        </Style>
+        <Style Selector="TextBox.DarkInput:pointerover">
+            <Setter Property="BorderBrush" Value="#718096"/>
+        </Style>
+        
+        <!-- Dark Theme CheckBox Styles -->
+        <Style Selector="CheckBox.DarkCheckBox">
+            <Setter Property="Foreground" Value="#CBD5E0"/>
+        </Style>
+        
+        <!-- Dark Theme Separator Styles -->
+        <Style Selector="Separator.DarkSeparator">
+            <Setter Property="Background" Value="#4A5568"/>
+        </Style>
+        
+        <!-- Dark Theme ProgressBar Styles -->
+        <Style Selector="ProgressBar.DarkProgress">
+            <Setter Property="Background" Value="#374151"/>
+            <Setter Property="Foreground" Value="#4C51BF"/>
+            <Setter Property="Height" Value="4"/>
+            <Setter Property="CornerRadius" Value="2"/>
+        </Style>
+    </Window.Styles>
+    
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="{Binding InspectorWidth}"/>
+        </Grid.ColumnDefinitions>
+        
+        <!-- Status and Progress Bar -->
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Classes="ToolbarPanel" 
+                BorderThickness="0,0,0,1" Padding="15,10">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="{Binding StatusText}" Classes="HeaderText" Margin="0,0,0,8"/>
+                <ProgressBar Value="{Binding LoadingProgress}" Maximum="100" 
+                             IsVisible="{Binding IsLoading}" 
+                             Classes="DarkProgress"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- Action Buttons -->
+        <Border Grid.Row="1" Grid.ColumnSpan="2" Classes="ToolbarPanel" 
+                BorderThickness="0,0,0,1" Padding="15,10">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="📁 Load File" Command="{Binding LoadFirstFileCommand}" 
+                        IsEnabled="{Binding !IsLoading}" 
+                        Classes="DarkButton PrimaryButton"/>
+                
+                <Separator Classes="DarkSeparator" Width="1" Height="24"/>
+                
+                <CheckBox Content="Side-by-Side Mode" IsChecked="{Binding IsSideBySideMode}" 
+                          VerticalAlignment="Center" Classes="DarkCheckBox"/>
+                
+                <Button Content="📄 Load Second File" Command="{Binding LoadSecondFileCommand}" 
+                        IsEnabled="{Binding !IsLoading}" IsVisible="{Binding IsSideBySideMode}" 
+                        Classes="DarkButton SuccessButton"/>
+                
+                <CheckBox Content="Sync Views" IsChecked="{Binding IsSynchronizationEnabled}" 
+                          VerticalAlignment="Center" Classes="DarkCheckBox"
+                          IsVisible="{Binding IsSideBySideMode}"/>
+                
+                <Separator Classes="DarkSeparator" Width="1" Height="24"/>
+                
+                <CheckBox Content="Show Inspector" IsChecked="{Binding IsInspectorVisible}" 
+                          VerticalAlignment="Center" Classes="DarkCheckBox"/>
+                
+                <Separator Classes="DarkSeparator" Width="1" Height="24"/>
+                
+            </StackPanel>
+        </Border>
+        
+        <!-- File Information Headers -->
+        <Grid Grid.Row="2" Grid.Column="0" Margin="15,10,10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="{Binding SeparatorWidth}"/>
+                <ColumnDefinition Width="{Binding SecondPanelWidth}"/>
+            </Grid.ColumnDefinitions>
+            
+            <Border Grid.Column="0" Classes="InfoPanel" Padding="12">
+                <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                    <TextBlock Text="{Binding File1Info}" FontFamily="Consolas,Monospace" 
+                               FontSize="11" TextWrapping="Wrap" Foreground="#CBD5E0"/>
+                </ScrollViewer>
+            </Border>
+            
+            <Border Grid.Column="2" Classes="InfoPanel" Padding="12"
+                    IsVisible="{Binding ShowSecondPanel}">
+                <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                    <TextBlock Text="{Binding File2Info}" FontFamily="Consolas,Monospace" 
+                               FontSize="11" TextWrapping="Wrap" Foreground="#CBD5E0"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        
+        <!-- Hex Content -->
+        <Grid Grid.Row="3" Grid.Column="0" Margin="15,0,10,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="{Binding SeparatorWidth}"/>
+                <ColumnDefinition Width="{Binding SecondPanelWidth}"/>
+            </Grid.ColumnDefinitions>
+            
+            <Border Grid.Column="0" Classes="ContentPanel">
+                <!-- Custom Hex Viewer Control with Multi-Selection -->
+                <controls:HexViewerControl HexRows="{Binding HexRows1}" 
+                                         DataContext="{Binding}"
+                                         x:Name="CustomHexViewer1"/>
+            </Border>
+            
+            <Border Grid.Column="2" Classes="ContentPanel"
+                    IsVisible="{Binding ShowSecondPanel}">
+                <!-- Second Custom Hex Viewer Control -->
+                <controls:HexViewerControl HexRows="{Binding HexRows2}" 
+                                         DataContext="{Binding}"
+                                         x:Name="CustomHexViewer2"/>
+            </Border>
+        </Grid>
+        
+        <!-- Data Inspector Panel -->
+        <Border Grid.Row="1" Grid.RowSpan="3" Grid.Column="1" 
+                Classes="InspectorPanel" 
+                BorderThickness="1,0,0,0" Padding="15">
+            <ScrollViewer>
+                <StackPanel Spacing="12">
+                    <Expander Header="🔍 Data Inspector" IsExpanded="True">
+                        <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ToggleSwitch IsChecked="{Binding IsLittleEndian}" OnContent="Little Endian" OffContent="Big Endian" />
+                            </StackPanel>
+
+                            <!-- Selection Actions -->
+                            <StackPanel Spacing="8" IsVisible="{Binding SelectionLength, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <TextBlock Text="📋 Selection Actions" Classes="HeaderText" FontSize="12"/>
+                                <WrapPanel Orientation="Horizontal" ItemWidth="80" ItemHeight="28">
+                                    <Button Content="📋 Hex" Command="{Binding CopyAsHexCommand}"
+                                            Classes="DarkButton InfoButton" Padding="4,2" FontSize="9" Margin="2"/>
+                                    <Button Content="📋 ASCII" Command="{Binding CopyAsAsciiCommand}"
+                                            Classes="DarkButton InfoButton" Padding="4,2" FontSize="9" Margin="2"/>
+                                    <Button Content="📋 C Array" Command="{Binding CopyAsCArrayCommand}"
+                                            Classes="DarkButton InfoButton" Padding="4,2" FontSize="9" Margin="2"/>
+                                    <Button Content="📋 Base64" Command="{Binding CopyAsBase64Command}"
+                                            Classes="DarkButton InfoButton" Padding="4,2" FontSize="9" Margin="2"/>
+                                    <Button Content="💾 Export" Command="{Binding ExportToFileCommand}"
+                                            Classes="DarkButton SuccessButton" Padding="4,2" FontSize="9" Margin="2"/>
+                                    <Button Content="🗑️ Clear" Command="{Binding ClearSelectionCommand}"
+                                            Classes="DarkButton DangerButton" Padding="4,2" FontSize="9" Margin="2"/>
+                                </WrapPanel>
+                                <TextBlock Text="{Binding SelectionLength, StringFormat='Selected: {0} bytes'}"
+                                           Classes="StatusText" FontSize="10" FontFamily="Consolas"/>
+                            </StackPanel>
+
+                            <Rectangle Height="1" Fill="#4A5568" Margin="0,5"/>
+
+                            <!-- String Values -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="📝 String Values" Classes="HeaderText" FontSize="14"/>
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,5,0,0">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="ASCII:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding AsciiValue}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="UTF-8:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Utf8Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Char:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CharValue}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10"
+                                             Classes="DarkInput"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <Rectangle Height="1" Fill="#4A5568" Margin="0,5"/>
+
+                            <!-- Integer Values -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="🔢 Integer Values" Classes="HeaderText" FontSize="14"/>
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,5,0,0">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Int8:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Int8Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="UInt8:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding UInt8Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Int16:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Int16Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="UInt16:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding UInt16Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Int32:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Int32Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="UInt32:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding UInt32Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Int64:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Int64Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="UInt64:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding UInt64Value}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10"
+                                             Classes="DarkInput"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <Rectangle Height="1" Fill="#4A5568" Margin="0,5"/>
+
+                            <!-- Floating Point Values -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="🔢 Floating Point" Classes="HeaderText" FontSize="14"/>
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,5,0,0">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Float:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding FloatValue}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10" Margin="0,0,0,4"
+                                             Classes="DarkInput"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Double:" Margin="0,0,12,4"
+                                               Classes="LabelText"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DoubleValue}" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="10"
+                                             Classes="DarkInput"/>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+
+                    <Expander Header="🔍 Search" IsExpanded="True">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,*" VerticalAlignment="Top">
+
+                                <!-- Search Input -->
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Find:" Classes="LabelText" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SearchText}" Classes="DarkInput" Watermark="Hex, SHA1, or Text"/>
+                                <Button Grid.Row="0" Grid.Column="2" Content="🔍" Command="{Binding SearchCommand}" Classes="DarkButton PrimaryButton" Margin="5,0,0,0"/>
+
+                                <!-- Search Options -->
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Type:" Classes="LabelText" VerticalAlignment="Center" Margin="0,10,10,0"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding SearchTypes}" SelectedItem="{Binding SearchType}" Margin="0,10,0,0"/>
+
+                                <!-- Search Actions -->
+                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                                    <Button Content="Stop" Command="{Binding StopSearchCommand}" IsEnabled="{Binding IsSearching}" Classes="DarkButton DangerButton"/>
+                                    <Button Content="Clear" Command="{Binding ClearSearchCommand}" Classes="DarkButton SecondaryButton"/>
+                                </StackPanel>
+
+                                <!-- Search Results -->
+                                <Border Grid.Row="4" Grid.ColumnSpan="3" Classes="ContentPanel" Margin="0,15,0,0" IsVisible="{Binding SearchResults.Count}">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="5">
+                                            <Button Content="&lt; Prev" Command="{Binding NavigateToPreviousResultCommand}" Classes="DarkButton InfoButton"/>
+                                            <Button Content="Next &gt;" Command="{Binding NavigateToNextResultCommand}" Classes="DarkButton InfoButton"/>
+                                        </StackPanel>
+                                        <ListBox ItemsSource="{Binding SearchResults}" SelectedItem="{Binding SelectedSearchResult}" Background="Transparent">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="12"/>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        
+        <!-- Status Bar -->
+        <Border Grid.Row="4" Grid.ColumnSpan="2" Classes="StatusPanel" 
+                BorderThickness="0,1,0,0" Padding="15,8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding StatusText}" Classes="StatusText"
+                           VerticalAlignment="Center" FontSize="12"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="15">
+                    <TextBlock Text="{Binding LoadingProgress, StringFormat='Progress: {0:F0}%'}" 
+                               VerticalAlignment="Center" FontSize="11" Classes="StatusText"
+                               IsVisible="{Binding IsLoading}"/>
+                    <TextBlock Text="{Binding SelectedOffset, StringFormat='Offset: 0x{0:X8}'}" 
+                               VerticalAlignment="Center" FontSize="11" Classes="StatusText"
+                               FontFamily="Consolas"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+    </Grid>
+</Window>

@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, cancellation-and-fire-and-forget-2 ]
+  pull_request:
+    branches: [ main, cancellation-and-fire-and-forget-2 ]
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        dotnet: [8.0.x]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/.nuget/packages
+          key: nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-dotnet-${{ matrix.dotnet }}-
+
+      - name: Restore (auto-detect .sln/.csproj)
+        run: |
+          set -e
+          SOLN=$(git ls-files '*.sln' | head -n 1 || true)
+          if [ -n "$SOLN" ]; then
+            echo "Restoring solution: $SOLN"
+            dotnet restore "$SOLN"
+            exit 0
+          fi
+          CSPROJ=$(git ls-files '*.csproj' | head -n 1 || true)
+          if [ -n "$CSPROJ" ]; then
+            echo "Restoring from project dir: $(dirname "$CSPROJ")"
+            dotnet restore "$(dirname "$CSPROJ")"
+            exit 0
+          fi
+          echo "No .sln or .csproj found. Aborting."
+          exit 1
+
+      - name: Ensure dotnet-format available (manifest or fallback)
+        working-directory: ./tests/S7.Tests
+        run: |
+          set -e
+          if [ -f .config/dotnet-tools.json ]; then
+            echo "Attempting dotnet tool restore in tests/S7.Tests"
+            if dotnet tool restore; then
+              echo "dotnet tool restore succeeded"
+            else
+              echo "dotnet tool restore failed; installing dotnet-format globally as fallback"
+              dotnet tool install -g dotnet-format
+            fi
+          else
+            echo "No tool manifest; installing dotnet-format globally for CI"
+            dotnet tool install -g dotnet-format
+          fi
+
+      - name: Format check (warn only)
+        run: |
+         set -e
+         SOLN=$(git ls-files '*.sln' | head -n1 || true)
+         CSPROJ=$(git ls-files '*.csproj' | head -n1 || true)
+         RESULT=0
+         if [ -n "$SOLN" ]; then
+           dotnet format "$SOLN" --verify-no-changes || RESULT=1
+         elif [ -n "$CSPROJ" ]; then
+           dotnet format "$CSPROJ" --verify-no-changes || RESULT=1
+         else
+           echo "No .sln or .csproj found; skipping format check."
+           exit 0
+         fi
+         if [ "$RESULT" -eq 1 ]; then
+           echo "::warning ::Code formatting issues found. Please run 'dotnet format' locally."
+         fi
+
+      - name: Build all projects (Release)
+        run: |
+          set -e
+          SOLN=$(git ls-files '*.sln' | head -n 1 || true)
+          if [ -n "$SOLN" ]; then
+            echo "Building solution: $SOLN"
+            dotnet build "$SOLN" --configuration Release --no-restore
+            exit 0
+          fi
+          CSPROJ=$(git ls-files '*.csproj' | head -n 1 || true)
+          if [ -n "$CSPROJ" ]; then
+            echo "Building project: $CSPROJ"
+            dotnet build "$CSPROJ" --configuration Release --no-restore
+            exit 0
+          fi
+          echo "No .sln or .csproj found. Aborting."
+          exit 1
+
+      - name: Run tests (explicit csproj)
+        run: |
+          if [ -f ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj ]; then
+            dotnet test ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+          else
+            echo "Test project not found at ./src/tests/S7.Core.Tests/S7.Core.Tests.csproj; skipping tests."
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+
+      - name: Clean up stale partial files (best-effort)
+        if: always()
+        run: |
+          echo "Cleaning .partial files from workspace (best-effort)"
+          find $RUNNER_TEMP -type f -name "*.partial" -maxdepth 4 -print -delete || true
+
+      - name: Show disk usage (debug)
+        if: always()
+        run: df -h || true
+
+      - name: List workspace (debug)
+        if: always()
+        run: ls -la || true

@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="using:S7_Csharp_Utility.Converters"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        x:Class="S7_Csharp_Utility.Views.DiffView"
+        Title="File Comparison"
+        MinWidth="900" MinHeight="700" Background="#1A1A1A">
+
+    <Window.Resources>
+        <converters:DiffLineTypeToBrushConverter x:Key="DiffLineTypeToBrushConverter"/>
+    </Window.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- Header with Status and Progress -->
+        <Border Grid.Row="0" Classes="ToolbarPanel" Padding="20,16">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Vertical" Spacing="8">
+                    <TextBlock Text="{Binding ComparisonStatus}" Classes="HeaderText"/>
+                    <ProgressBar Value="{Binding LoadingProgress}" Maximum="100"
+                                 IsVisible="{Binding IsLoading}" Classes="DarkProgress"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button Content="🔄 Refresh Comparison"
+                            Command="{Binding RefreshCommand}"
+                            IsEnabled="{Binding NotLoading}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- File Information Section -->
+        <Border Grid.Row="1" Padding="20,16">
+            <Grid ColumnDefinitions="*,20,*">
+                <StackPanel Grid.Column="0" Spacing="8">
+                    <TextBlock Text="File 1 Information" Classes="SubHeaderText"/>
+                    <Border Classes="InfoPanel" Padding="16">
+                        <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="{Binding File1Info}"
+                                       FontFamily="JetBrains Mono,Consolas,Monaco,Menlo,monospace"
+                                       FontSize="11" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Spacing="8">
+                    <TextBlock Text="File 2 Information" Classes="SubHeaderText"/>
+                    <Border Classes="InfoPanel" Padding="16">
+                        <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="{Binding File2Info}"
+                                       FontFamily="JetBrains Mono,Consolas,Monaco,Menlo,monospace"
+                                       FontSize="11" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Diff Content -->
+        <ListBox Grid.Row="2" ItemsSource="{Binding DiffLines}" Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="Auto,*" Background="{Binding Type, Converter={StaticResource DiffLineTypeToBrushConverter}}">
+                        <TextBlock Text="{Binding Position}" FontFamily="Consolas,Monaco,monospace" FontSize="10" Foreground="Gray" Margin="5,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas,Monaco,monospace" FontSize="12" TextWrapping="Wrap"/>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+    </Grid>
+</Window>

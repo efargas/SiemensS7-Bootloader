@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="S7_Csharp_Utility.Views.DumpComparisonView">
+    <TabControl>
+        <TabItem Header="Compare Folder">
+            <StackPanel Spacing="8" Margin="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Name="CompareFolderTextBox" Watermark="Select folder to compare..." Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFolder, Mode=TwoWay}" Margin="0,0,8,0" />
+                    <Button Name="BrowseCompareFolderButton" Content="Browse" Grid.Column="1" Command="{Binding BrowseCompareFolderCommand}" />
+                </Grid>
+                <Button Name="CompareDumpsButton" Content="Start Comparison" HorizontalAlignment="Stretch" Command="{Binding CompareDumpsCommand}" Classes="ActionButton" />
+                <ListBox Name="ComparisonResultsListBox" Height="100" HorizontalAlignment="Stretch" />
+            </StackPanel>
+        </TabItem>
+        <TabItem Header="Compare Files">
+            <StackPanel Spacing="8" Margin="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Name="CompareFile1TextBox" Watermark="Select file 1..." Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFile1, Mode=TwoWay}" Margin="0,0,8,0" />
+                    <Button Name="BrowseCompareFile1Button" Content="Browse" Grid.Column="1" Command="{Binding BrowseCompareFile1Command}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Name="CompareFile2TextBox" Watermark="Select file 2..." Grid.Column="0" HorizontalAlignment="Stretch" Text="{Binding CompareFile2, Mode=TwoWay}" Margin="0,0,8,0" />
+                    <Button Name="BrowseCompareFile2Button" Content="Browse" Grid.Column="1" Command="{Binding BrowseCompareFile2Command}" />
+                </Grid>
+                <Button Name="CompareTwoFilesButton" Content="Compare These Files" HorizontalAlignment="Stretch" Command="{Binding CompareTwoFilesCommand}" Classes="ActionButton" />
+                <ListBox Name="FileCompareResultsListBox" Height="100" HorizontalAlignment="Stretch" />
+            </StackPanel>
+        </TabItem>
+    </TabControl>
+</UserControl>

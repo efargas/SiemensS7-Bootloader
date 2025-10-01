@@ -1,0 +1,139 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="S7_Csharp_Utility.Views.ComparisonResultWindow"
+        Title="Folder Comparison Results"
+        Width="1200"
+        Height="800"
+        MinWidth="800"
+        MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        Background="#1A1A1A">
+    
+    <Window.Styles>
+        <!-- Dark Theme Styles -->
+        <Style Selector="TextBlock.HeaderText">
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.DarkButton">
+            <Setter Property="Background" Value="#4C51BF"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#4A5568"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.DarkButton:pointerover">
+            <Setter Property="Opacity" Value="0.9"/>
+        </Style>
+        <Style Selector="Button.SecondaryButton">
+            <Setter Property="Background" Value="#718096"/>
+        </Style>
+        <Style Selector="Button.SuccessButton">
+            <Setter Property="Background" Value="#38A169"/>
+        </Style>
+    </Window.Styles>
+    
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2D3748" BorderBrush="#4A5568" BorderThickness="0,0,0,1" Padding="15,10">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="📊 Folder Comparison Results" Classes="HeaderText" FontSize="16" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding ResultCount, StringFormat='({0} items)'}" 
+                           Foreground="#A0AEC0" FontSize="12" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- Main content area with improved layout -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,300" Margin="10">
+            <!-- Results display -->
+            <Border Grid.Column="0" Background="#1A202C" BorderBrush="#4A5568" BorderThickness="1" CornerRadius="4" Margin="0,0,5,0">
+                <ScrollViewer Name="ResultScrollViewer" Padding="15">
+                    <TextBlock Name="ResultTextBlock" 
+                               Text="{Binding ComparisonResult}"
+                               TextWrapping="Wrap"
+                               FontFamily="Consolas,Monaco,monospace"
+                               FontSize="11"
+                               Foreground="#E2E8F0"
+                               LineHeight="16"/>
+                </ScrollViewer>
+            </Border>
+            
+            <!-- Statistics and actions panel -->
+            <Border Grid.Column="1" Background="#252525" BorderBrush="#4A5568" BorderThickness="1" CornerRadius="4" Margin="5,0,0,0">
+                <ScrollViewer Padding="15">
+                    <StackPanel Spacing="15">
+                        <!-- Statistics -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="📈 Statistics" Classes="HeaderText" FontSize="14"/>
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,5,0,0">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Total Files:" Margin="0,0,10,4" Foreground="#CBD5E0"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TotalFiles}" FontFamily="Consolas" FontSize="11" Foreground="#E2E8F0"/>
+                                
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Identical:" Margin="0,0,10,4" Foreground="#CBD5E0"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IdenticalFiles}" FontFamily="Consolas" FontSize="11" Foreground="#38A169"/>
+                                
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Different:" Margin="0,0,10,4" Foreground="#CBD5E0"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DifferentFiles}" FontFamily="Consolas" FontSize="11" Foreground="#E53E3E"/>
+                                
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Unique A:" Margin="0,0,10,4" Foreground="#CBD5E0"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding UniqueFilesA}" FontFamily="Consolas" FontSize="11" Foreground="#D69E2E"/>
+                                
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Unique B:" Margin="0,0,10,4" Foreground="#CBD5E0"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding UniqueFilesB}" FontFamily="Consolas" FontSize="11" Foreground="#D69E2E"/>
+                            </Grid>
+                        </StackPanel>
+                        
+                        <Rectangle Height="1" Fill="#4A5568"/>
+                        
+                        <!-- Filter Options -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="🔍 Filter Results" Classes="HeaderText" FontSize="14"/>
+                            <StackPanel Spacing="6">
+                                <CheckBox Content="Show Identical Files" IsChecked="{Binding ShowIdentical}" Foreground="#CBD5E0"/>
+                                <CheckBox Content="Show Different Files" IsChecked="{Binding ShowDifferent}" Foreground="#CBD5E0"/>
+                                <CheckBox Content="Show Unique Files" IsChecked="{Binding ShowUnique}" Foreground="#CBD5E0"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <Rectangle Height="1" Fill="#4A5568"/>
+                        
+                        <!-- Export Options -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="💾 Export Options" Classes="HeaderText" FontSize="14"/>
+                            <StackPanel Spacing="6">
+                                <Button Content="📄 Export to Text" Command="{Binding ExportToTextCommand}" 
+                                        Classes="DarkButton SecondaryButton" HorizontalAlignment="Stretch"/>
+                                <Button Content="📊 Export to CSV" Command="{Binding ExportToCsvCommand}" 
+                                        Classes="DarkButton SecondaryButton" HorizontalAlignment="Stretch"/>
+                                <Button Content="📋 Copy Summary" Command="{Binding CopySummaryCommand}" 
+                                        Classes="DarkButton SecondaryButton" HorizontalAlignment="Stretch"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        
+        <!-- Button area -->
+        <Border Grid.Row="2" Background="#2D3748" BorderBrush="#4A5568" BorderThickness="0,1,0,0" Padding="15,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Name="CopyButton" 
+                        Content="📋 Copy All Results" 
+                        Command="{Binding CopyToClipboardCommand}"
+                        Classes="DarkButton SuccessButton"/>
+                <Button Name="RefreshButton" 
+                        Content="🔄 Refresh" 
+                        Command="{Binding RefreshCommand}"
+                        Classes="DarkButton SecondaryButton"/>
+                <Button Name="CloseButton" 
+                        Content="✖ Close" 
+                        IsDefault="True"
+                        Click="CloseButton_Click"
+                        Classes="DarkButton SecondaryButton"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

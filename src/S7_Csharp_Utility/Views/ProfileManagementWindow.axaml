@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="using:S7_Csharp_Utility.Converters"
+        x:Class="S7_Csharp_Utility.ProfileManagementWindow"
+        Title="Profile Management"
+        Width="800" Height="500"
+        WindowStartupLocation="CenterOwner"
+        Background="#1A1A1A">
+    <Grid ColumnDefinitions="2*,3*" Margin="8">
+        <!-- Left Column: Profiles List -->
+        <DockPanel Grid.Column="0" Margin="0,0,8,0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                <Button Content="Add Profile" Command="{Binding AddProfileCommand}" />
+                <Button Content="Delete Profile" Command="{Binding DeleteProfileCommand}" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding Profiles}"
+                      SelectedItem="{Binding SelectedProfile, Mode=TwoWay}"
+                      AutoGenerateColumns="False"
+                      GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Profile Name" Binding="{Binding ModelName}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+
+        <!-- Right Column: Profile Editor -->
+        <DockPanel Grid.Column="1" IsEnabled="{Binding SelectedProfile, Converter={x:Static converters:ObjectConverters.IsNotNull}}">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                <Button Content="Save Profile" Command="{Binding SaveProfileCommand}" />
+                <Button Content="Set as Active Profile" Command="{Binding SetActiveProfileCommand}" />
+            </StackPanel>
+
+            <Grid DockPanel.Dock="Top" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                <TextBlock Text="Model Name:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" Classes="LabelText"/>
+                <TextBox Text="{Binding SelectedProfile.ModelName, Mode=TwoWay}" Grid.Row="0" Grid.Column="1" />
+                <TextBlock Text="Firmware Version:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" Classes="LabelText"/>
+                <TextBox Text="{Binding SelectedProfile.FirmwareVersion, Mode=TwoWay}" Grid.Row="1" Grid.Column="1" />
+            </Grid>
+
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <Button Content="Add Region" Command="{Binding AddRegionCommand}" />
+                <Button Content="Remove Region" Command="{Binding RemoveRegionCommand}" />
+            </StackPanel>
+
+            <DataGrid Name="RegionsGrid" ItemsSource="{Binding SelectedProfile.Regions}" SelectedItem="{Binding SelectedRegion, Mode=TwoWay}" AutoGenerateColumns="False">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay}" Width="*" />
+                    <DataGridTextColumn Header="Address" Binding="{Binding Address, Mode=TwoWay}" Width="2*" />
+                    <DataGridTextColumn Header="Size" Binding="{Binding Size, Mode=TwoWay}" Width="*" />
+                    <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" IsReadOnly="True" Width="2*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+    </Grid>
+</Window>

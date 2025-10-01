@@ -1,0 +1,6 @@
+# Handle line endings
+* text=auto
+
+# Mark binary files
+*.png binary
+*.jpg binary
