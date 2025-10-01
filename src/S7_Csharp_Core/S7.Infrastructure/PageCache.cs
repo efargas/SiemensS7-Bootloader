@@ -51,8 +51,6 @@ namespace S7.Infrastructure
             var lazy = _inflight.GetOrAdd(pageIndex, _ => new Lazy<Task<Page>>(() => FetchAndCachePageAsync(pageIndex, pageSize, ct), LazyThreadSafetyMode.ExecutionAndPublication));
 
             // Return the task produced by the Lazy wrapper.
-            // Note: we intentionally do not remove the inflight entry on success here;
-            // we only remove it on failure (see FetchAndCachePageAsync) to avoid races where another caller starts a duplicate fetch.
             return lazy.Value;
         }
 
@@ -100,6 +98,9 @@ namespace S7.Infrastructure
                         _lruList.RemoveLast();
                     }
                 }
+
+                // On success, remove the lazy task from the inflight dictionary as it's no longer needed.
+                _inflight.TryRemove(pageIndex, out _);
 
                 return page;
             }

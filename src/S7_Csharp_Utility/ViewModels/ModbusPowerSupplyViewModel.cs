@@ -181,42 +181,5 @@ namespace S7_Csharp_Utility.ViewModels
             _powerController.Disconnect();
             ModbusStatus = "Disconnected";
         }
-
-        /// <summary>
-        /// Sets the power of the PLC.
-        /// </summary>
-        /// <param name="on">True to turn on, false to turn off.</param>
-        public async Task SetPowerAsync(bool on)
-        {
-            if (ModbusStatus != "Connected")
-            {
-                _loggingService.Log("Cannot set power: Modbus not connected.", LogCategory.Warning);
-                return;
-            }
-            try
-            {
-                await _powerController.SetPowerAsync(ModbusCoil, on, ModbusSlaveId);
-                _loggingService.Log($"Power set to {(on ? "ON" : "OFF")}", LogCategory.Info);
-            }
-            catch (Exception ex)
-            {
-                _loggingService.Log($"Failed to set power: {ex.Message}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"Failed to set power: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Power cycles the PLC.
-        /// </summary>
-        /// <param name="delaySeconds">The delay in seconds between turning off and on.</param>
-        public async Task PowerCycleAsync(int delaySeconds)
-        {
-            _loggingService.Log("[POWER] Turning PLC power OFF...", LogCategory.Info);
-            await SetPowerAsync(false);
-            _loggingService.Log($"[POWER] Waiting {delaySeconds} seconds before powering on...", LogCategory.Info);
-            await Task.Delay(delaySeconds * 1000);
-            _loggingService.Log("[POWER] Turning PLC power ON...", LogCategory.Info);
-            await SetPowerAsync(true);
-        }
     }
 }

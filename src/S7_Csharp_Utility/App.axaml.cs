@@ -64,18 +64,16 @@ namespace S7_Csharp_Utility
         /// <param name="services">The service collection to configure.</param>
         private void ConfigureServices(IServiceCollection services)
         {
-            // Register Services
-            services.AddSingleton<LoggingService>(_ => new LoggingService(Dispatcher.UIThread));
-            services.AddSingleton<SocatLoggerService>(_ => new SocatLoggerService(Dispatcher.UIThread));
-            services.AddSingleton<ConfigurationService>();
+            // Register Core Services
+            services.AddSingleton<IConfigurationService, ConfigurationService>();
+            services.AddSingleton<IPowerController, PowerController>();
             services.AddSingleton<PayloadManager>(_ => new PayloadManager(AppContext.BaseDirectory));
-            services.AddSingleton<SocatService>();
-            services.AddSingleton<PowerController>(sp =>
-            {
-                var loggingService = sp.GetRequiredService<LoggingService>();
-                return new PowerController((message, isError) =>
-                    loggingService.Log(message, isError ? LogCategory.Error : LogCategory.Info));
-            });
+            services.AddSingleton<SocatService>(); // Assuming SocatService will be refactored to use ILogger as well.
+            services.AddLogging(builder => builder.AddDebug()); // Add basic logging
+
+            // Register Command Handlers
+            services.AddTransient<ICommandHandler<MemoryDumpOptions>, MemoryDumpCommandHandler>();
+            services.AddTransient<ICommandHandler<StagerInstallOptions>, StagerInstallCommandHandler>();
 
             // Register ViewModels
             services.AddSingleton<MainWindowViewModel>();

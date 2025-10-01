@@ -15,33 +15,32 @@ namespace S7.Core.Commands
     public class MemoryDumpCommandHandler : CommandHandler<MemoryDumpOptions>
     {
         private readonly PayloadManager _payloadManager;
+        private readonly ILoggerFactory _loggerFactory;
         private readonly PlcClient? _plcClient;
 
         /// <summary>
         /// Initializes a new instance of the MemoryDumpCommandHandler class.
         /// </summary>
-        /// <param name="logger">The logger instance</param>
-        /// <param name="payloadManager">The payload manager for loading dumper payload</param>
-        public MemoryDumpCommandHandler(ILogger<MemoryDumpCommandHandler> logger, PayloadManager payloadManager)
+        public MemoryDumpCommandHandler(ILogger<MemoryDumpCommandHandler> logger, PayloadManager payloadManager, ILoggerFactory loggerFactory)
             : base(logger)
         {
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
+            _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         }
 
         private readonly ICommunicationChannel? _testChannel;
 
-        internal MemoryDumpCommandHandler(ILogger<MemoryDumpCommandHandler> logger, PayloadManager payloadManager, ICommunicationChannel testChannel)
+        internal MemoryDumpCommandHandler(ILogger<MemoryDumpCommandHandler> logger, PayloadManager payloadManager, ICommunicationChannel testChannel, ILoggerFactory loggerFactory)
             : base(logger)
         {
             _payloadManager = payloadManager ?? throw new ArgumentNullException(nameof(payloadManager));
             _testChannel = testChannel;
+            _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         }
 
         /// <summary>
         /// Validates the memory dump options.
         /// </summary>
-        /// <param name="options">The options to validate</param>
-        /// <returns>A validation result</returns>
         protected override ValidationResult ValidateOptions(MemoryDumpOptions options)
         {
             var baseValidation = base.ValidateOptions(options);
@@ -50,7 +49,6 @@ namespace S7.Core.Commands
 
             var errors = new System.Collections.Generic.List<string>();
 
-            // Validate output directory exists or can be created
             try
             {
                 var outputDir = Path.GetDirectoryName(options.OutputPath);
@@ -64,13 +62,11 @@ namespace S7.Core.Commands
                 errors.Add($"Cannot create output directory: {ex.Message}");
             }
 
-            // Validate payload path exists
             if (!Directory.Exists(options.PayloadPath))
             {
                 errors.Add($"Payload directory does not exist: {options.PayloadPath}");
             }
 
-            // Validate communication channel configuration
             if (options.ChannelConfig.Mode.Equals("TCP", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(options.ChannelConfig.Host))
@@ -90,7 +86,6 @@ namespace S7.Core.Commands
                 errors.Add($"Unsupported communication mode: {options.ChannelConfig.Mode}");
             }
 
-            // Check if output file already exists and overwrite is not allowed
             var outputFilename = GenerateOutputFilename(options);
             var fullOutputPath = Path.Combine(options.OutputPath, outputFilename);
             if (File.Exists(fullOutputPath) && !options.OverwriteExisting)
@@ -104,9 +99,6 @@ namespace S7.Core.Commands
         /// <summary>
         /// Executes the memory dump command.
         /// </summary>
-        /// <param name="options">The command options</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>A command result with the output file path</returns>
         public override async Task<CommandResult> ExecuteAsync(MemoryDumpOptions options, CancellationToken cancellationToken)
         {
             ICommunicationChannel? channel = null;
@@ -116,7 +108,7 @@ namespace S7.Core.Commands
                 channel = _testChannel ?? CreateCommunicationChannel(options.ChannelConfig);
 
                 LogProgress("Connecting to PLC", options.CorrelationId);
-                await channel.ConnectAsync().ConfigureAwait(false);
+                await channel.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
                 if (!channel.IsConnected)
                 {
@@ -125,8 +117,7 @@ namespace S7.Core.Commands
 
                 LogProgress("Connection established successfully", options.CorrelationId);
 
-                var plcClient = _plcClient ?? new PlcClient(channel, message =>
-                    Logger.LogInformation("PLC: {Message} [CorrelationId: {CorrelationId}]", message, options.CorrelationId));
+                var plcClient = _plcClient ?? new PlcClient(channel, _loggerFactory);
 
                 LogProgress("Loading memory dumper payload", options.CorrelationId);
                 var dumperPayload = await _payloadManager.GetMemoryDumperPayloadAsync(options.PayloadPath).ConfigureAwait(false);
@@ -180,19 +171,10 @@ namespace S7.Core.Commands
             }
             finally
             {
-                if (channel != null)
-                {
-                    LogProgress("Disconnecting from PLC", options.CorrelationId);
-                    channel.Disconnect();
-                }
+                channel?.Dispose();
             }
         }
 
-        /// <summary>
-        /// Creates a communication channel based on the configuration.
-        /// </summary>
-        /// <param name="config">The channel configuration</param>
-        /// <returns>A communication channel instance</returns>
         private static ICommunicationChannel CreateCommunicationChannel(CommunicationChannelConfig config)
         {
             return config.Mode.ToUpperInvariant() switch
@@ -208,11 +190,6 @@ namespace S7.Core.Commands
             };
         }
 
-        /// <summary>
-        /// Generates the output filename for the memory dump.
-        /// </summary>
-        /// <param name="options">The command options</param>
-        /// <returns>The generated filename</returns>
         private static string GenerateOutputFilename(MemoryDumpOptions options)
         {
             if (!string.IsNullOrWhiteSpace(options.CustomFilename))
@@ -230,29 +207,10 @@ namespace S7.Core.Commands
     /// </summary>
     public class MemoryDumpResult
     {
-        /// <summary>
-        /// Gets or sets the path to the output file.
-        /// </summary>
         public string OutputFilePath { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the number of bytes that were dumped.
-        /// </summary>
         public uint BytesDumped { get; set; }
-
-        /// <summary>
-        /// Gets or sets the duration of the operation in seconds.
-        /// </summary>
         public double DurationSeconds { get; set; }
-
-        /// <summary>
-        /// Gets or sets the starting address that was dumped.
-        /// </summary>
         public uint Address { get; set; }
-
-        /// <summary>
-        /// Gets or sets the length that was requested to be dumped.
-        /// </summary>
         public uint Length { get; set; }
     }
 }

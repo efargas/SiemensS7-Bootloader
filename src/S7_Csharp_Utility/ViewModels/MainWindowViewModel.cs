@@ -17,6 +17,7 @@ using System.Threading;
 using Avalonia.Threading;
 using S7_Csharp_Utility.Models;
 using S7_Csharp_Utility.Interfaces;
+using S7.Core.Commands;
 
 namespace S7_Csharp_Utility.ViewModels
 {
@@ -33,7 +34,11 @@ namespace S7_Csharp_Utility.ViewModels
         public FileCompareViewModel FileCompareViewModel { get; }
         public LoggingService Logging { get; }
         public SocatLoggerService SocatLogging { get; }
-        private readonly PayloadManager _payloadManager;
+        private readonly ICommandHandler<StagerInstallOptions> _stagerInstallHandler;
+        private readonly ICommandHandler<MemoryDumpOptions> _memoryDumpHandler;
+        private readonly IDialogService _dialogService;
+        public IConfigurationService ConfigService { get; }
+
 
         private string _dumpAddress = "0x691E28";
         [Required]
@@ -147,9 +152,6 @@ namespace S7_Csharp_Utility.ViewModels
         public ICommand ExitCommand { get; }
         public ICommand CancelScanCommand { get; }
 
-        private readonly IDialogService _dialogService;
-        public ConfigurationService ConfigService { get; }
-
         private CancellationTokenSource? _scanCancellationTokenSource;
         private DeviceProfile? _loadedProfile;
         public DeviceProfile? LoadedProfile
@@ -186,10 +188,11 @@ namespace S7_Csharp_Utility.ViewModels
         public MainWindowViewModel(
             LoggingService loggingService,
             SocatLoggerService socatLoggerService,
-            PayloadManager payloadManager,
             IDialogService dialogService,
-            ConfigurationService configService,
+            IConfigurationService configService,
             IViewService viewService,
+            ICommandHandler<StagerInstallOptions> stagerInstallHandler,
+            ICommandHandler<MemoryDumpOptions> memoryDumpHandler,
             PlcConnectionViewModel plcConnectionViewModel,
             ModbusPowerSupplyViewModel modbusPowerSupplyViewModel,
             ConfigurationViewModel configurationViewModel,
@@ -197,10 +200,11 @@ namespace S7_Csharp_Utility.ViewModels
         {
             Logging = loggingService;
             SocatLogging = socatLoggerService;
-            _payloadManager = payloadManager;
             _dialogService = dialogService;
             ConfigService = configService;
             ViewService = viewService;
+            _stagerInstallHandler = stagerInstallHandler;
+            _memoryDumpHandler = memoryDumpHandler;
             PlcConnectionViewModel = plcConnectionViewModel;
             ModbusPowerSupplyViewModel = modbusPowerSupplyViewModel;
             ConfigurationViewModel = configurationViewModel;
@@ -270,75 +274,56 @@ namespace S7_Csharp_Utility.ViewModels
             }
         }
 
-        private ICommunicationChannel? CreateCommunicationChannel()
-        {
-            if (PlcConnectionViewModel?.SelectedCommunicationMode == "TCP (socat)")
-            {
-                return new TcpChannel(PlcConnectionViewModel.PlcHost ?? "localhost", PlcConnectionViewModel.PlcPort);
-            }
-            else if (PlcConnectionViewModel?.SelectedCommunicationMode == "Serial" && PlcConnectionViewModel.SelectedSerialPort != null)
-            {
-                return new SerialChannel(PlcConnectionViewModel.SelectedSerialPort, PlcConnectionViewModel.SelectedBaudRate, PlcConnectionViewModel.SelectedParity, PlcConnectionViewModel.SelectedStopBits, PlcConnectionViewModel.SelectedFlowControl);
-            }
-            return null;
-        }
-
         private async Task StartExploitSequenceAsync()
         {
             IsUploadingStager = true;
-            ICommunicationChannel? channel = null;
+            StagerInstalled = false;
             try
             {
-                Logging.Log("[EXPLOIT] Starting exploit sequence...", LogCategory.Info);
-                await ModbusPowerSupplyViewModel.PowerCycleAsync(ModbusPowerSupplyViewModel.DelaySeconds);
-                await Task.Delay(50);
+                var options = new StagerInstallOptions
+                {
+                    ChannelConfig = new CommunicationChannelConfig
+                    {
+                        Mode = PlcConnectionViewModel.SelectedCommunicationMode,
+                        Host = PlcConnectionViewModel.PlcHost,
+                        Port = PlcConnectionViewModel.PlcPort,
+                        SerialPort = PlcConnectionViewModel.SelectedSerialPort,
+                        BaudRate = PlcConnectionViewModel.SelectedBaudRate,
+                        Parity = PlcConnectionViewModel.SelectedParity,
+                        StopBits = PlcConnectionViewModel.SelectedStopBits,
+                        FlowControl = PlcConnectionViewModel.SelectedFlowControl
+                    },
+                    PowerConfig = new PowerControllerConfig
+                    {
+                        Host = ModbusPowerSupplyViewModel.ModbusHost,
+                        Port = ModbusPowerSupplyViewModel.ModbusPort,
+                        Coil = ModbusPowerSupplyViewModel.ModbusCoil,
+                        DelaySeconds = ModbusPowerSupplyViewModel.DelaySeconds
+                    },
+                    PayloadPath = ConfigurationViewModel.PayloadsPath,
+                    PerformHandshake = true,
+                    GetVersionInfo = true
+                };
 
-                Logging.Log("[CONNECTION] Creating communication channel...", LogCategory.Info);
-                channel = CreateCommunicationChannel();
+                var result = await _stagerInstallHandler.HandleAsync(options);
 
-                if (channel == null) throw new Exception("Could not create communication channel. PLC Connection View Model is not initialized.");
-
-                Logging.Log($"[CONNECTION] Connecting to PLC at {PlcConnectionViewModel.PlcHost}:{PlcConnectionViewModel.PlcPort}...", LogCategory.Info);
-                await channel.ConnectAsync();
-
-                if (!channel.IsConnected) throw new Exception("Failed to establish connection to PLC");
-
-                Logging.Log("[CONNECTION] ✅ Connected to PLC successfully", LogCategory.Info);
-                var plcClient = new PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
-                await RunStagerSequenceAsync(plcClient);
-            }
-            catch (Exception ex) when (ex is TimeoutException || ex is System.IO.IOException)
-            {
-                var errorType = ex is TimeoutException ? "Timeout" : "Connection";
-                Logging.Log($"[ERROR] ⏱️ {errorType} during stager sequence: {ex}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync($"{errorType} Error", $"The operation timed out. Error: {ex.Message}");
+                if (result.IsSuccess && result.ResultObject is StagerInstallResult stagerResult)
+                {
+                    StagerInstalled = stagerResult.IsInstalled;
+                    Logging.Log("Stager installation successful.", LogCategory.Info);
+                }
+                else
+                {
+                    await _dialogService.ShowMessageAsync("Error", result.ErrorMessage ?? "An unknown error occurred during stager installation.");
+                }
             }
             catch (Exception ex)
             {
-                Logging.Log($"[ERROR] ❌ Unexpected error during stager sequence: {ex}", LogCategory.Error);
-                if (ex.InnerException != null) Logging.Log($"[ERROR] Inner exception: {ex.InnerException}", LogCategory.Error);
-                await _dialogService.ShowMessageAsync("Error", $"An error occurred during the stager sequence: {ex.Message}");
+                HandleException(ex);
             }
             finally
             {
-                channel?.Disconnect();
                 IsUploadingStager = false;
-            }
-        }
-
-        private async Task RunStagerSequenceAsync(PlcClient plcClient)
-        {
-            StagerInstalled = false;
-            if (!plcClient.IsConnected) return;
-
-            if (await plcClient.PerformHandshakeAsync())
-            {
-                await plcClient.GetVersion();
-                byte[] stagerPayload = await _payloadManager.GetStagerPayloadAsync(ConfigurationViewModel.PayloadsPath);
-                Logging.Log($"Loaded stager payload ({stagerPayload.Length} bytes) from {ConfigurationViewModel.PayloadsPath}.", LogCategory.Info);
-                await plcClient.InstallStager(stagerPayload);
-                StagerInstalled = true;
-                Logging.Log("Stager is installed and ready.", LogCategory.Info);
             }
         }
 
@@ -347,7 +332,6 @@ namespace S7_Csharp_Utility.ViewModels
             IsDumpingMemory = true;
             using (_dumpCancellationTokenSource = new CancellationTokenSource())
             {
-                ICommunicationChannel? channel = null;
                 try
                 {
                     if (!uint.TryParse(DumpAddress.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber, null, out uint address))
@@ -356,12 +340,48 @@ namespace S7_Csharp_Utility.ViewModels
                         return;
                     }
 
-                    channel = CreateCommunicationChannel();
-                    if (channel == null) throw new Exception("Could not create communication channel.");
+                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                    var progress = new Progress<(long bytesRead, long totalBytes)>(p =>
+                    {
+                        var percentage = (double)p.bytesRead / p.totalBytes * 100;
+                        var elapsed = stopwatch.Elapsed;
+                        var bytesPerSecond = p.bytesRead > 0 ? p.bytesRead / elapsed.TotalSeconds : 0;
+                        var remainingSeconds = bytesPerSecond > 0 ? (p.totalBytes - p.bytesRead) / bytesPerSecond : 0;
 
-                    await channel.ConnectAsync();
-                    var plcClient = new PlcClient(channel, message => Logging.Log(message, LogCategory.Info));
-                    await RunDumpSequenceAsync(plcClient, address, DumpLength, _dumpCancellationTokenSource.Token);
+                        Dispatch(() =>
+                        {
+                            DumpProgressPercentage = percentage;
+                            DumpProgressBytes = $"Read: {p.bytesRead} / {p.totalBytes} bytes";
+                            DumpProgressTime = $"Elapsed: {elapsed.TotalSeconds:F0}s | Remaining: {remainingSeconds:F0}s";
+                        });
+                    });
+
+                    var options = new MemoryDumpOptions
+                    {
+                        Address = address,
+                        Length = DumpLength,
+                        OutputPath = ConfigurationViewModel.DumpsPath,
+                        PayloadPath = ConfigurationViewModel.PayloadsPath,
+                        Progress = progress,
+                        ChannelConfig = new CommunicationChannelConfig
+                        {
+                            Mode = PlcConnectionViewModel.SelectedCommunicationMode,
+                            Host = PlcConnectionViewModel.PlcHost,
+                            Port = PlcConnectionViewModel.PlcPort,
+                            SerialPort = PlcConnectionViewModel.SelectedSerialPort,
+                            BaudRate = PlcConnectionViewModel.SelectedBaudRate,
+                            Parity = PlcConnectionViewModel.SelectedParity,
+                            StopBits = PlcConnectionViewModel.SelectedStopBits,
+                            FlowControl = PlcConnectionViewModel.SelectedFlowControl
+                        }
+                    };
+
+                    var result = await _memoryDumpHandler.HandleAsync(options, _dumpCancellationTokenSource.Token);
+
+                    if (!result.IsSuccess)
+                    {
+                        await _dialogService.ShowMessageAsync("Error", result.ErrorMessage ?? "An unknown error occurred during memory dump.");
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -369,12 +389,10 @@ namespace S7_Csharp_Utility.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Logging.Log($"An error occurred during the dump sequence: {ex}", LogCategory.Error);
-                    await _dialogService.ShowMessageAsync("Error", ex.Message);
+                    HandleException(ex);
                 }
                 finally
                 {
-                    channel?.Disconnect();
                     IsDumpingMemory = false;
                 }
             }
@@ -382,36 +400,6 @@ namespace S7_Csharp_Utility.ViewModels
         }
 
         private void CancelDump() => _dumpCancellationTokenSource?.Cancel();
-
-        private async Task RunDumpSequenceAsync(PlcClient plcClient, uint address, uint length, CancellationToken cancellationToken)
-        {
-            Logging.Log($"Starting memory dump of {length} bytes from 0x{address:X8}...", LogCategory.Info);
-            byte[] dumperPayload = await _payloadManager.GetMemoryDumperPayloadAsync(ConfigurationViewModel.PayloadsPath);
-            Logging.Log($"Loaded dumper payload ({dumperPayload.Length} bytes) from {ConfigurationViewModel.PayloadsPath}.", LogCategory.Info);
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var progress = new Progress<long>(bytesRead =>
-            {
-                double percentage = (double)bytesRead / length * 100;
-                var elapsed = stopwatch.Elapsed;
-                double bytesPerSecond = bytesRead > 0 ? bytesRead / elapsed.TotalSeconds : 0;
-                double remainingSeconds = (bytesPerSecond > 0) ? (length - bytesRead) / bytesPerSecond : 0;
-
-                Dispatch(() =>
-                {
-                    DumpProgressPercentage = percentage;
-                    DumpProgressBytes = $"Read: {bytesRead} / {length} bytes";
-                    DumpProgressTime = $"Elapsed: {elapsed.TotalSeconds:F0}s | Remaining: {remainingSeconds:F0s}";
-                });
-            });
-
-            var dumpedData = await plcClient.DumpMemoryAsync(address, length, dumperPayload, progress);
-            stopwatch.Stop();
-            string resolvedDumpsPath = ApplicationConfiguration.ResolvePath(ConfigurationViewModel.DumpsPath, ApplicationConfiguration.GetDefaultDumpsPath());
-            string outFilename = $"mem_dump_{address:x8}_{address + length:x8}.bin";
-            string fullPath = System.IO.Path.Combine(resolvedDumpsPath, outFilename);
-            await System.IO.File.WriteAllBytesAsync(fullPath, dumpedData, cancellationToken);
-            Logging.Log($"Successfully dumped {dumpedData.Length} bytes to {fullPath} in {stopwatch.Elapsed.TotalSeconds:F1}s.", LogCategory.Info);
-        }
 
         public async Task LoadConfigurationOnStartup()
         {

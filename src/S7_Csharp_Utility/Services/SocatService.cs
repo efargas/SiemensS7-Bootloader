@@ -3,16 +3,18 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
+using S7_Csharp_Utility.Interfaces;
 
 namespace S7_Csharp_Utility.Services
 {
     /// <summary>
     /// Service for managing the socat process.
     /// </summary>
-    public class SocatService
+    public class SocatService : ISocatService
     {
         private Process? _socatProcess;
-        private readonly SocatLoggerService _logger;
+        private readonly ILogger<SocatService> _logger;
 
         /// <summary>
         /// Gets all running socat process IDs as an array.
@@ -40,7 +42,7 @@ namespace S7_Csharp_Utility.Services
                                     list.Add(pid);
                                 }
                             }
-                            catch { }
+                            catch { /* Ignore errors reading cmdline */ }
                         }
                     }
                     return list.ToArray();
@@ -55,10 +57,10 @@ namespace S7_Csharp_Utility.Services
         /// <summary>
         /// Kills all running socat processes.
         /// </summary>
-        public static void KillAllSocatProcesses(Action<string>? log = null)
+        public static void KillAllSocatProcesses(ILogger? logger = null)
         {
             var firstPIDs = GetSocatProcessIds();
-            log?.Invoke($"[SOCAT] Attempting to kill socat PIDs: {string.Join(", ", firstPIDs)}");
+            logger?.LogInformation("[SOCAT] Attempting to kill socat PIDs: {PIDs}", string.Join(", ", firstPIDs));
             foreach (var pid in firstPIDs)
             {
                 try
@@ -67,26 +69,26 @@ namespace S7_Csharp_Utility.Services
                     var processName = proc.ProcessName;
                     proc.Kill();
                     proc.WaitForExit(1000);
-                    log?.Invoke($"[SOCAT] Killed socat process with PID {pid} ({processName})");
+                    logger?.LogInformation("[SOCAT] Killed socat process with PID {PID} ({ProcessName})", pid, processName);
                 }
                 catch (Exception ex)
                 {
-                    log?.Invoke($"[SOCAT] Failed to kill socat process with PID {pid}: {ex.Message}");
+                    logger?.LogError(ex, "[SOCAT] Failed to kill socat process with PID {PID}", pid);
                 }
             }
             // Check again for survivors
             var remaining = GetSocatProcessIds();
             if (remaining.Length > 0)
-                log?.Invoke($"[SOCAT][WARNING] The following socat PIDs are still running after kill: {string.Join(", ", remaining)}");
+                logger?.LogWarning("[SOCAT] The following socat PIDs are still running after kill: {PIDs}", string.Join(", ", remaining));
             else
-                log?.Invoke("[SOCAT] All socat processes terminated.");
+                logger?.LogInformation("[SOCAT] All socat processes terminated.");
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SocatService"/> class.
         /// </summary>
-        /// <param name="logger">The logger service for socat.</param>
-        public SocatService(SocatLoggerService logger)
+        /// <param name="logger">The logger instance.</param>
+        public SocatService(ILogger<SocatService> logger)
         {
             _logger = logger;
         }
@@ -99,8 +101,6 @@ namespace S7_Csharp_Utility.Services
         /// <summary>
         /// Starts the socat process.
         /// </summary>
-        /// <param name="serialPort">The serial port to connect to.</param>
-        /// <param name="tcpPort">The TCP port to listen on.</param>
         public void Start(string serialPort, int tcpPort, bool verbose, bool hexDump, int blockSize)
         {
             if (IsRunning)
@@ -108,14 +108,12 @@ namespace S7_Csharp_Utility.Services
                 Stop();
             }
 
-            _logger.Clear();
-            _logger.Log($"Starting socat: TCP-LISTEN:{tcpPort} <-> {serialPort}");
+            _logger.LogInformation("Starting socat: TCP-LISTEN:{TcpPort} <-> {SerialPort}", tcpPort, serialPort);
 
-            // Validate and normalize serial device path
             var device = serialPort?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(device))
             {
-                _logger.Log("ERROR: No serial port selected. Please select a serial device before starting socat.");
+                _logger.LogError("No serial port selected. Please select a serial device before starting socat.");
                 throw new ArgumentException("Serial port is required");
             }
             if (!device.StartsWith("/dev/", StringComparison.Ordinal))
@@ -127,20 +125,18 @@ namespace S7_Csharp_Utility.Services
             if (verbose) flagArgs += "-d -d -v ";
             if (blockSize > 0) flagArgs += $"-b {blockSize} ";
             if (hexDump) flagArgs += "-x ";
-            // Ensure raw serial and no echo to faithfully pass bytes
             string rhs = $"{device},raw,echo=0";
             string arguments = $"{flagArgs}TCP-LISTEN:{tcpPort},fork,reuseaddr {rhs}";
-            _logger.Log($"Executing: socat {arguments}");
+            _logger.LogInformation("Executing: socat {Arguments}", arguments);
 
-            // On Unix platforms, set default serial parameters with stty as in reference 'start.sh'
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 string sttyFlags = "cs8 38400 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke -ixon -crtscts -parodd parenb raw";
                 string sttyCmd = $"stty -F {device} {sttyFlags}";
-                _logger.Log($"Executing: {sttyCmd}");
+                _logger.LogInformation("Executing: {SttyCmd}", sttyCmd);
                 try
                 {
-                    var sttyProcess = new Process()
+                    var sttyProcess = new Process
                     {
                         StartInfo = new ProcessStartInfo
                         {
@@ -157,12 +153,12 @@ namespace S7_Csharp_Utility.Services
                     if (sttyProcess.ExitCode != 0)
                     {
                         string err = sttyProcess.StandardError.ReadToEnd();
-                        _logger.Log($"WARNING: stty exited with code {sttyProcess.ExitCode}: {err}");
+                        _logger.LogWarning("stty exited with code {ExitCode}: {Error}", sttyProcess.ExitCode, err);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"WARNING: Failed to run stty for serial device setup: {ex.Message}");
+                    _logger.LogWarning(ex, "Failed to run stty for serial device setup.");
                 }
             }
 
@@ -181,21 +177,20 @@ namespace S7_Csharp_Utility.Services
                 _socatProcess = Process.Start(processStartInfo);
                 if (_socatProcess == null)
                 {
-                    throw new Exception("Failed to start socat process.");
+                    throw new InvalidOperationException("Failed to start socat process.");
                 }
 
                 _socatProcess.EnableRaisingEvents = true;
-                _socatProcess.Exited += (s, e) => _logger.Log($"socat exited with code {_socatProcess.ExitCode}");
+                _socatProcess.Exited += (s, e) => _logger.LogInformation("socat exited with code {ExitCode}", _socatProcess.ExitCode);
 
-                _socatProcess.OutputDataReceived += (sender, args) => { if (args.Data != null) _logger.Log(args.Data); };
-                _socatProcess.ErrorDataReceived += (sender, args) => { if (args.Data != null) _logger.Log(args.Data); };
+                _socatProcess.OutputDataReceived += (sender, args) => { if (args.Data != null) _logger.LogInformation("{SocatOutput}", args.Data); };
+                _socatProcess.ErrorDataReceived += (sender, args) => { if (args.Data != null) _logger.LogError("{SocatError}", args.Data); };
                 _socatProcess.BeginOutputReadLine();
                 _socatProcess.BeginErrorReadLine();
             }
             catch (Exception ex)
             {
-                // Handle exceptions, e.g., socat not found
-                _logger.Log($"ERROR: Failed to start socat. Make sure it is installed and in the system's PATH. Error: {ex.Message}");
+                _logger.LogError(ex, "Failed to start socat. Make sure it is installed and in the system's PATH.");
                 throw;
             }
         }
