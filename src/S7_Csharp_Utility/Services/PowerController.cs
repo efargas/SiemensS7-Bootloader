@@ -99,12 +99,20 @@ namespace S7_Csharp_Utility.Services
             {
                 await ConnectAsync(host, port, cancellationToken);
             }
+
             _logger.LogInformation("[POWER] Turning PLC power OFF...");
             await SetPowerAsync((ushort)coil, false);
-            _logger.LogInformation("[POWER] Waiting {DelaySeconds} seconds before powering on...", delaySeconds);
-            await Task.Delay(delaySeconds * 1000, cancellationToken);
-            _logger.LogInformation("[POWER] Turning PLC power ON...");
-            await SetPowerAsync((ushort)coil, true);
+
+            try
+            {
+                _logger.LogInformation("[POWER] Waiting {DelaySeconds} seconds before powering on...", delaySeconds);
+                await Task.Delay(delaySeconds * 1000, cancellationToken);
+            }
+            finally
+            {
+                _logger.LogInformation("[POWER] Turning PLC power ON...");
+                await SetPowerAsync((ushort)coil, true);
+            }
         }
 
         public void Dispose()
