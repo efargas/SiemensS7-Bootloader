@@ -1,4 +1,4 @@
-using S7.Net.Interfaces;
+﻿using S7.Net.Interfaces;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,13 +14,11 @@ namespace S7.Net.Channels
         private readonly int _port;
         private TcpClient? _client;
         private NetworkStream? _stream;
-        private bool _disposed;
 
         /// <summary>
         /// Indicates whether the channel is connected.
         /// </summary>
         public bool IsConnected => _client?.Connected ?? false;
-
         /// <summary>
         /// Indicates whether there is data available to be read.
         /// </summary>
@@ -53,21 +51,20 @@ namespace S7.Net.Channels
         /// </summary>
         public void Disconnect()
         {
-            if (_stream != null)
-            {
-                _stream.Close();
-                _stream = null;
-            }
-            if (_client != null)
-            {
-                _client.Close();
-                _client = null;
-            }
+            _stream?.Close();
+            _client?.Close();
+            _stream = null;
+            _client = null;
         }
 
         /// <summary>
         /// Reads data from the TCP stream.
         /// </summary>
+        /// <param name="buffer">The buffer to read data into.</param>
+        /// <param name="offset">The offset in the buffer to start writing to.</param>
+        /// <param name="count">The number of bytes to read.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The number of bytes read.</returns>
         public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");
@@ -77,37 +74,14 @@ namespace S7.Net.Channels
         /// <summary>
         /// Writes data to the TCP stream.
         /// </summary>
+        /// <param name="buffer">The buffer containing the data to write.</param>
+        /// <param name="offset">The offset in the buffer to start writing from.</param>
+        /// <param name="count">The number of bytes to write.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
         {
             if (_stream == null) throw new System.IO.IOException("Not connected.");
             await _stream.WriteAsync(buffer, offset, count, cancellationToken);
-        }
-
-        /// <summary>
-        /// Disposes the channel resources.
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            System.GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// Disposes the channel resources.
-        /// </summary>
-        /// <param name="disposing">True if called from Dispose(), false if called from a finalizer.</param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed) return;
-
-            if (disposing)
-            {
-                // Dispose managed state (managed objects).
-                _stream?.Dispose();
-                _client?.Dispose();
-            }
-
-            _disposed = true;
         }
     }
 }
