@@ -349,12 +349,7 @@ namespace S7.Net
 
             _log($"Requesting UART speed change to {baudRate} baud (IBRD={ibrd}, FBRD={fbrd})...");
             // Prepare arguments: "A" + IBRD (4 bytes) + FBRD (4 bytes)
-            var args = new byte[1 + 4 + 4];
-            args[0] = (byte)'A';
-            var ibrdBytes = GetBigEndianBytes(ibrd);
-            var fbrdBytes = GetBigEndianBytes(fbrd);
-            Buffer.BlockCopy(ibrdBytes, 0, args, 1, 4);
-            Buffer.BlockCopy(fbrdBytes, 0, args, 5, 4);
+            var args = BuildUartSpeedArgs(ibrd, fbrd);
 
             var response = await _protocolHandler.InvokeAddHookAsync(PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, args, true, cancellationToken).ConfigureAwait(false);
 
