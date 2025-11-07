@@ -155,18 +155,22 @@ int doit(uint8_t *read_buf, unsigned char *write_buf) {
     uint32_t ibrd = read_be32(read_buf + 4);
     uint32_t fbrd = read_be32(read_buf + 8);
     
-    // Reconfigure UART speed with provided divisors
-    int result = reconfigure_uart_speed(ibrd, fbrd);
-    
-    if (result == 0) {
-        // Success - send confirmation
-        // Note: This will be sent at the OLD baud rate, then the host
-        // must switch to the new baud rate
-        UART_protocol_send_single(greeting, sizeof(greeting) - 1);
-    } else {
-        // Error - send error message
+    // Validate divisors before attempting to reconfigure
+    if (ibrd == 0 || ibrd > 0xFFFF || fbrd > 0x3F) {
+        // Error - send error message at the current baud rate
         UART_protocol_send_single(error_msg, sizeof(error_msg) - 1);
+        write_buf[0] = 1;
+        return -1;
     }
+
+    // Success - send confirmation at the OLD baud rate
+    UART_protocol_send_single(greeting, sizeof(greeting) - 1);
+
+    // Wait for the confirmation message to be fully transmitted
+    uart_wait_tx_complete();
+
+    // Now, reconfigure the UART to the new speed
+    int result = reconfigure_uart_speed(ibrd, fbrd);
     
     write_buf[0] = (result == 0) ? 0 : 1;
     return result;
