@@ -9,18 +9,20 @@ namespace S7.Core.Abstractions.Commands
 {
     /// <summary>
     /// Options for memory dump command handler operations.
+    /// Supports both single-section and multi-section memory dumps.
     /// </summary>
     public class MemoryDumpOptions : CommandHandlerOptions
     {
         /// <summary>
         /// Gets or sets the starting memory address for the dump operation.
+        /// Only used when MemorySections is null or empty.
         /// </summary>
-        [Required(ErrorMessage = "Memory address is required")]
         [NumericRange(0, uint.MaxValue, ErrorMessage = "Address must be a valid 32-bit unsigned integer")]
         public uint Address { get; set; }
 
         /// <summary>
         /// Gets or sets the starting memory address for the dump operation (alias for Address).
+        /// Only used when MemorySections is null or empty.
         /// </summary>
         public uint StartAddress 
         { 
@@ -30,10 +32,17 @@ namespace S7.Core.Abstractions.Commands
 
         /// <summary>
         /// Gets or sets the length of memory to dump in bytes.
+        /// Only used when MemorySections is null or empty.
         /// </summary>
-        [Required(ErrorMessage = "Memory length is required")]
         [NumericRange(1, uint.MaxValue, Alignment = 4, ErrorMessage = "Length must be at least 1 byte and aligned to 4-byte boundary")]
         public uint Length { get; set; }
+
+        /// <summary>
+        /// Gets or sets the array of memory sections to dump sequentially.
+        /// When specified, this takes precedence over Address and Length properties.
+        /// Each section will be dumped, saved, and require client acknowledgment before proceeding.
+        /// </summary>
+        public MemorySection[]? MemorySections { get; set; }
 
         /// <summary>
         /// Gets or sets the path to the payload file to use for the operation.
@@ -140,12 +149,70 @@ namespace S7.Core.Abstractions.Commands
         {
             var results = base.Validate().ToList();
 
-            // Validate address + length doesn't overflow
-            if (Address > uint.MaxValue - Length)
+            // Check if we're using sections or single address/length
+            bool usingSections = MemorySections != null && MemorySections.Length > 0;
+
+            if (!usingSections)
             {
-                results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
-                    "Address + Length would cause integer overflow",
-                    new[] { nameof(Address), nameof(Length) }));
+                // Single-section mode validation
+                if (Address == 0 && Length == 0)
+                {
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
+                        "Either MemorySections must be specified, or Address and Length must be provided",
+                        new[] { nameof(Address), nameof(Length), nameof(MemorySections) }));
+                }
+
+                // Validate address + length doesn't overflow
+                if (Address > uint.MaxValue - Length)
+                {
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
+                        "Address + Length would cause integer overflow",
+                        new[] { nameof(Address), nameof(Length) }));
+                }
+
+                // Validate chunk size is reasonable for the total length
+                if (Length > 0 && ChunkSize > Length)
+                {
+                    results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
+                        "Chunk size cannot be larger than total length",
+                        new[] { nameof(ChunkSize), nameof(Length) }));
+                }
+            }
+            else
+            {
+                // Multi-section mode validation
+                for (int i = 0; i < MemorySections!.Length; i++)
+                {
+                    var section = MemorySections[i];
+                    
+                    if (string.IsNullOrWhiteSpace(section.Name))
+                    {
+                        results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
+                            $"Section {i}: Name is required",
+                            new[] { $"MemorySections[{i}].Name" }));
+                    }
+
+                    if (section.Length == 0)
+                    {
+                        results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
+                            $"Section {i} ({section.Name}): Length must be greater than 0",
+                            new[] { $"MemorySections[{i}].Length" }));
+                    }
+
+                    if (section.Address > uint.MaxValue - section.Length)
+                    {
+                        results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
+                            $"Section {i} ({section.Name}): Address + Length would cause integer overflow",
+                            new[] { $"MemorySections[{i}].Address", $"MemorySections[{i}].Length" }));
+                    }
+
+                    if (section.Length > 0 && ChunkSize > section.Length)
+                    {
+                        results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
+                            $"Section {i} ({section.Name}): Chunk size cannot be larger than section length",
+                            new[] { nameof(ChunkSize), $"MemorySections[{i}].Length" }));
+                    }
+                }
             }
 
             // Validate output file doesn't exist if overwrite is disabled
@@ -158,14 +225,6 @@ namespace S7.Core.Abstractions.Commands
                         $"Output file already exists and overwrite is disabled: {outputPath}",
                         new[] { nameof(CustomFilename), nameof(OverwriteExisting) }));
                 }
-            }
-
-            // Validate chunk size is reasonable for the total length
-            if (ChunkSize > Length)
-            {
-                results.Add(new System.ComponentModel.DataAnnotations.ValidationResult(
-                    "Chunk size cannot be larger than total length",
-                    new[] { nameof(ChunkSize), nameof(Length) }));
             }
 
             return results;

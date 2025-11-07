@@ -43,6 +43,9 @@
 **/bin/**/*.mdb
 **/bin/**/*.vshost.*
 **/bin/**/*.lastcodeanalysissucceeded
+**/bin/**/runtimes/
+**/bin/**/S7_CS_Utility
+**/bin/**/CoverletSourceRootsMapping_*
 
 # NuGet packages
 *.nupkg

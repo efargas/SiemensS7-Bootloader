@@ -1,11 +1,44 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using S7.Core.Abstractions.Configuration;
 
 namespace S7.Core.Abstractions.Commands
 {
     /// <summary>
+    /// Represents a single memory section to be dumped.
+    /// </summary>
+    public record MemorySection
+    {
+        /// <summary>
+        /// Gets the name/description of this memory section.
+        /// </summary>
+        [Required]
+        public string Name { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Gets the starting memory address for this section.
+        /// </summary>
+        [Required]
+        [Range(0, uint.MaxValue)]
+        public uint Address { get; init; }
+
+        /// <summary>
+        /// Gets the length of memory to dump in bytes for this section.
+        /// </summary>
+        [Required]
+        [Range(1, uint.MaxValue)]
+        public uint Length { get; init; }
+
+        /// <summary>
+        /// Gets optional metadata for this section.
+        /// </summary>
+        public string? Metadata { get; init; }
+    }
+
+    /// <summary>
     /// Command for performing memory dump operations on a PLC.
+    /// Supports dumping single or multiple memory sections sequentially.
     /// </summary>
     public class MemoryDumpCommand : ICommand<MemoryDumpResult>
     {
@@ -16,17 +49,23 @@ namespace S7.Core.Abstractions.Commands
 
         /// <summary>
         /// Gets the starting memory address for the dump operation.
+        /// Only used when MemorySections is null or empty.
         /// </summary>
-        [Required]
         [Range(0, uint.MaxValue)]
         public uint Address { get; init; }
 
         /// <summary>
         /// Gets the length of memory to dump in bytes.
+        /// Only used when MemorySections is null or empty.
         /// </summary>
-        [Required]
         [Range(1, uint.MaxValue)]
         public uint Length { get; init; }
+
+        /// <summary>
+        /// Gets the array of memory sections to dump sequentially.
+        /// When specified, this takes precedence over Address and Length properties.
+        /// </summary>
+        public MemorySection[]? MemorySections { get; init; }
 
         /// <summary>
         /// Gets the path to the payload file to use for the operation.
@@ -91,9 +130,19 @@ namespace S7.Core.Abstractions.Commands
     public class MemoryDumpResult
     {
         /// <summary>
-        /// Gets the path to the generated dump file.
+        /// Gets the path to the generated dump file (single section mode).
         /// </summary>
         public string DumpFilePath { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Gets the paths to all generated dump files (multi-section mode).
+        /// </summary>
+        public List<string> DumpFilePaths { get; init; } = new();
+
+        /// <summary>
+        /// Gets the section results for multi-section dumps.
+        /// </summary>
+        public List<SectionDumpResult>? SectionResults { get; init; }
 
         /// <summary>
         /// Gets the actual number of bytes dumped.
@@ -175,5 +224,61 @@ namespace S7.Core.Abstractions.Commands
         /// Gets the time spent on verification (if enabled).
         /// </summary>
         public TimeSpan VerificationTime { get; init; }
+    }
+
+    /// <summary>
+    /// Result of dumping a single memory section.
+    /// </summary>
+    public class SectionDumpResult
+    {
+        /// <summary>
+        /// Gets the name of the section that was dumped.
+        /// </summary>
+        public string SectionName { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Gets the starting address of the section.
+        /// </summary>
+        public uint StartAddress { get; init; }
+
+        /// <summary>
+        /// Gets the length of the section in bytes.
+        /// </summary>
+        public uint Length { get; init; }
+
+        /// <summary>
+        /// Gets the path to the dump file for this section.
+        /// </summary>
+        public string DumpFilePath { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Gets the number of bytes actually dumped for this section.
+        /// </summary>
+        public uint BytesDumped { get; init; }
+
+        /// <summary>
+        /// Gets the duration of dumping this section.
+        /// </summary>
+        public TimeSpan Duration { get; init; }
+
+        /// <summary>
+        /// Gets the checksum of this section's data (if verification was enabled).
+        /// </summary>
+        public string? Checksum { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether this section was verified successfully.
+        /// </summary>
+        public bool IsVerified { get; init; }
+
+        /// <summary>
+        /// Gets whether the client acknowledged this section completion.
+        /// </summary>
+        public bool ClientAcknowledged { get; init; }
+
+        /// <summary>
+        /// Gets the timestamp when acknowledgment was received.
+        /// </summary>
+        public DateTime? AcknowledgmentTime { get; init; }
     }
 }
