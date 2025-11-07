@@ -297,15 +297,16 @@ namespace S7_Csharp_Utility.Services
                         _logger.Log($"[SOCAT] ✅ Successfully restarted socat at {newBaudRate} baud");
                         return true;
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
-                        _logger.Log($"[SOCAT] Restart attempt {i + 1} failed: {ex.Message}. Retrying in {retryDelayMs}ms...");
                         if (i < maxRetries - 1)
                         {
+                            _logger.Log($"[SOCAT] Restart attempt {i + 1} failed. Retrying in {retryDelayMs}ms...");
                             System.Threading.Thread.Sleep(retryDelayMs);
                         }
                         else
                         {
+                            _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate after multiple attempts.");
                             throw; // Re-throw the last exception if all retries fail
                         }
                     }
@@ -314,8 +315,8 @@ namespace S7_Csharp_Utility.Services
             }
             catch (Exception ex)
             {
-                _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate after multiple attempts: {ex.Message}");
-                return false;
+                _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate: {ex.Message}");
+                throw; // Propagate the exception to the caller
             }
         }
     }

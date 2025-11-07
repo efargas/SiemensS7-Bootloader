@@ -44,6 +44,18 @@ typedef struct {
 
 int (*read_flash_page_calc_crc)(unsigned short start_offset, unsigned int *fl_dw2_stored_crc_out, unsigned int *fl_dw_3_out_num_dwords, unsigned int *fl_dw_4_out, unsigned int *fl_dw_5_out, unsigned int *content_out, unsigned int *calc_crc_out, int use_inline_size, unsigned int *num_wait_cycles) = (int (*)(unsigned short start_offset, unsigned int *fl_dw2_stored_crc_out, unsigned int *fl_dw_3_out_num_dwords, unsigned int *fl_dw_4_out, unsigned int *fl_dw_5_out, unsigned int *content_out, unsigned int *calc_crc_out, int use_inline_size, unsigned int *num_wait_cycles)) 0x13A2C;
 
+/**
+ * @brief Safely read a 32-bit value from potentially unaligned memory
+ * @param p Pointer to the data to read
+ * @return The 32-bit value in little-endian format
+ * 
+ * This function prevents unaligned memory access faults on ARM processors
+ * by reading byte-by-byte and reconstructing the 32-bit value.
+ */
+static inline uint32_t read_le32(const uint8_t *p) {
+    return ((uint32_t)p[0]) | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
 int doit_multisection(unsigned char *, unsigned char *) __attribute__((noinline));
 
 /**
@@ -110,7 +122,7 @@ int _start(unsigned char *read_buf, unsigned char *write_buf) {
  * - Offset 8: Number of bytes to dump (4 bytes)
  */
 int doit_multisection(uint8_t *read_buf, unsigned char *write_buf) {
-    uint32_t magic = *((uint32_t *)(read_buf + 4));
+    uint32_t magic = read_le32(read_buf + 4);
     uint32_t num_sections;
     uint32_t i;
     char *tar_addr;
@@ -123,7 +135,7 @@ int doit_multisection(uint8_t *read_buf, unsigned char *write_buf) {
     /* Check if this is multi-section mode or legacy single-section */
     if (magic == 0xDEADBEEF) {
         /* Multi-section mode */
-        num_sections = *((uint32_t *)(read_buf + 8));
+        num_sections = read_le32(read_buf + 8);
         
         /* Validate number of sections */
         if (num_sections == 0 || num_sections > 16) {
@@ -137,8 +149,8 @@ int doit_multisection(uint8_t *read_buf, unsigned char *write_buf) {
             uint32_t section_offset = 12 + (i * 8);
             
             /* Extract section address and length */
-            tar_addr = *((char **)(read_buf + section_offset));
-            size = *((uint32_t *)(read_buf + section_offset + 4));
+            tar_addr = (char *)read_le32(read_buf + section_offset);
+            size = read_le32(read_buf + section_offset + 4);
             
             /* Validate section parameters */
             if (size == 0 || size > 0x100000) {  /* Max 1MB per section */
@@ -170,8 +182,8 @@ int doit_multisection(uint8_t *read_buf, unsigned char *write_buf) {
         
     } else {
         /* Legacy single-section mode (backward compatibility) */
-        size = *((uint32_t *)(read_buf + 8)); 
-        tar_addr = *((char **)(read_buf + 4));
+        size = read_le32(read_buf + 8); 
+        tar_addr = (char *)read_le32(read_buf + 4);
         
         /* Validate parameters */
         if (size == 0 || size > 0x100000) {
