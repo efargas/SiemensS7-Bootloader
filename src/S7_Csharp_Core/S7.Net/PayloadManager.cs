@@ -63,7 +63,8 @@ namespace S7.Net
                         "stager*",
                         "dump_mem*",
                         "hello_*",
-                        "tic_tac_toe*"
+                        "tic_tac_toe*",
+                        "set_uart_speed*"
                     };
 
                     var foundFiles = new HashSet<string>();
@@ -136,6 +137,16 @@ namespace S7.Net
         }
 
         /// <summary>
+        /// Asynchronously gets the UART speed reconfiguration payload.
+        /// </summary>
+        /// <returns>The UART speed reconfiguration payload as a byte array.</returns>
+        public async Task<byte[]> GetUartSpeedPayloadAsync(string payloadsBase)
+        {
+            var filePath = await FindPayloadFileAsync(payloadsBase, new[] { "set_uart_speed.bin", "set_uart_speed" }).ConfigureAwait(false);
+            return await File.ReadAllBytesAsync(filePath).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Asynchronously loads a payload from the specified file path.
         /// </summary>
         /// <param name="payloadPath">The path to the payload file.</param>
@@ -177,6 +188,8 @@ namespace S7.Net
                 return "Stager";
             if (fileName.Contains("dump_mem") || directory.Contains("dump_mem"))
                 return "Memory Dumper";
+            if (fileName.Contains("set_uart_speed") || directory.Contains("set_uart_speed"))
+                return "UART Speed Config";
             if (fileName.Contains("hello") || directory.Contains("hello"))
                 return "Hello World";
             if (fileName.Contains("tic_tac_toe") || directory.Contains("tic_tac_toe"))
@@ -199,6 +212,7 @@ namespace S7.Net
             {
                 "Stager" => $"Bootloader stager payload ({sizeKb:F1} KB)",
                 "Memory Dumper" => $"Memory dump utility ({sizeKb:F1} KB)",
+                "UART Speed Config" => $"UART speed reconfiguration ({sizeKb:F1} KB)",
                 "Hello World" => $"Hello World demo payload ({sizeKb:F1} KB)",
                 "Tic Tac Toe" => $"Tic Tac Toe game payload ({sizeKb:F1} KB)",
                 "Binary" => $"Binary payload ({sizeKb:F1} KB)",
