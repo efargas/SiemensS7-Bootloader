@@ -265,23 +265,15 @@ namespace S7_Csharp_Utility.Services
                 return false;
             }
 
-            if (!IsRunning)
-            {
-                _logger.Log($"[SOCAT] Warning: socat is not currently running. Starting with new baud rate {newBaudRate}...");
-            }
-            else
-            {
-                _logger.Log($"[SOCAT] Restarting socat with new baud rate: {_currentBaudRate} → {newBaudRate}");
-            }
+            var previousBaudRate = _currentBaudRate;
+            _logger.Log($"[SOCAT] Attempting to restart socat with new baud rate: {previousBaudRate} → {newBaudRate}");
 
             try
             {
-                // Stop current process if running
                 if (IsRunning)
                 {
                     Stop();
-                    // Give the system a moment to release the serial port
-                    System.Threading.Thread.Sleep(100); // A small initial delay
+                    System.Threading.Thread.Sleep(100);
                 }
 
                 const int maxRetries = 5;
@@ -290,33 +282,36 @@ namespace S7_Csharp_Utility.Services
                 {
                     try
                     {
-                        // Start with new baud rate but same other settings
-                        StartWithBaudRate(_currentSerialPort, _currentTcpPort, _currentVerbose,
-                                        _currentHexDump, _currentBlockSize, newBaudRate);
-
+                        StartWithBaudRate(_currentSerialPort, _currentTcpPort, _currentVerbose, _currentHexDump, _currentBlockSize, newBaudRate);
                         _logger.Log($"[SOCAT] ✅ Successfully restarted socat at {newBaudRate} baud");
                         return true;
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
+                        _logger.Log($"[SOCAT] Restart attempt {i + 1} with {newBaudRate} baud failed: {ex.Message}");
                         if (i < maxRetries - 1)
                         {
-                            _logger.Log($"[SOCAT] Restart attempt {i + 1} failed. Retrying in {retryDelayMs}ms...");
                             System.Threading.Thread.Sleep(retryDelayMs);
-                        }
-                        else
-                        {
-                            _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate after multiple attempts.");
-                            throw; // Re-throw the last exception if all retries fail
                         }
                     }
                 }
-                return false; // Should be unreachable
+
+                _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate {newBaudRate}. Reverting to {previousBaudRate} baud.");
+                try
+                {
+                    StartWithBaudRate(_currentSerialPort, _currentTcpPort, _currentVerbose, _currentHexDump, _currentBlockSize, previousBaudRate);
+                    _logger.Log($"[SOCAT] ✅ Successfully reverted to {previousBaudRate} baud.");
+                }
+                catch (Exception revertEx)
+                {
+                    _logger.Log($"[SOCAT] ❌ CRITICAL: Failed to revert to previous baud rate: {revertEx.Message}");
+                }
+                return false;
             }
             catch (Exception ex)
             {
-                _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate: {ex.Message}");
-                throw; // Propagate the exception to the caller
+                _logger.Log($"[SOCAT] ❌ An unexpected error occurred during restart: {ex.Message}");
+                return false;
             }
         }
     }
