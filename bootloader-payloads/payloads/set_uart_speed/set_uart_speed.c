@@ -204,10 +204,10 @@ int doit(uint8_t *read_buf, unsigned char *write_buf) {
         // Success - send confirmation
         // Note: This will be sent at the OLD baud rate, then the host
         // must switch to the new baud rate
-        UART_protocol_send_single(greeting, sizeof(greeting));
+        UART_protocol_send_single(greeting, sizeof(greeting) - 1);
     } else {
         // Error - send error message
-        UART_protocol_send_single(error_msg, sizeof(error_msg));
+        UART_protocol_send_single(error_msg, sizeof(error_msg) - 1);
     }
     
     write_buf[0] = (result == 0) ? 0 : 1;
