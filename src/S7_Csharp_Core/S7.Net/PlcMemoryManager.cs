@@ -353,8 +353,8 @@ namespace S7.Net
             args[0] = (byte)'A';
             var ibrdBytes = GetBigEndianBytes(ibrd);
             var fbrdBytes = GetBigEndianBytes(fbrd);
-            Array.Copy(ibrdBytes, 0, args, 1, 4);
-            Array.Copy(fbrdBytes, 0, args, 5, 4);
+            Buffer.BlockCopy(ibrdBytes, 0, args, 1, 4);
+            Buffer.BlockCopy(fbrdBytes, 0, args, 5, 4);
 
             var response = await _protocolHandler.InvokeAddHookAsync(PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, args, true, cancellationToken).ConfigureAwait(false);
 
