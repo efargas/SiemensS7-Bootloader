@@ -103,11 +103,12 @@ public async Task<byte[]> GetUartSpeedPayloadAsync(string payloadsBase)
 
 **PlcMemoryManager Methods:**
 ```csharp
-// Execute UART speed reconfiguration
+// Execute UART speed reconfiguration with optional callback
 public async Task<bool> SetUartSpeedAsync(
     uint baudRate, 
     byte[] uartSpeedPayload, 
-    PlcStagerManager stagerManager, 
+    PlcStagerManager stagerManager,
+    Action<uint>? onSuccessCallback = null,
     CancellationToken cancellationToken = default)
 ```
 
@@ -116,13 +117,46 @@ public async Task<bool> SetUartSpeedAsync(
 // User-facing API for UART speed configuration
 public async Task<bool> SetUartSpeedAsync(
     uint baudRate, 
-    byte[] uartSpeedPayload, 
+    byte[] uartSpeedPayload,
+    Action<uint>? onSuccessCallback = null,
     CancellationToken cancellationToken = default)
+```
+
+**SocatService Methods:**
+```csharp
+// Restart socat with new baud rate (automatic reconfiguration)
+public bool RestartWithNewBaudRate(int newBaudRate)
+
+// Get current baud rate
+public int CurrentBaudRate { get; }
 ```
 
 ## Usage Workflow
 
-### Programmatic Usage
+### Automatic Socat Reconfiguration (Recommended)
+
+```csharp
+// 1. Load UART speed payload
+var payloadManager = new PayloadManager(baseDirectory);
+var uartSpeedPayload = await payloadManager.GetUartSpeedPayloadAsync(payloadsBase);
+
+// 2. Set UART speed with automatic socat restart
+bool success = await plcClient.SetUartSpeedAsync(115200, uartSpeedPayload, 
+    onSuccessCallback: (newBaudRate) => 
+    {
+        // Automatically restart socat with new baud rate
+        socatService.RestartWithNewBaudRate((int)newBaudRate);
+    });
+
+if (success)
+{
+    // 3. Continue with faster memory dumps
+    var dumpPayload = await payloadManager.GetMemoryDumperPayloadAsync(payloadsBase);
+    var data = await plcClient.DumpMemoryAsync(address, length, dumpPayload, progress);
+}
+```
+
+### Manual Socat Reconfiguration
 
 ```csharp
 // 1. Load UART speed payload
@@ -164,18 +198,26 @@ if (success)
 
 ### Host Reconfiguration Required
 
-**Critical:** After the PLC's UART speed is changed, the host serial connection (socat or direct serial) MUST be reconfigured to match. The confirmation message "UART_SPEED_OK" is sent at the OLD baud rate, after which the UART switches to the new speed.
+**Automatic (Recommended):** Use the `onSuccessCallback` parameter to automatically restart socat with the new baud rate:
+
+```csharp
+await plcClient.SetUartSpeedAsync(115200, uartSpeedPayload, 
+    onSuccessCallback: (newBaudRate) => socatService.RestartWithNewBaudRate((int)newBaudRate));
+```
+
+**Manual (Fallback):** If automatic reconfiguration fails or is not used, the host serial connection (socat or direct serial) MUST be manually reconfigured to match. The confirmation message "UART_SPEED_OK" is sent at the OLD baud rate, after which the UART switches to the new speed.
 
 **Timing:**
 ```
 PLC sends "UART_SPEED_OK" → [still at old baud rate]
+Callback invoked (if provided) → [socat restarts with new baud rate]
 PLC switches UART to new speed → [immediately after sending]
-Host must switch to new baud rate → [before next communication]
+Host ready at new baud rate → [automatic or manual reconfiguration complete]
 ```
 
 ### Power Cycle Behavior
 
-**Reset on Power Loss:** UART speed returns to default (38400 baud) after PLC power cycle. The reconfiguration must be performed again after each power cycle.
+**Automatic Reset:** UART speed automatically returns to default (38400 baud) after PLC power cycle. No manual reversion is needed - the bootloader hardware initializes the UART to default settings on each boot.
 
 ### Reliability Considerations
 

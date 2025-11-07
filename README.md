@@ -88,12 +88,18 @@ This tool requires the ability to power-cycle the PLC to catch the bootloader at
     *   **Recommended Speed:** 115200 baud (3x faster)
     *   **Alternative Speeds:** 230400 baud (6x faster) or 460800 baud (12x faster, experimental)
     *   The application will upload the `set_uart_speed.bin` payload to reconfigure the UART.
-    *   After successful reconfiguration, you must also update your `socat` command to match the new baud rate:
+    *   **Automatic Socat Reconfiguration:** The application can automatically restart socat with the new baud rate using a callback:
+    ```csharp
+    await plcClient.SetUartSpeedAsync(115200, payload, 
+        onSuccessCallback: (newBaud) => socatService.RestartWithNewBaudRate((int)newBaud));
+    ```
+    *   **Manual Reconfiguration (Fallback):** If automatic reconfiguration is not used, manually restart socat:
     ```sh
     # Example for 115200 baud
+    killall socat
     socat TCP-LISTEN:10001,fork,reuseaddr /dev/ttyUSB0,raw,echo=0,b115200
     ```
-    *   **Note:** UART speed returns to default (38400) after PLC power cycle.
+    *   **Note:** UART speed automatically returns to default (38400) after PLC power cycle - no manual reversion needed.
 
 6.  **Dump Comparison:**
     *   This utility helps find identical dump files.

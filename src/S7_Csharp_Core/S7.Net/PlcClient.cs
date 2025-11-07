@@ -177,14 +177,15 @@ namespace S7.Net
         /// </summary>
         /// <param name="baudRate">The target baud rate (38400, 57600, 115200, 230400, or 460800).</param>
         /// <param name="uartSpeedPayload">The UART speed reconfiguration payload binary.</param>
+        /// <param name="onSuccessCallback">Optional callback invoked after successful PLC reconfiguration. Can be used to automatically restart socat with the new baud rate.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>True if UART speed was successfully changed, false otherwise.</returns>
         /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
         /// <exception cref="ArgumentNullException">Thrown when uartSpeedPayload is null.</exception>
         /// <exception cref="ArgumentException">Thrown when baud rate is invalid.</exception>
-        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, CancellationToken cancellationToken = default)
+        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, Action<uint>? onSuccessCallback = null, CancellationToken cancellationToken = default)
         {
-            return await _memoryManager.SetUartSpeedAsync(baudRate, uartSpeedPayload, _stagerManager, cancellationToken).ConfigureAwait(false);
+            return await _memoryManager.SetUartSpeedAsync(baudRate, uartSpeedPayload, _stagerManager, onSuccessCallback, cancellationToken).ConfigureAwait(false);
         }
 
         #region IDisposable Implementation

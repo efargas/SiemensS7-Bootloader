@@ -253,12 +253,13 @@ namespace S7.Net
         /// <param name="baudRate">The target baud rate (38400, 57600, 115200, 230400, or 460800).</param>
         /// <param name="uartSpeedPayload">The UART speed reconfiguration payload.</param>
         /// <param name="stagerManager">The stager manager for payload installation.</param>
+        /// <param name="onSuccessCallback">Optional callback invoked after successful PLC reconfiguration, before host reconfiguration is needed. Receives the new baud rate as parameter.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>True if UART speed was successfully changed, false otherwise.</returns>
         /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
         /// <exception cref="ArgumentNullException">Thrown when uartSpeedPayload is null.</exception>
         /// <exception cref="ArgumentException">Thrown when baud rate is invalid.</exception>
-        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, PlcStagerManager stagerManager, CancellationToken cancellationToken = default)
+        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, PlcStagerManager stagerManager, Action<uint>? onSuccessCallback = null, CancellationToken cancellationToken = default)
         {
             if (uartSpeedPayload is null) throw new ArgumentNullException(nameof(uartSpeedPayload));
             if (stagerManager is null) throw new ArgumentNullException(nameof(stagerManager));
@@ -299,7 +300,27 @@ namespace S7.Net
             if (responseStr.StartsWith("UART_SPEED_OK"))
             {
                 _log($"✅ UART speed successfully changed to {baudRate} baud.");
-                _log($"⚠️  WARNING: You must now reconfigure your socat/serial connection to {baudRate} baud!");
+                
+                // Invoke callback before host reconfiguration (e.g., to restart socat)
+                if (onSuccessCallback != null)
+                {
+                    _log($"Invoking success callback for host reconfiguration...");
+                    try
+                    {
+                        onSuccessCallback(baudRate);
+                        _log($"✅ Host reconfiguration callback completed successfully.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log($"⚠️  Warning: Host reconfiguration callback failed: {ex.Message}");
+                        _log($"⚠️  You must manually reconfigure your socat/serial connection to {baudRate} baud!");
+                    }
+                }
+                else
+                {
+                    _log($"⚠️  WARNING: You must now reconfigure your socat/serial connection to {baudRate} baud!");
+                }
+                
                 return true;
             }
             else if (responseStr.StartsWith("UART_SPEED_ERR"))

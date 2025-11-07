@@ -13,6 +13,14 @@ namespace S7_Csharp_Utility.Services
     {
         private Process? _socatProcess;
         private readonly SocatLoggerService _logger;
+        
+        // Store current socat configuration for restart capability
+        private string? _currentSerialPort;
+        private int _currentTcpPort;
+        private bool _currentVerbose;
+        private bool _currentHexDump;
+        private int _currentBlockSize;
+        private int _currentBaudRate = 38400; // Default baud rate
 
         /// <summary>
         /// Gets all running socat process IDs as an array.
@@ -97,19 +105,49 @@ namespace S7_Csharp_Utility.Services
         public bool IsRunning => _socatProcess != null && !_socatProcess.HasExited;
 
         /// <summary>
+        /// Gets the current baud rate being used by socat.
+        /// </summary>
+        public int CurrentBaudRate => _currentBaudRate;
+
+        /// <summary>
         /// Starts the socat process.
         /// </summary>
         /// <param name="serialPort">The serial port to connect to.</param>
         /// <param name="tcpPort">The TCP port to listen on.</param>
+        /// <param name="verbose">Enable verbose logging.</param>
+        /// <param name="hexDump">Enable hex dump logging.</param>
+        /// <param name="blockSize">Block size for socat.</param>
         public void Start(string serialPort, int tcpPort, bool verbose, bool hexDump, int blockSize)
+        {
+            StartWithBaudRate(serialPort, tcpPort, verbose, hexDump, blockSize, 38400);
+        }
+
+        /// <summary>
+        /// Starts the socat process with a specific baud rate.
+        /// </summary>
+        /// <param name="serialPort">The serial port to connect to.</param>
+        /// <param name="tcpPort">The TCP port to listen on.</param>
+        /// <param name="verbose">Enable verbose logging.</param>
+        /// <param name="hexDump">Enable hex dump logging.</param>
+        /// <param name="blockSize">Block size for socat.</param>
+        /// <param name="baudRate">Baud rate to use (38400, 57600, 115200, 230400, 460800).</param>
+        public void StartWithBaudRate(string serialPort, int tcpPort, bool verbose, bool hexDump, int blockSize, int baudRate)
         {
             if (IsRunning)
             {
                 Stop();
             }
 
+            // Store current configuration for restart capability
+            _currentSerialPort = serialPort;
+            _currentTcpPort = tcpPort;
+            _currentVerbose = verbose;
+            _currentHexDump = hexDump;
+            _currentBlockSize = blockSize;
+            _currentBaudRate = baudRate;
+
             _logger.Clear();
-            _logger.Log($"Starting socat: TCP-LISTEN:{tcpPort} <-> {serialPort}");
+            _logger.Log($"Starting socat: TCP-LISTEN:{tcpPort} <-> {serialPort} @ {baudRate} baud");
 
             // Validate and normalize serial device path
             var device = serialPort?.Trim() ?? string.Empty;
@@ -135,7 +173,7 @@ namespace S7_Csharp_Utility.Services
             // On Unix platforms, set default serial parameters with stty as in reference 'start.sh'
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                string sttyFlags = "cs8 38400 ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke -ixon -crtscts -parodd parenb raw";
+                string sttyFlags = $"cs8 {baudRate} ignbrk -brkint -icrnl -imaxbel -opost -onlcr -isig -icanon -iexten -echo -echoe -echok -echoctl -echoke -ixon -crtscts -parodd parenb raw";
                 string sttyCmd = $"stty -F {device} {sttyFlags}";
                 _logger.Log($"Executing: {sttyCmd}");
                 try
@@ -211,6 +249,53 @@ namespace S7_Csharp_Utility.Services
                 _socatProcess.WaitForExit();
             }
             _socatProcess = null;
+        }
+
+        /// <summary>
+        /// Restarts socat with a new baud rate while preserving all other settings.
+        /// This is useful after reconfiguring the PLC's UART speed.
+        /// </summary>
+        /// <param name="newBaudRate">The new baud rate to use (38400, 57600, 115200, 230400, 460800).</param>
+        /// <returns>True if restart was successful, false if socat was not previously running or restart failed.</returns>
+        public bool RestartWithNewBaudRate(int newBaudRate)
+        {
+            if (string.IsNullOrEmpty(_currentSerialPort))
+            {
+                _logger.Log($"[SOCAT] Cannot restart with new baud rate: socat has never been started.");
+                return false;
+            }
+
+            if (!IsRunning)
+            {
+                _logger.Log($"[SOCAT] Warning: socat is not currently running. Starting with new baud rate {newBaudRate}...");
+            }
+            else
+            {
+                _logger.Log($"[SOCAT] Restarting socat with new baud rate: {_currentBaudRate} → {newBaudRate}");
+            }
+
+            try
+            {
+                // Stop current process if running
+                if (IsRunning)
+                {
+                    Stop();
+                    // Give the system a moment to release the serial port
+                    System.Threading.Thread.Sleep(500);
+                }
+
+                // Start with new baud rate but same other settings
+                StartWithBaudRate(_currentSerialPort, _currentTcpPort, _currentVerbose, 
+                                _currentHexDump, _currentBlockSize, newBaudRate);
+
+                _logger.Log($"[SOCAT] ✅ Successfully restarted socat at {newBaudRate} baud");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate: {ex.Message}");
+                return false;
+            }
         }
     }
 }
