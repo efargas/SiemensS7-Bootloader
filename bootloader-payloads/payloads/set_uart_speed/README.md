@@ -50,6 +50,8 @@ read_buf[4:7] = IBRD (uint32_t, big-endian)
 read_buf[8:11] = FBRD (uint32_t, big-endian)
 ```
 
+**Note:** The payload uses a safe `read_be32()` helper function to read big-endian values from the buffer, avoiding potential unaligned memory access issues on ARM processors.
+
 ## Usage
 
 ### Building

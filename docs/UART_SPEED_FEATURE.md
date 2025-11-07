@@ -69,6 +69,7 @@ This feature enables dynamic reconfiguration of the Siemens S7 PLC's UART baud r
 **Key Features:**
 - Receives pre-calculated IBRD and FBRD divisors from host (no hardcoded clock frequency)
 - Supports any baud rate supported by PL011 UART hardware
+- Safe big-endian reading with `read_be32()` helper to avoid unaligned memory access
 - Configures PL011 UART registers:
   - UARTIBRD: Integer baud rate divisor (0-65535)
   - UARTFBRD: Fractional baud rate divisor (0-63)
@@ -76,7 +77,7 @@ This feature enables dynamic reconfiguration of the Siemens S7 PLC's UART baud r
   - UARTCR: Control register (UART enable, TX/RX enable)
 - Returns "UART_SPEED_OK" on success
 - Returns "UART_SPEED_ERR" on failure
-- Binary size: 788 bytes (optimized)
+- Binary size: 880 bytes (optimized with safe endianness handling)
 
 **Baud Rate Divisor Calculations (Host-Side):**
 

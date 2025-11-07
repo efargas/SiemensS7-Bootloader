@@ -50,6 +50,18 @@ char greeting[] = "UART_SPEED_OK\0";
 char error_msg[] = "UART_SPEED_ERR\0";
 
 /**
+ * @brief Read a big-endian uint32_t from a byte buffer
+ * @param p Pointer to 4-byte buffer
+ * @return 32-bit value in host byte order
+ * 
+ * This function safely reads a big-endian value from an unaligned buffer,
+ * avoiding potential alignment issues on ARM processors.
+ */
+uint32_t read_be32(const uint8_t *p) {
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
+}
+
+/**
  * @brief Wait for UART to finish transmitting
  */
 void uart_wait_tx_complete(void) {
@@ -138,10 +150,10 @@ int _start(unsigned char *read_buf, unsigned char *write_buf) {
  * @return 0 on success
  */
 int doit(uint8_t *read_buf, unsigned char *write_buf) {
-    // Extract IBRD and FBRD from read_buf
-    // Host sends: "A" + IBRD (4 bytes) + FBRD (4 bytes)
-    uint32_t ibrd = *((uint32_t *)(read_buf + 4));
-    uint32_t fbrd = *((uint32_t *)(read_buf + 8));
+    // Extract IBRD and FBRD from read_buf using safe big-endian read
+    // Host sends: "A" + IBRD (4 bytes, big-endian) + FBRD (4 bytes, big-endian)
+    uint32_t ibrd = read_be32(read_buf + 4);
+    uint32_t fbrd = read_be32(read_buf + 8);
     
     // Reconfigure UART speed with provided divisors
     int result = reconfigure_uart_speed(ibrd, fbrd);
