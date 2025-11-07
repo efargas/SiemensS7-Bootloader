@@ -64,16 +64,42 @@ char error_msg[] = "UART_SPEED_ERR\0";
  * @param baud_rate Target baud rate
  * @param ibrd Pointer to store integer divisor
  * @param fbrd Pointer to store fractional divisor
+ * 
+ * Pre-calculated divisor values for common baud rates to avoid division.
+ * Based on UART_CLK = 14.745600 MHz
  */
 void calculate_baud_divisors(uint32_t baud_rate, uint32_t *ibrd, uint32_t *fbrd) {
-    // BaudRateDivisor = UARTCLK / (16 × BaudRate)
-    uint32_t brd_x16 = UART_CLK_HZ / baud_rate;
-    *ibrd = brd_x16 >> 4;  // Divide by 16 to get integer part
+    // Use pre-calculated values for common baud rates
+    // BaudRateDivisor = 14745600 / (16 × BaudRate)
+    // IBRD = integer part, FBRD = fractional part × 64
     
-    // Calculate fractional part: ((BRD - IBRD) × 64 + 0.5)
-    // We multiply by 1024 (64*16) then divide by 16 for better precision
-    uint32_t remainder = brd_x16 & 0xF;
-    *fbrd = ((remainder * 64) + 8) >> 4;  // +8 for rounding (0.5 * 16)
+    switch(baud_rate) {
+        case 38400:
+            *ibrd = 24;
+            *fbrd = 0;
+            break;
+        case 57600:
+            *ibrd = 16;
+            *fbrd = 0;
+            break;
+        case 115200:
+            *ibrd = 8;
+            *fbrd = 0;
+            break;
+        case 230400:
+            *ibrd = 4;
+            *fbrd = 0;
+            break;
+        case 460800:
+            *ibrd = 2;
+            *fbrd = 0;
+            break;
+        default:
+            // For unknown rates, use safe default (38400)
+            *ibrd = 24;
+            *fbrd = 0;
+            break;
+    }
 }
 
 /**

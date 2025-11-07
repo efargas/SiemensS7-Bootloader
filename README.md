@@ -82,7 +82,20 @@ This tool requires the ability to power-cycle the PLC to catch the bootloader at
     *   **Dump Memory:** Click "Dump Memory". The application will upload the `dump_mem.bin` payload and begin the dump.
     *   Progress is shown in real-time. The dumped file will be saved in the application's root directory (e.g., `mem_dump_10000000_10000400.bin`).
 
-5.  **Dump Comparison:**
+5.  **UART Speed Optimization (Optional):**
+    *   For faster memory dumps, you can reconfigure the PLC's UART to a higher baud rate.
+    *   **Default Speed:** 38400 baud
+    *   **Recommended Speed:** 115200 baud (3x faster)
+    *   **Alternative Speeds:** 230400 baud (6x faster) or 460800 baud (12x faster, experimental)
+    *   The application will upload the `set_uart_speed.bin` payload to reconfigure the UART.
+    *   After successful reconfiguration, you must also update your `socat` command to match the new baud rate:
+    ```sh
+    # Example for 115200 baud
+    socat TCP-LISTEN:10001,fork,reuseaddr /dev/ttyUSB0,raw,echo=0,b115200
+    ```
+    *   **Note:** UART speed returns to default (38400) after PLC power cycle.
+
+6.  **Dump Comparison:**
     *   This utility helps find identical dump files.
     *   Click "Select Folder & Compare Dumps" and choose the directory containing your `.bin` dump files.
     *   The application will calculate the MD5 hash of each file and display groups of identical files in the results box.
