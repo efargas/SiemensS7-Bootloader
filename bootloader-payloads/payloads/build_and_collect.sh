@@ -12,6 +12,7 @@ set -e
 # - tic_tac_toe: Interactive game payload
 # - hello_world: Simple test payload
 # - stager: Payload loading helper
+# - set_uart_speed: UART speed reconfiguration payload
 #
 # Usage: ./build_and_collect.sh
 
@@ -23,7 +24,7 @@ echo "Building all payloads and collecting outputs..."
 mkdir -p "$OUTPUT_DIR"
 
 # Build payloads with Makefiles
-for D in dump_mem hello_loop tic_tac_toe; do
+for D in dump_mem hello_loop tic_tac_toe set_uart_speed; do
     echo "Building $D..."
     (cd "$D" && make)
     

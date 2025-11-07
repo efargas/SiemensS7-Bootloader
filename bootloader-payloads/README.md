@@ -12,6 +12,7 @@ bootloader-payloads/
 │   ├── hello_world/            # Simple hello world payload
 │   ├── stager/                 # Stager payload
 │   ├── tic_tac_toe/           # Tic-tac-toe game payload
+│   ├── set_uart_speed/        # UART speed reconfiguration payload
 │   ├── lib/                   # Shared library code
 │   ├── makeinc/               # Build configuration
 │   ├── build_and_collect.sh   # Build and collect script
@@ -45,6 +46,7 @@ cd docker-scripts
 - **hello_world**: Basic "hello world" payload for verification
 - **stager**: Staging payload for multi-stage exploitation
 - **tic_tac_toe**: Interactive tic-tac-toe game payload
+- **set_uart_speed**: UART speed reconfiguration payload for faster memory dumps (NEW)
 
 ## Build Requirements
 
