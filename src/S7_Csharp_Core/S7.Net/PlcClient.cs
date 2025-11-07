@@ -175,17 +175,18 @@ namespace S7.Net
         /// Sets the UART speed on the PLC to improve memory dump transfer rates.
         /// After changing the UART speed, the host serial connection must be reconfigured to match.
         /// </summary>
-        /// <param name="baudRate">The target baud rate (38400, 57600, 115200, 230400, or 460800).</param>
+        /// <param name="baudRate">The target baud rate (e.g., 38400, 57600, 115200, 230400, or 460800).</param>
         /// <param name="uartSpeedPayload">The UART speed reconfiguration payload binary.</param>
+        /// <param name="uartClockHz">UART clock frequency in Hz (default: 14745600 for S7-1200). Override for different hardware variants.</param>
         /// <param name="onSuccessCallback">Optional callback invoked after successful PLC reconfiguration. Can be used to automatically restart socat with the new baud rate.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>True if UART speed was successfully changed, false otherwise.</returns>
         /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
         /// <exception cref="ArgumentNullException">Thrown when uartSpeedPayload is null.</exception>
         /// <exception cref="ArgumentException">Thrown when baud rate is invalid.</exception>
-        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, Action<uint>? onSuccessCallback = null, CancellationToken cancellationToken = default)
+        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, uint uartClockHz = UartBaudRateCalculator.DefaultUartClockHz, Action<uint>? onSuccessCallback = null, CancellationToken cancellationToken = default)
         {
-            return await _memoryManager.SetUartSpeedAsync(baudRate, uartSpeedPayload, _stagerManager, onSuccessCallback, cancellationToken).ConfigureAwait(false);
+            return await _memoryManager.SetUartSpeedAsync(baudRate, uartSpeedPayload, _stagerManager, uartClockHz, onSuccessCallback, cancellationToken).ConfigureAwait(false);
         }
 
         #region IDisposable Implementation

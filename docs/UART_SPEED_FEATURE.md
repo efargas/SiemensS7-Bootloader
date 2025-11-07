@@ -67,27 +67,29 @@ This feature enables dynamic reconfiguration of the Siemens S7 PLC's UART baud r
 **Location:** `bootloader-payloads/payloads/set_uart_speed/`
 
 **Key Features:**
-- Pre-calculated baud rate divisors (no runtime division)
-- Supports: 38400, 57600, 115200, 230400, 460800 baud
+- Receives pre-calculated IBRD and FBRD divisors from host (no hardcoded clock frequency)
+- Supports any baud rate supported by PL011 UART hardware
 - Configures PL011 UART registers:
-  - UARTIBRD: Integer baud rate divisor
-  - UARTFBRD: Fractional baud rate divisor
+  - UARTIBRD: Integer baud rate divisor (0-65535)
+  - UARTFBRD: Fractional baud rate divisor (0-63)
   - UARTLCR_H: Line control (8N1, FIFO enabled)
   - UARTCR: Control register (UART enable, TX/RX enable)
 - Returns "UART_SPEED_OK" on success
 - Returns "UART_SPEED_ERR" on failure
-- Binary size: 940 bytes
+- Binary size: 788 bytes (optimized)
 
-**Baud Rate Divisor Calculations:**
+**Baud Rate Divisor Calculations (Host-Side):**
 
-Based on UART clock frequency of 14.745600 MHz:
+The C# host calculates divisors based on the UART clock frequency:
 
 ```
 BaudRateDivisor = UARTCLK / (16 × BaudRate)
 IBRD = integer(BaudRateDivisor)
-FBRD = fractional(BaudRateDivisor) × 64
+FBRD = integer((BaudRateDivisor - IBRD) × 64 + 0.5)
 
-Examples:
+Default UART_CLK = 14.7456 MHz (configurable for different hardware)
+
+Examples (with default clock):
 - 38400 baud: IBRD=24, FBRD=0
 - 115200 baud: IBRD=8, FBRD=0
 - 230400 baud: IBRD=4, FBRD=0
@@ -101,13 +103,25 @@ Examples:
 public async Task<byte[]> GetUartSpeedPayloadAsync(string payloadsBase)
 ```
 
+**UartBaudRateCalculator (Helper Class):**
+```csharp
+// Calculate IBRD and FBRD divisors for any baud rate
+public static (uint ibrd, uint fbrd) CalculateDivisors(
+    uint baudRate, 
+    uint uartClockHz = 14745600)
+
+// Get pre-calculated divisors for common baud rates
+public static (uint ibrd, uint fbrd) GetCommonBaudRateDivisors(uint baudRate)
+```
+
 **PlcMemoryManager Methods:**
 ```csharp
-// Execute UART speed reconfiguration with optional callback
+// Execute UART speed reconfiguration with optional callback and configurable UART clock
 public async Task<bool> SetUartSpeedAsync(
     uint baudRate, 
     byte[] uartSpeedPayload, 
     PlcStagerManager stagerManager,
+    uint uartClockHz = 14745600,
     Action<uint>? onSuccessCallback = null,
     CancellationToken cancellationToken = default)
 ```
@@ -118,6 +132,7 @@ public async Task<bool> SetUartSpeedAsync(
 public async Task<bool> SetUartSpeedAsync(
     uint baudRate, 
     byte[] uartSpeedPayload,
+    uint uartClockHz = 14745600,
     Action<uint>? onSuccessCallback = null,
     CancellationToken cancellationToken = default)
 ```
@@ -140,13 +155,19 @@ public int CurrentBaudRate { get; }
 var payloadManager = new PayloadManager(baseDirectory);
 var uartSpeedPayload = await payloadManager.GetUartSpeedPayloadAsync(payloadsBase);
 
-// 2. Set UART speed with automatic socat restart
+// 2. Set UART speed with automatic socat restart (using default UART clock 14.7456 MHz)
 bool success = await plcClient.SetUartSpeedAsync(115200, uartSpeedPayload, 
+    uartClockHz: UartBaudRateCalculator.DefaultUartClockHz,
     onSuccessCallback: (newBaudRate) => 
     {
         // Automatically restart socat with new baud rate
         socatService.RestartWithNewBaudRate((int)newBaudRate);
     });
+
+// Alternative: Override UART clock for different hardware variants
+// bool success = await plcClient.SetUartSpeedAsync(115200, uartSpeedPayload, 
+//     uartClockHz: 16000000, // 16 MHz for different hardware
+//     onSuccessCallback: (newBaudRate) => socatService.RestartWithNewBaudRate((int)newBaudRate));
 
 if (success)
 {

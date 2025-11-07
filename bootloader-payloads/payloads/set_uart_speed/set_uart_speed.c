@@ -44,63 +44,10 @@
 // Watchdog register
 #define WATCHDOG_EXCITE     do {*((volatile uint32_t *)0xFFFBB120) = 0x967EA5C3;} while (0)
 
-// UART clock frequency (assumed based on common ARM implementations)
-// This value may need adjustment based on actual PLC hardware
-#define UART_CLK_HZ         14745600  // Common UART clock frequency
-
-// Baud rate definitions
-#define BAUD_38400          38400
-#define BAUD_115200         115200
-#define BAUD_230400         230400
-#define BAUD_460800         460800
-
 volatile uint32_t* uart_base = (volatile uint32_t*)UART_BASE_ADDR;
 
 char greeting[] = "UART_SPEED_OK\0";
 char error_msg[] = "UART_SPEED_ERR\0";
-
-/**
- * @brief Calculate baud rate divisors for PL011 UART
- * @param baud_rate Target baud rate
- * @param ibrd Pointer to store integer divisor
- * @param fbrd Pointer to store fractional divisor
- * 
- * Pre-calculated divisor values for common baud rates to avoid division.
- * Based on UART_CLK = 14.745600 MHz
- */
-void calculate_baud_divisors(uint32_t baud_rate, uint32_t *ibrd, uint32_t *fbrd) {
-    // Use pre-calculated values for common baud rates
-    // BaudRateDivisor = 14745600 / (16 × BaudRate)
-    // IBRD = integer part, FBRD = fractional part × 64
-    
-    switch(baud_rate) {
-        case 38400:
-            *ibrd = 24;
-            *fbrd = 0;
-            break;
-        case 57600:
-            *ibrd = 16;
-            *fbrd = 0;
-            break;
-        case 115200:
-            *ibrd = 8;
-            *fbrd = 0;
-            break;
-        case 230400:
-            *ibrd = 4;
-            *fbrd = 0;
-            break;
-        case 460800:
-            *ibrd = 2;
-            *fbrd = 0;
-            break;
-        default:
-            // For unknown rates, use safe default (38400)
-            *ibrd = 24;
-            *fbrd = 0;
-            break;
-    }
-}
 
 /**
  * @brief Wait for UART to finish transmitting
@@ -115,28 +62,25 @@ void uart_wait_tx_complete(void) {
 }
 
 /**
- * @brief Reconfigure UART baud rate
- * @param baud_rate Target baud rate
+ * @brief Reconfigure UART speed with provided divisors
+ * @param ibrd Integer baud rate divisor (0-65535)
+ * @param fbrd Fractional baud rate divisor (0-63)
  * @return 0 on success, -1 on error
+ * 
+ * The divisors are calculated by the host based on:
+ * BaudRateDivisor = UARTCLK / (16 × BaudRate)
+ * IBRD = integer(BaudRateDivisor)
+ * FBRD = integer((BaudRateDivisor - IBRD) × 64 + 0.5)
  */
-int reconfigure_uart_speed(uint32_t baud_rate) {
-    uint32_t ibrd, fbrd;
+int reconfigure_uart_speed(uint32_t ibrd, uint32_t fbrd) {
     uint32_t cr_saved;
     
-    // Validate baud rate
-    if (baud_rate == 0 || baud_rate > BAUD_460800) {
-        return -1;
-    }
-    
-    // Calculate divisors
-    calculate_baud_divisors(baud_rate, &ibrd, &fbrd);
-    
-    // Validate divisors
+    // Validate divisors (basic sanity check)
     if (ibrd == 0 || ibrd > 0xFFFF) {
         return -1;
     }
     if (fbrd > 0x3F) {
-        fbrd = 0x3F;  // Cap at maximum value
+        return -1;  // FBRD must be 0-63
     }
     
     // Wait for current transmission to complete
@@ -189,16 +133,18 @@ int _start(unsigned char *read_buf, unsigned char *write_buf) {
 
 /**
  * @brief Main UART speed configuration function
- * @param read_buf Buffer containing baud rate (4 bytes at offset 4)
+ * @param read_buf Buffer containing IBRD (4 bytes at offset 4) and FBRD (4 bytes at offset 8)
  * @param write_buf Buffer for response (unused)
  * @return 0 on success
  */
 int doit(uint8_t *read_buf, unsigned char *write_buf) {
-    // Extract baud rate from read_buf (at offset 4)
-    uint32_t baud_rate = *((uint32_t *)(read_buf + 4));
+    // Extract IBRD and FBRD from read_buf
+    // Host sends: "A" + IBRD (4 bytes) + FBRD (4 bytes)
+    uint32_t ibrd = *((uint32_t *)(read_buf + 4));
+    uint32_t fbrd = *((uint32_t *)(read_buf + 8));
     
-    // Reconfigure UART speed
-    int result = reconfigure_uart_speed(baud_rate);
+    // Reconfigure UART speed with provided divisors
+    int result = reconfigure_uart_speed(ibrd, fbrd);
     
     if (result == 0) {
         // Success - send confirmation

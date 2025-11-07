@@ -8,6 +8,70 @@ using S7.Utils;
 namespace S7.Net
 {
     /// <summary>
+    /// Helper class for calculating PL011 UART baud rate divisors.
+    /// </summary>
+    public static class UartBaudRateCalculator
+    {
+        /// <summary>
+        /// Default UART clock frequency for Siemens S7-1200 PLC (14.7456 MHz).
+        /// This value can be overridden if needed for different hardware variants.
+        /// </summary>
+        public const uint DefaultUartClockHz = 14745600;
+
+        /// <summary>
+        /// Calculates the integer and fractional baud rate divisors for PL011 UART.
+        /// </summary>
+        /// <param name="baudRate">Target baud rate (e.g., 115200)</param>
+        /// <param name="uartClockHz">UART clock frequency in Hz (default: 14745600)</param>
+        /// <returns>Tuple containing (IBRD, FBRD) divisors</returns>
+        /// <exception cref="ArgumentException">Thrown when baud rate is invalid</exception>
+        public static (uint ibrd, uint fbrd) CalculateDivisors(uint baudRate, uint uartClockHz = DefaultUartClockHz)
+        {
+            if (baudRate == 0)
+                throw new ArgumentException("Baud rate must be greater than zero", nameof(baudRate));
+            
+            if (uartClockHz == 0)
+                throw new ArgumentException("UART clock frequency must be greater than zero", nameof(uartClockHz));
+
+            // BaudRateDivisor = UARTCLK / (16 × BaudRate)
+            double baudRateDivisor = (double)uartClockHz / (16.0 * baudRate);
+            
+            // IBRD = integer part of divisor
+            uint ibrd = (uint)baudRateDivisor;
+            
+            // FBRD = integer((fractional part) × 64 + 0.5)
+            double fractionalPart = baudRateDivisor - ibrd;
+            uint fbrd = (uint)(fractionalPart * 64.0 + 0.5);
+            
+            // Validate divisors
+            if (ibrd == 0 || ibrd > 65535)
+                throw new ArgumentException($"Calculated IBRD ({ibrd}) is out of valid range (1-65535) for baud rate {baudRate}", nameof(baudRate));
+            
+            if (fbrd > 63)
+                fbrd = 63; // Cap at maximum value
+            
+            return (ibrd, fbrd);
+        }
+
+        /// <summary>
+        /// Gets pre-calculated divisors for common baud rates.
+        /// These are optimized for the default UART clock of 14.7456 MHz.
+        /// </summary>
+        public static (uint ibrd, uint fbrd) GetCommonBaudRateDivisors(uint baudRate)
+        {
+            return baudRate switch
+            {
+                38400 => (24, 0),
+                57600 => (16, 0),
+                115200 => (8, 0),
+                230400 => (4, 0),
+                460800 => (2, 0),
+                _ => CalculateDivisors(baudRate) // Fallback to calculation
+            };
+        }
+    }
+
+    /// <summary>
     /// Manages memory operations for Siemens S7 PLC communication.
     /// Responsible for IRAM writes, subprotocol operations, and memory dumps.
     /// </summary>
@@ -253,24 +317,28 @@ namespace S7.Net
         /// <param name="baudRate">The target baud rate (38400, 57600, 115200, 230400, or 460800).</param>
         /// <param name="uartSpeedPayload">The UART speed reconfiguration payload.</param>
         /// <param name="stagerManager">The stager manager for payload installation.</param>
+        /// <param name="uartClockHz">UART clock frequency in Hz (default: 14745600 for S7-1200). Override for different hardware.</param>
         /// <param name="onSuccessCallback">Optional callback invoked after successful PLC reconfiguration, before host reconfiguration is needed. Receives the new baud rate as parameter.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>True if UART speed was successfully changed, false otherwise.</returns>
         /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
         /// <exception cref="ArgumentNullException">Thrown when uartSpeedPayload is null.</exception>
         /// <exception cref="ArgumentException">Thrown when baud rate is invalid.</exception>
-        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, PlcStagerManager stagerManager, Action<uint>? onSuccessCallback = null, CancellationToken cancellationToken = default)
+        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, PlcStagerManager stagerManager, uint uartClockHz = UartBaudRateCalculator.DefaultUartClockHz, Action<uint>? onSuccessCallback = null, CancellationToken cancellationToken = default)
         {
             if (uartSpeedPayload is null) throw new ArgumentNullException(nameof(uartSpeedPayload));
             if (stagerManager is null) throw new ArgumentNullException(nameof(stagerManager));
             if (uartSpeedPayload.Length == 0) throw new ArgumentException("UART speed payload cannot be empty.", nameof(uartSpeedPayload));
             
-            // Validate baud rate
-            var validBaudRates = new uint[] { 38400, 57600, 115200, 230400, 460800 };
-            if (!validBaudRates.Contains(baudRate))
-                throw new ArgumentException($"Invalid baud rate. Supported rates: {string.Join(", ", validBaudRates)}", nameof(baudRate));
+            if (baudRate == 0)
+                throw new ArgumentException("Baud rate must be greater than zero.", nameof(baudRate));
 
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Calculate baud rate divisors based on UART clock frequency
+            _log($"Calculating UART divisors for {baudRate} baud (UART clock: {uartClockHz} Hz)...");
+            var (ibrd, fbrd) = UartBaudRateCalculator.CalculateDivisors(baudRate, uartClockHz);
+            _log($"Calculated divisors: IBRD={ibrd}, FBRD={fbrd}");
 
             _log($"Installing UART speed reconfiguration payload (target: {baudRate} baud)...");
             await stagerManager.InstallAddHookViaStagerAsync(_nextPayloadLocation, uartSpeedPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, cancellationToken).ConfigureAwait(false);
@@ -279,12 +347,14 @@ namespace S7.Net
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            _log($"Requesting UART speed change to {baudRate} baud...");
-            // Prepare arguments: "A" + baud_rate
-            var args = new byte[1 + 4];
+            _log($"Requesting UART speed change to {baudRate} baud (IBRD={ibrd}, FBRD={fbrd})...");
+            // Prepare arguments: "A" + IBRD (4 bytes) + FBRD (4 bytes)
+            var args = new byte[1 + 4 + 4];
             args[0] = (byte)'A';
-            var baudRateBytes = GetBigEndianBytes(baudRate);
-            Array.Copy(baudRateBytes, 0, args, 1, 4);
+            var ibrdBytes = GetBigEndianBytes(ibrd);
+            var fbrdBytes = GetBigEndianBytes(fbrd);
+            Array.Copy(ibrdBytes, 0, args, 1, 4);
+            Array.Copy(fbrdBytes, 0, args, 5, 4);
 
             var response = await _protocolHandler.InvokeAddHookAsync(PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, args, true, cancellationToken).ConfigureAwait(false);
 

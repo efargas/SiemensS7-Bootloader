@@ -6,11 +6,12 @@ This payload reconfigures the PL011 UART baud rate on the Siemens S7 PLC to impr
 
 ## Features
 
-- Dynamically reconfigures UART baud rate
-- Supports standard baud rates: 38400, 115200, 230400, 460800
-- Calculates proper baud rate divisors automatically
+- Dynamically reconfigures UART baud rate using host-calculated divisors
+- Supports any baud rate supported by the PL011 UART hardware
+- Flexible UART clock frequency configuration from host
 - Preserves UART configuration (8N1, FIFO enabled)
 - Provides confirmation/error feedback
+- Smaller binary size (788 bytes) through simplified logic
 
 ## Technical Details
 
@@ -18,12 +19,15 @@ This payload reconfigures the PL011 UART baud rate on the Siemens S7 PLC to impr
 
 The payload configures the ARM PL011 UART by:
 
-1. Calculating integer and fractional baud rate divisors
-2. Disabling the UART safely
-3. Setting the new divisor values
-4. Re-enabling the UART with the new baud rate
+1. Receiving pre-calculated integer (IBRD) and fractional (FBRD) baud rate divisors from the host
+2. Validating the divisor values
+3. Disabling the UART safely
+4. Setting the new divisor values
+5. Re-enabling the UART with the new baud rate
 
-### Baud Rate Calculation
+### Baud Rate Calculation (Host-Side)
+
+The host calculates the divisors based on the UART clock frequency:
 
 ```
 BaudRateDivisor = UARTCLK / (16 × BaudRate)
@@ -31,12 +35,19 @@ UARTIBRD = integer(BaudRateDivisor)
 UARTFBRD = integer((BaudRateDivisor - UARTIBRD) × 64 + 0.5)
 ```
 
+**Default UART Clock:** 14.7456 MHz (configurable for different hardware variants)
+
+**Example Calculations:**
+- 115200 baud: IBRD=8, FBRD=0
+- 230400 baud: IBRD=4, FBRD=0
+
 ### Memory Layout
 
-The payload expects the target baud rate as a 32-bit value at offset 4 in the read buffer:
+The payload expects IBRD and FBRD as 32-bit values in the read buffer:
 
 ```
-read_buf[4:7] = target_baud_rate (uint32_t, little-endian)
+read_buf[4:7] = IBRD (uint32_t, big-endian)
+read_buf[8:11] = FBRD (uint32_t, big-endian)
 ```
 
 ## Usage
