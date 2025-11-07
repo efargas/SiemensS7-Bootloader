@@ -281,19 +281,40 @@ namespace S7_Csharp_Utility.Services
                 {
                     Stop();
                     // Give the system a moment to release the serial port
-                    System.Threading.Thread.Sleep(500);
+                    System.Threading.Thread.Sleep(100); // A small initial delay
                 }
 
-                // Start with new baud rate but same other settings
-                StartWithBaudRate(_currentSerialPort, _currentTcpPort, _currentVerbose, 
-                                _currentHexDump, _currentBlockSize, newBaudRate);
+                const int maxRetries = 5;
+                const int retryDelayMs = 200;
+                for (int i = 0; i < maxRetries; i++)
+                {
+                    try
+                    {
+                        // Start with new baud rate but same other settings
+                        StartWithBaudRate(_currentSerialPort, _currentTcpPort, _currentVerbose,
+                                        _currentHexDump, _currentBlockSize, newBaudRate);
 
-                _logger.Log($"[SOCAT] ✅ Successfully restarted socat at {newBaudRate} baud");
-                return true;
+                        _logger.Log($"[SOCAT] ✅ Successfully restarted socat at {newBaudRate} baud");
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Log($"[SOCAT] Restart attempt {i + 1} failed: {ex.Message}. Retrying in {retryDelayMs}ms...");
+                        if (i < maxRetries - 1)
+                        {
+                            System.Threading.Thread.Sleep(retryDelayMs);
+                        }
+                        else
+                        {
+                            throw; // Re-throw the last exception if all retries fail
+                        }
+                    }
+                }
+                return false; // Should be unreachable
             }
             catch (Exception ex)
             {
-                _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate: {ex.Message}");
+                _logger.Log($"[SOCAT] ❌ Failed to restart socat with new baud rate after multiple attempts: {ex.Message}");
                 return false;
             }
         }
