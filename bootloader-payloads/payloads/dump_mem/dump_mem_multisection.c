@@ -71,9 +71,9 @@ int _start(unsigned char *read_buf, unsigned char *write_buf) {
  * Waits for a single byte ACK (0x00) from the client.
  * If NAK (0xFF) or timeout occurs, returns error.
  */
-int wait_for_client_ack(void) {
-    char ack_buf[4];
-    int result;
+    int wait_for_client_ack(void) {
+        char ack_buf[1];
+        int result;
     
     /* Read one byte acknowledgment */
     result = UART_protocol_recv_chunk(ack_buf, sizeof(ack_buf));
