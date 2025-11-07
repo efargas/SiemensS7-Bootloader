@@ -171,6 +171,22 @@ namespace S7.Net
             return await _memoryManager.DumpMemoryAsync(address, length, dumpMemPayload, _stagerManager, progress, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Sets the UART speed on the PLC to improve memory dump transfer rates.
+        /// After changing the UART speed, the host serial connection must be reconfigured to match.
+        /// </summary>
+        /// <param name="baudRate">The target baud rate (38400, 57600, 115200, 230400, or 460800).</param>
+        /// <param name="uartSpeedPayload">The UART speed reconfiguration payload binary.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>True if UART speed was successfully changed, false otherwise.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when uartSpeedPayload is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when baud rate is invalid.</exception>
+        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, CancellationToken cancellationToken = default)
+        {
+            return await _memoryManager.SetUartSpeedAsync(baudRate, uartSpeedPayload, _stagerManager, cancellationToken).ConfigureAwait(false);
+        }
+
         #region IDisposable Implementation
         private bool _disposed = false;
 

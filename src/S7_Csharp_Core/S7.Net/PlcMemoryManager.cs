@@ -246,5 +246,72 @@ namespace S7.Net
             _log($"Memory dump complete. Received {data.Length} bytes.");
             return data;
         }
+
+        /// <summary>
+        /// Sets the UART speed on the PLC by uploading and executing the UART speed reconfiguration payload.
+        /// </summary>
+        /// <param name="baudRate">The target baud rate (38400, 57600, 115200, 230400, or 460800).</param>
+        /// <param name="uartSpeedPayload">The UART speed reconfiguration payload.</param>
+        /// <param name="stagerManager">The stager manager for payload installation.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>True if UART speed was successfully changed, false otherwise.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when not connected to PLC.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when uartSpeedPayload is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when baud rate is invalid.</exception>
+        public async Task<bool> SetUartSpeedAsync(uint baudRate, byte[] uartSpeedPayload, PlcStagerManager stagerManager, CancellationToken cancellationToken = default)
+        {
+            if (uartSpeedPayload is null) throw new ArgumentNullException(nameof(uartSpeedPayload));
+            if (stagerManager is null) throw new ArgumentNullException(nameof(stagerManager));
+            if (uartSpeedPayload.Length == 0) throw new ArgumentException("UART speed payload cannot be empty.", nameof(uartSpeedPayload));
+            
+            // Validate baud rate
+            var validBaudRates = new uint[] { 38400, 57600, 115200, 230400, 460800 };
+            if (!validBaudRates.Contains(baudRate))
+                throw new ArgumentException($"Invalid baud rate. Supported rates: {string.Join(", ", validBaudRates)}", nameof(baudRate));
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _log($"Installing UART speed reconfiguration payload (target: {baudRate} baud)...");
+            await stagerManager.InstallAddHookViaStagerAsync(_nextPayloadLocation, uartSpeedPayload, PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, cancellationToken).ConfigureAwait(false);
+            AdvancePayloadLocation((uint)uartSpeedPayload.Length);
+            _log("UART speed payload installed.");
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _log($"Requesting UART speed change to {baudRate} baud...");
+            // Prepare arguments: "A" + baud_rate
+            var args = new byte[1 + 4];
+            args[0] = (byte)'A';
+            var baudRateBytes = GetBigEndianBytes(baudRate);
+            Array.Copy(baudRateBytes, 0, args, 1, 4);
+
+            var response = await _protocolHandler.InvokeAddHookAsync(PlcConstants.DEFAULT_SECOND_ADD_HOOK_IND, args, true, cancellationToken).ConfigureAwait(false);
+
+            if (response == null)
+            {
+                _log("[WARNING] No response from UART speed payload.");
+                return false;
+            }
+
+            var responseStr = System.Text.Encoding.ASCII.GetString(response).TrimEnd('\0');
+            _log($"UART speed payload response: {responseStr}");
+
+            if (responseStr.StartsWith("UART_SPEED_OK"))
+            {
+                _log($"✅ UART speed successfully changed to {baudRate} baud.");
+                _log($"⚠️  WARNING: You must now reconfigure your socat/serial connection to {baudRate} baud!");
+                return true;
+            }
+            else if (responseStr.StartsWith("UART_SPEED_ERR"))
+            {
+                _log($"❌ UART speed change failed. PLC reported error.");
+                return false;
+            }
+            else
+            {
+                _log($"⚠️  Unexpected response from UART speed payload: {responseStr}");
+                return false;
+            }
+        }
     }
 }
