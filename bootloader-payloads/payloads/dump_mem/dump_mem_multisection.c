@@ -21,10 +21,10 @@
 #include "memory.h"
 
 /* Protocol messages */
-char greeting[] = "Ok\0";
-char section_start_msg[] = "SECTION_START\0";
-char section_done_msg[] = "SECTION_DONE\0";
-char all_done_msg[] = "ALL_DONE\0";
+char greeting[] = "Ok";
+char section_start_msg[] = "SECTION_START";
+char section_done_msg[] = "SECTION_DONE";
+char all_done_msg[] = "ALL_DONE";
 
 /**
  * @brief Structure representing a single memory section to dump
