@@ -29,8 +29,16 @@ _start:
     /* --- Switch UART to 115200 baud --- */
     bl uart_set_baudrate_turbo
 
-    /* --- Load payload at 115200 baud --- */
-    // First, receive destination address (4 bytes, big-endian)
+    /* --- Verify communication at 115200 baud --- */
+    // Wait for 0xCC from client to verify speed
+    bl uart_recv_char
+    cmp r0, #0xCC
+    bne _start // If verification fails, restart from beginning
+    
+    // Send 0xDD to confirm we're at the same speed
+    mov r0, #0xDD
+    bl uart_send_char
+
     /* --- Load payload at 115200 baud --- */
     // First, receive destination address (4 bytes, big-endian)
     bl uart_recv_u32_be

