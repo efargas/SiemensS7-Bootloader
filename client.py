@@ -408,7 +408,6 @@ def main():
         p.add_argument('-o', '--out-file', dest='outfile', default=None)
 
     # Specific stager for turbo mode, but available for all commands
-    parser.add_argument('--turbo-stager', type=argparse.FileType('rb'), default=None, help='Specify the turbo stager to enable high-speed mode for any command.')
 
     # Arguments for test
     parser_test.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
