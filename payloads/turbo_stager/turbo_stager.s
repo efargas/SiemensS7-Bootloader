@@ -31,31 +31,6 @@ _start:
 
     /* --- Load payload at 115200 baud --- */
     // First, receive destination address (4 bytes, big-endian)
-    bl uart_recv_u32_be
-    mov r2, r0 // r2 = destination pointer
-
-    // Second, receive payload size (4 bytes, big-endian)
-    bl uart_recv_u32_be
-    mov r1, r0 // r1 = size
-
-    // Set up counter
-    mov r3, #0         // r3 = counter
-
-load_loop:
-    cmp r3, r1 // if counter == size, we are done
-    beq execute_payload
-
-    // Receive one byte and store it
-    bl uart_recv_char
-    strb r0, [r2, r3]
-
-    // Increment counter and loop
-    add r3, r3, #1
-    b load_loop
-
-_start:
-    /* ... (handshake and baud rate switch) ... */
-
     /* --- Load payload at 115200 baud --- */
     // First, receive destination address (4 bytes, big-endian)
     bl uart_recv_u32_be
