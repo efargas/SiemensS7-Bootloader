@@ -29,6 +29,20 @@ _start:
     /* --- Switch UART to 115200 baud --- */
     bl uart_set_baudrate_turbo
 
+    /* --- Verify communication at 115200 baud --- */
+    /* Wait for 0xCC from client to verify speed with timeout */
+    _verify_speed:
+    mov r4, #0x100000   /* Timeout counter (~3 seconds at this speed) */
+    bl uart_recv_char_with_timeout
+    cmp r0, #-1         /* Check if timeout occurred */
+    beq end_loop        /* If timeout, halt execution */
+    cmp r0, #0xCC
+    bne _verify_speed   /* If not 0xCC, retry receiving */
+
+    /* Send 0xDD to confirm we're at the same speed */
+    mov r0, #0xDD
+    bl uart_send_char
+
     /* --- Load payload at 115200 baud --- */
     // First, receive destination address (4 bytes, big-endian)
     bl uart_recv_u32_be
@@ -110,6 +124,32 @@ rx_wait:
     bne rx_wait
     // Read character from data register
     ldr r0, [r1, #0x00] // UARTDR offset
+    bx lr
+
+/*
+ * uart_recv_char_with_timeout()
+ * Receives a single character from UART with timeout.
+ * r4: timeout counter value
+ * returns: character in r0, or -1 if timeout
+ */
+uart_recv_char_with_timeout:
+    push {r5, r6}
+    ldr r5, =0xFFFB8000 // UART_BASE
+    mov r6, r4          // r6 = timeout counter
+rx_wait_with_timeout:
+    ldr r2, [r5, #0x18] // UARTFR offset
+    tst r2, #(1 << 4)   // Check RXFE bit
+    beq rx_data_ready   // Data is ready
+    subs r6, r6, #1     // Decrement timeout counter
+    bne rx_wait_with_timeout
+    // Timeout occurred
+    mvn r0, #0          // r0 = -1 (timeout indicator)
+    pop {r5, r6}
+    bx lr
+rx_data_ready:
+    // Read character from data register
+    ldr r0, [r5, #0x00] // UARTDR offset
+    pop {r5, r6}
     bx lr
 
 /*
