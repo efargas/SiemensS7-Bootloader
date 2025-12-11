@@ -234,7 +234,6 @@ class SiemensS7Client:
         return True
 
     def verify_turbo_speed(self):
-        log.info("Verifying communication at 115200 baud...")
         log.info("Sending speed verification (0xCC)...")
         self.r.send('\xcc')
         log.info("Waiting for confirmation (0xDD)...")
