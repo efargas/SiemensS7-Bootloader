@@ -343,7 +343,9 @@ class SiemensS7Client:
                 log.info("Got answer: {}".format(answ))
             elif args.action == ACTION_HELLO_LOOP:
                 self.invoke_add_hook(second_addhook_ind, await_response=False)
-                while True: log.info("Got packet: {}".format(self.recv_packet()))
+                while True:
+                    packet = self.recv_packet()
+                    log.info("Got packet: {}".format(packet))
             elif args.action == ACTION_TIC_TAC_TOE:
                 log.info("[*] Demonstrating Code Execution")
                 self.invoke_add_hook(second_addhook_ind, await_response=False)
