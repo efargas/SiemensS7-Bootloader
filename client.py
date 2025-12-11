@@ -75,6 +75,10 @@ def recv_packet(r):
     rem = ord(answ)
     while rem > 0:
         add = r.recv(rem)
+        if not add:
+            log.error("Connection closed while receiving packet.")
+            return None
+        rem -= len(add)
         rem -= len(add)
         answ += add
     if calc_checksum_byte(answ[:-1]) != answ[-1]:
