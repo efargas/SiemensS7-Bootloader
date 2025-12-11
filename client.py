@@ -264,8 +264,14 @@ class SiemensS7Client:
         payload = args.payload.read() if hasattr(args, 'payload') and args.payload else None
 
         if args.action == ACTION_DUMP_TURBO:
-            if not self.switch_to_turbo_mode(): return
-            if not self.load_payload_turbo(payload, self.next_payload_location): return
+            if not self.switch_to_turbo_mode():
+                log.error("Failed to switch to turbo mode.")
+                self.bye()
+                return
+            if not self.load_payload_turbo(payload, self.next_payload_location):
+                log.error("Failed to load payload in turbo mode.")
+                self.bye()
+                return
             log.info("Dumping memory...")
             contents = self.payload_dump_mem(args.address, args.length, DEFAULT_SECOND_ADD_HOOK_IND)
         else:
