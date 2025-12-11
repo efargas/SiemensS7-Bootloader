@@ -68,8 +68,6 @@ execute_payload:
     str r1, [r0]
 
     // Write function pointer (address is in r2)
-    // Set LSB to indicate Thumb mode
-    orr r2, r2, #1
     str r2, [r0, #4]
 
     // Send 'D' for Done to signal completion to the client
