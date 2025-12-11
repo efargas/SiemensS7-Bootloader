@@ -62,7 +62,7 @@ _start:
     /* --- Load payload at 115200 baud --- */
     // First, receive destination address (4 bytes, big-endian)
     bl uart_recv_u32_be
-    mov r2, r0 // r2 = destination address where payload will be loaded
+    mov r2, r0 // r2 = destination address (will be preserved in r5 before hook installation)
     
     // Validate destination address is in valid memory range
     ldr r4, =MIN_VALID_ADDR
