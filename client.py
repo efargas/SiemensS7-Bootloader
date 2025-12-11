@@ -9,7 +9,7 @@ import os
 import argparse
 from binascii import hexlify
 
-from pwn import remote, context, log, xor, serialtube
+from pwn import remote, context, log, serialtube
 
 context.update(log_level="info", bits=32, endian="big")
 
