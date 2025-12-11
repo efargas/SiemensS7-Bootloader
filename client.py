@@ -125,9 +125,7 @@ class SiemensS7Client:
         self.recv_packet()
 
     def get_version(self):
-        self.invoke_primary_handler(0, await_response=False) # The original code was bugged, it did not await response
-        return self.recv_packet()
-
+        return self.invoke_primary_handler(0)
     def bye(self):
         self.invoke_primary_handler(0xa2)
         answ = self.recv_packet()
