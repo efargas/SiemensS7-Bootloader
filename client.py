@@ -267,7 +267,8 @@ class SiemensS7Client:
             # Step 1: Install turbo_stager using the normal stager
             # Use hook 0x19 for turbo_stager itself (not 0x1a, which turbo_stager will use for the final payload)
             TURBO_STAGER_HOOK_IND = 0x19
-            turbo_stager_code = open(TURBO_STAGER_PL_FILENAME, 'rb').read()
+            with open(TURBO_STAGER_PL_FILENAME, 'rb') as f:
+                turbo_stager_code = f.read()
             turbo_stager_addhook_ind = self.install_addhook_via_stager(
                 self.next_payload_location, 
                 turbo_stager_code, 
