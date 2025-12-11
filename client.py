@@ -254,7 +254,7 @@ class SiemensS7Client:
         log.info("Sending payload...")
         self.r.send(payload)
         log.info("Waiting for 'Done' signal from stager...")
-        done_signal = self.r.recv(1)
+        done_signal = self.r.recv(1, timeout=10)
         if done_signal != 'D':
             log.error("Did not receive 'Done' signal. Got {}.".format(hexlify(done_signal)))
             return False
