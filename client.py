@@ -317,9 +317,9 @@ class SiemensS7Client:
 def main():
     parser = argparse.ArgumentParser(description='Trigger code execution on Siemens PLC')
     # Connection args
-    parser.add_argument('--serial-port', dest='serial_port', type=str, help="Direct serial port, e.g., /dev/ttyUSB0")
-    parser.add_argument('-P', '--port', dest='port', type=int, help="Local TCP port for socat forwarding")
-
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--serial-port', dest='serial_port', type=str, help="Direct serial port, e.g., /dev/ttyUSB0")
+    group.add_argument('-P', '--port', dest='port', type=int, help="Local TCP port for socat forwarding")
     # Power supply args
     parser.add_argument('--switch-power', dest='switch_power', default=False, action='store_true')
     parser.add_argument('--powersupply-host', dest='powersupply_host', default='powersupply')
