@@ -242,6 +242,7 @@ class SiemensS7Client:
             log.error("Timeout waiting for speed confirmation (0xDD). Baud rate switch may have failed.")
             return False
         if confirmation != '\xdd':
+            log.error("Did not receive speed confirmation (0xDD). Got {} instead.".format(hexlify(confirmation)))
             return False
         log.success("Speed verification successful. Communication at 115200 baud confirmed.")
         return True
