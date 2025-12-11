@@ -54,9 +54,6 @@ load_loop:
     b load_loop
 
 execute_payload:
-    // Preserve destination address on the stack
-    push {r2}
-
     // Instead of jumping, install the loaded payload as an additional hook
     // Hook table address: 0x1003ABA0
     // Hook index: 0x1a (26), matches DEFAULT_SECOND_ADD_HOOK_IND in client.py
@@ -70,8 +67,6 @@ execute_payload:
     ldr r1, =0x000000ff
     str r1, [r0]
 
-    // Restore destination address from stack
-    pop {r2}
     // Write function pointer (address is in r2)
     str r2, [r0, #4]
 
