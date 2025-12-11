@@ -316,6 +316,10 @@ class SiemensS7Client:
             
             # Step 5: Send the dump_mem payload via turbo mode
             # The turbo_stager will receive it, install it at hook 0x1a, and send 'D'
+            if payload is None:
+                log.error("No payload loaded to send via turbo mode.")
+                self.bye()
+                return
             if not self.load_payload_turbo(payload, payload_install_addr):
                 self.bye()
                 return
