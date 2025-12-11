@@ -53,6 +53,33 @@ load_loop:
     add r3, r3, #1
     b load_loop
 
+_start:
+    /* ... (handshake and baud rate switch) ... */
+
+    /* --- Load payload at 115200 baud --- */
+    // First, receive destination address (4 bytes, big-endian)
+    bl uart_recv_u32_be
+    mov r4, r0 // r4 = destination pointer (use callee-saved register)
+
+    // Second, receive payload size (4 bytes, big-endian)
+    bl uart_recv_u32_be
+    mov r1, r0 // r1 = size
+
+    // Set up counter
+    mov r3, #0         // r3 = counter
+
+load_loop:
+    cmp r3, r1 // if counter == size, we are done
+    beq execute_payload
+
+    // Receive one byte and store it
+    bl uart_recv_char
+    strb r0, [r4, r3]
+
+    // Increment counter and loop
+    add r3, r3, #1
+    b load_loop
+
 execute_payload:
     // Instead of jumping, install the loaded payload as an additional hook
     // Hook table address: 0x1003ABA0
@@ -67,8 +94,8 @@ execute_payload:
     ldr r1, =0x000000ff
     str r1, [r0]
 
-    // Write function pointer (address is in r2)
-    str r2, [r0, #4]
+    // Write function pointer (address is in r4)
+    str r4, [r0, #4]
 
     // Send 'D' for Done to signal completion to the client
     mov r0, #'D'
