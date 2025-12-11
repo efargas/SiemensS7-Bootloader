@@ -393,12 +393,12 @@ def main():
     # Arguments for invoke
     parser_invoke_hook.add_argument('-p', '--payload', type=argparse.FileType('rb'), required=True)
     parser_invoke_hook.add_argument('-a', '--args', default="", nargs='+')
-    parser_invoke_hook.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
+    parser_invoke_hook.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
 
     # Arguments for dump
     for p in [parser_dump, parser_dump_turbo]:
         stager_default = TURBO_STAGER_PL_FILENAME if p == parser_dump_turbo else STAGER_PL_FILENAME
-        p.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=stager_default)
+        p.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=stager_default)
         p.add_argument('-p', '--payload', type=argparse.FileType('rb'), default=DUMPMEM_PL_FILENAME)
         p.add_argument('-a', '--address', type=lambda x: int(x, 0), required=True)
         p.add_argument('-l', '--length', type=lambda x: int(x, 0), required=True)
@@ -408,16 +408,16 @@ def main():
     parser.add_argument('--turbo-stager', type=argparse.FileType('rb'), default=None, help='Specify the turbo stager to enable high-speed mode for any command.')
 
     # Arguments for test
-    parser_test.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
-    parser_test.add_argument('-p', '--payload', type=argparse.FileType('r'), default="payloads/hello_world/hello_world.bin")
+    parser_test.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
+    parser_test.add_argument('-p', '--payload', type=argparse.FileType('rb'), default="payloads/hello_world/hello_world.bin")
     
     # Arguments for hello_loop
-    parser_hello_loop.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
-    parser_hello_loop.add_argument('-p', '--payload', type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin")
+    parser_hello_loop.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
+    parser_hello_loop.add_argument('-p', '--payload', type=argparse.FileType('rb'), default="payloads/hello_loop/build/hello_loop.bin")
 
     # Arguments for tictactoe
-    parser_tictactoe.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
-    parser_tictactoe.add_argument('-p', '--payload', type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin")
+    parser_tictactoe.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
+    parser_tictactoe.add_argument('-p', '--payload', type=argparse.FileType('rb'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin")
 
     args = parser.parse_args()
 
