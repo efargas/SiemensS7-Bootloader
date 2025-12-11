@@ -503,7 +503,7 @@ def main():
                 r.unrecv(answ)
                 client.handle_connection(args)
                 break
-        # Add small delay between attempts to give device time to boot
+        # Add a periodic small delay every 10 attempts to avoid overwhelming the device
         if i % 10 == 9:
             time.sleep(0.1)
     else:
