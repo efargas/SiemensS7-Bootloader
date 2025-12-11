@@ -7,7 +7,7 @@ set -e
 CROSS_COMPILE=arm-none-eabi-
 
 # Assemble and create an ELF file. The -EB flag ensures Big Endian output.
-${CROSS_COMPILE}as -o turbo_stager.elf turbo_stager.s
+${CROSS_COMPILE}as -EB -o turbo_stager.elf turbo_stager.s
 
 # Extract the raw binary from the .text section.
 ${CROSS_COMPILE}objcopy -O binary -j .text turbo_stager.elf turbo_stager.bin
