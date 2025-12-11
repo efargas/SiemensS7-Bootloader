@@ -228,8 +228,11 @@ class SiemensS7Client:
             return False
         log.info("Got initiator. Sending confirmation (0x5F) and switching baud rate.")
         self.r.send('\x5f')
-        self.r.baudrate = 115200
-        log.success("Switched to 115200 baud.")
+        if isinstance(self.r, serialtube):
+            self.r.baudrate = 115200
+            log.success("Switched to 115200 baud.")
+        else:
+            log.warning("Not a serial connection; skipping baud rate switch.")
         return True
 
     def verify_turbo_speed(self):
