@@ -237,9 +237,13 @@ class SiemensS7Client:
         1. Wait for 0xAA from device (handshake initiator)
         2. Send 0x5F to device (confirmation)
         3. Switch local baud rate to 115200
+        4. Verify speed change by exchanging 0xCC/0xDD with the device (see verify_turbo_speed())
         
         Returns:
             bool: True if handshake successful, False otherwise
+        
+        Note:
+            After calling this method, you should call verify_turbo_speed() to complete the turbo mode protocol.
         """
         log.info("Waiting for turbo handshake initiator (0xAA)...")
         initiator = self.r.recv(1, timeout=3)
