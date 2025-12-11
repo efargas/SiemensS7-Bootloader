@@ -31,10 +31,11 @@ _start:
 
     /* --- Verify communication at 115200 baud --- */
     // Wait for 0xCC from client to verify speed
+    _verify_speed:
     bl uart_recv_char
     cmp r0, #0xCC
-    bne _start // If verification fails, restart from beginning
-    
+    bne _verify_speed // If verification fails, retry receiving
+
     // Send 0xDD to confirm we're at the same speed
     mov r0, #0xDD
     bl uart_send_char
