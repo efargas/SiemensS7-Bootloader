@@ -32,7 +32,7 @@ _start:
     /* --- Verify communication at 115200 baud --- */
     /* Wait for 0xCC from client to verify speed with timeout */
     _verify_speed:
-    mov r4, #0x100000   /* Timeout counter (~3 seconds at this speed) */
+    mov r4, #0x100000   /* Timeout counter (~3 seconds at this speed)
     bl uart_recv_char_with_timeout
     cmp r0, #-1         /* Check if timeout occurred */
     beq end_loop        /* If timeout, halt execution */
