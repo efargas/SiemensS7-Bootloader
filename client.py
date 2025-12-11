@@ -398,7 +398,7 @@ def main():
 
     # Arguments for dump
     for p in [parser_dump, parser_dump_turbo]:
-        stager_default = TURBO_STAGER_PL_FILENAME if p == parser_dump_turbo else STAGER_PL_FILENAME
+        stager_default = STAGER_PL_FILENAME
         p.add_argument('-s', '--stager', dest="stager", type=argparse.FileType('rb'), default=stager_default)
         p.add_argument('-p', '--payload', type=argparse.FileType('rb'), default=DUMPMEM_PL_FILENAME)
         p.add_argument('-a', '--address', type=lambda x: int(x, 0), required=True)
