@@ -237,7 +237,6 @@ class SiemensS7Client:
         log.info("Sending speed verification (0xCC)...")
         self.r.send('\xcc')
         log.info("Waiting for confirmation (0xDD)...")
-        confirmation = self.r.recv(1)
         confirmation = self.r.recv(1, timeout=3)
         if confirmation == '':
             log.error("Timeout waiting for speed confirmation (0xDD). Baud rate switch may have failed.")
