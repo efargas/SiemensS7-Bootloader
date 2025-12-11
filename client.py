@@ -249,7 +249,8 @@ class SiemensS7Client:
         return True
 
     def handle_connection(self, args):
-        log.success("[+] Got special access greeting: {} [{}]".format(self.r.recv(5).encode('hex'), self.r.recv(5).encode('hex')))
+        greeting = self.r.recv(5)
+        log.success("[+] Got special access greeting: {} [{}]".format(greeting.encode('hex'), greeting.encode('hex')))
 
         version = self.get_version()
         bootloaderversion = version[2:3] + ".".join([str(ord(c)) for c in version[3:-2]])
