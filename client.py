@@ -224,9 +224,9 @@ class SiemensS7Client:
 
     def switch_to_turbo_mode(self):
         log.info("Waiting for turbo handshake initiator (0xAA)...")
-        initator = self.r.recv(1)
-        if initator != '\xaa':
-            log.error("Did not receive turbo handshake initiator. Got {} instead.".format(hexlify(initator)))
+        initiator = self.r.recv(1)
+        if initiator != '\xaa':
+            log.error("Did not receive turbo handshake initiator. Got {} instead.".format(hexlify(initiator)))
             return False
         log.info("Got initiator. Sending confirmation (0x5F) and switching baud rate.")
         self.r.send('\x5f')
