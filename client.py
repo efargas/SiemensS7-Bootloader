@@ -59,7 +59,25 @@ class SiemensS7Client:
         self.next_payload_location = FIRST_PAYLOAD_LOCATION
 
     def calc_checksum_byte(self, incoming):
-        return struct.pack(" 0:
+        return struct.pack("<i", -sum(map(ord, incoming[:ord(incoming[0])])))[0]
+
+    def send_packet(self, msg, step=2, sleep_amt=0.01):
+        assert (len(msg) <= MAX_MSG_LEN)
+        time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
+        msg = chr(len(msg) + 1) + msg
+        msg = msg + self.calc_checksum_byte(msg)
+        log.info("sending packet: {}".format(msg.encode("hex")))
+        for i in range(0, len(msg), step):
+            time.sleep(sleep_amt)
+            self.r.send(msg[i:i + step])
+
+    def recv_packet(self):
+        answ = self.r.recv(1)
+        if not answ:
+            log.error("Did not receive any data. Is the PLC connected?")
+            return None
+        rem = ord(answ)
+        while rem > 0:
             add = self.r.recv(rem)
             rem -= len(add)
             answ += add
