@@ -107,7 +107,7 @@ class SiemensS7Client:
         log.error("Could not encode chunk: {}".format(chunk.encode("hex")))
         assert False
 
-    def send_full_msg_via_stager(self, msg, chunk_size=8, sleep_amt=0.01):
+    def send_full_msg_via_stager(self, msg, chunk_size=2, sleep_amt=0.01):
         for i in range(0, len(msg), MAX_MSG_LEN - 1):
             time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
             chunk = msg[i:i + MAX_MSG_LEN - 1]
