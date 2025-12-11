@@ -218,7 +218,7 @@ uart_recv_u32_be:
  * Baud Rate Divisor = UARTCLK / (16 * Baud Rate)
  * For 115200: Divisor = 24000000 / (16 * 115200) = 13.02...
  * IBRD = integer part = 13
- * FBRD = fractional part * 64 = 0.02 * 64 ≈ 1
+ * FBRD = fractional part * 64 = 0.020833... * 64 ≈ 1.33 (rounded to 1)
  * 
  * Actual baud rate: 24000000 / (16 * (13 + 1/64)) ≈ 115384 baud
  * Error: ~0.16% (within acceptable tolerance)
