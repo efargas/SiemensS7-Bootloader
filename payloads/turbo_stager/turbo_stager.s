@@ -108,8 +108,8 @@ execute_payload:
     
     // Calculate hook table entry address
     ldr r0, =HOOK_TABLE_ADDR
-    ldr r1, =HOOK_INDEX
-    ldr r2, =HOOK_ENTRY_SIZE
+    mov r1, #HOOK_INDEX
+    mov r2, #HOOK_ENTRY_SIZE
     mul r3, r1, r2      // r3 = offset into hook table
     add r0, r0, r3      // r0 = address of hook entry
 
