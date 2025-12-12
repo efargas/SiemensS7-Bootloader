@@ -75,7 +75,7 @@ class SiemensS7Client:
         answ = self.r.recv(1)
         if not answ:
             log.error("Did not receive any data. Is the PLC connected?")
-            return None
+            raise EOFError("Did not receive any data. Is the PLC connected?")
         rem = ord(answ)
         while rem > 0:
             add = self.r.recv(rem)
