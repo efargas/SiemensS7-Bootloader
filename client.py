@@ -64,26 +64,17 @@ class SiemensS7Client:
     def send_packet(self, msg, step=2, sleep_amt=0.01):
         assert (len(msg) <= MAX_MSG_LEN)
         time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
-        msg = chr(len(msg) + 1) + msg
-        msg = msg + self.calc_checksum_byte(msg)
-        log.info("sending packet: {}".format(msg.encode("hex")))
-        for i in range(0, len(msg), step):
-            time.sleep(sleep_amt)
-            self.r.send(msg[i:i + step])
-
-    def recv_packet(self):
-        answ = self.r.recv(1)
         if not answ:
-            log.error("Did not receive any data. Is the PLC connected?")
-            raise EOFError("Did not receive any data. Is the PLC connected?")
+            raise IOError("No data received from PLC")
         rem = ord(answ)
         while rem > 0:
             add = self.r.recv(rem)
+            if not add:
+                raise IOError("Truncated packet from PLC")
             rem -= len(add)
             answ += add
         if self.calc_checksum_byte(answ[:-1]) != answ[-1]:
-            log.warning("Checksum validity failed. Got: {} [{}".format(repr(answ), answ.encode("hex")))
-            return None
+            raise ValueError("Checksum validity failed for packet: {}".format(answ.encode("hex")))
         return answ[1:-1]
 
     def recv_many(self, verbose=False):
