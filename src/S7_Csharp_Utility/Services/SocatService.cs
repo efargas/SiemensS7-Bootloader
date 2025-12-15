@@ -101,6 +101,9 @@ namespace S7_Csharp_Utility.Services
         /// </summary>
         /// <param name="serialPort">The serial port to connect to.</param>
         /// <param name="tcpPort">The TCP port to listen on.</param>
+        /// <param name="verbose">Whether to enable verbose logging.</param>
+        /// <param name="hexDump">Whether to enable hex dump logging.</param>
+        /// <param name="blockSize">The block size to use for data transfer.</param>    
         public void Start(string serialPort, int tcpPort, bool verbose, bool hexDump, int blockSize)
         {
             if (IsRunning)
